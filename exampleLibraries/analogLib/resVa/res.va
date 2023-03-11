@@ -1,0 +1,28 @@
+/*RESISTOR MODEL 
+The Designer's Guide (www.designers-guide.org).
+//*/
+`include "disciplines.vams" 
+`include "constants.vams"  //crucial file need for electrcial call
+
+module
+
+res1(p, n); // positive and negative connections on res
+
+in p;
+in n;
+
+electrical p, n;
+
+parameter real r=1
+(* type="instance" xyceAlsoModel="yes" *); //defining variable parameter for future operation; r cannot be 0
+/* what if more comments
+ */
+branch (p,n) resistor; //used with 3rd form of res 
+analog begin //just like verilog begin signals start of functions
+//hello
+//mello
+	I(p,n) <+ V(p,n)/r; 	    //defining current through res (conductance form, large r) (r>1)
+
+end
+endmodule
+

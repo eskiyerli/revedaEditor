@@ -3,14 +3,13 @@ Interactive console widget.  Use to add an interactive python interpreter
 in a GUI application.
 """
 
-import sys
 import code
 import re
-from typing import Dict, Callable
-from PySide6.QtWidgets import (QLineEdit, QWidget, QGridLayout, QPlainTextEdit,
-                               QApplication)
+from typing import Callable
+
 from PySide6.QtCore import (Qt, Signal, QEvent, QSize, )
 from PySide6.QtGui import (QTextCharFormat, QBrush, QColor, QFont)
+from PySide6.QtWidgets import (QLineEdit, QWidget, QGridLayout, QPlainTextEdit)
 
 
 class LineEdit(QLineEdit):

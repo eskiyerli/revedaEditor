@@ -22,7 +22,7 @@
 from PySide6.QtCore import (Qt, )
 from PySide6.QtGui import (QStandardItemModel)
 
-import backend.schBackEnd as scb
+import revedaEditor.backend.schBackEnd as scb
 
 
 def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryItem:

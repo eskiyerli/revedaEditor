@@ -19,15 +19,15 @@
 #   License: Mozilla Public License 2.0
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
+import math
+
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
-from PySide6.QtCore import (QPoint, QPointF, QRect, QRectF, Qt, QLine, QLineF)
-from PySide6.QtGui import (QPen, QFont, QFontMetrics, QColor, QPainterPath,
-                           QTextOption, QFontDatabase, QTransform)
+from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QLine, QLineF)
+from PySide6.QtGui import (QPen, QFont, QFontMetrics, QPainterPath,
+                           QTextOption, QFontDatabase)
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent, )
-import math
 from quantiphy import Quantity
-import pdk.callbacks as cb
 
 
 class shape(QGraphicsItem):

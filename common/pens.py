@@ -22,8 +22,11 @@
 
 from PySide6.QtCore import (Qt)
 from PySide6.QtGui import (QPen, QColor)
-from common.layers import (wireLayer,symbolLayer,selectedWireLayer,pinLayer,labelLayer,
-                           textLayer, draftLayer)
+
+from revedaEditor.common.layers import (wireLayer, symbolLayer,
+                                        selectedWireLayer, pinLayer,
+                                        labelLayer,
+                                        textLayer, draftLayer)
 
 
 class pen(QPen):
