@@ -1515,7 +1515,7 @@ class schematic_scene(editor_scene):
         self.schematicNets = {}  # netName: list of nets with the same name
         self.crossDots = set()  # list of cross dots
         self.draftItem = None
-        self.viewRect = QRect(0, 0, 0, 0)
+        self.viewRect = None
         self.viewportCrossDots = (
             set())  # an empty set of crossing points in the viewport
         self.sceneCrossDots = set()  # an empty set of all crossing points in the scene
@@ -1529,30 +1529,79 @@ class schematic_scene(editor_scene):
         self.pinType = "Signal"
         self.pinDir = "Input"
         self.parentView = None
+        self.wires = None
+        self.snapDistance = 40
+        self.snapRect = None
+        self.selectionRectItem = None
+
 
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(mouse_event)
+        modifiers = QGuiApplication.keyboardModifiers()
+        self.viewRect = self.parent.view.mapToScene(
+            self.parent.view.viewport().rect()).boundingRect()
+        
         if mouse_event.button() == Qt.LeftButton:
-            self.mousePressLoc = mouse_event.scenePos().toPoint()
-            self.start = self.snapToGrid(self.mousePressLoc, self.gridTuple)
-            if self.changeOrigin:  # change origin of the symbol
-                self.origin = self.start
+            self.mousePressLoc = self.snapToGrid(mouse_event.scenePos(
+            ).toPoint(), self.gridTuple)
+            if self.drawWire:
+                self.schematicWindow.messageLine.setText("Wire Mode")
+                self.snapRect = QRect(self.mousePressLoc.x(
+                )-self.snapDistance,self.mousePressLoc.y()-self.snapDistance,
+                                       2 * self.snapDistance, 2*self.snapDistance)
+                snapItems = [item for item in self.items(
+                    self.snapRect) if isinstance(item, shp.pin) or
+                           isinstance(item,net.schematicNet)]
+                lengths = list()
+                points = list()
+                items = list()
+                if snapItems:
+                    for item in snapItems:
+                        if isinstance(item, shp.pin):
+                            items.append(item)
+                            points.append(item.start)
+                            lengths.append((item.mapToScene(item.start)  -
+                                            self.mousePressLoc).manhattanLength())
+                        elif isinstance(item, net.schematicNet):
+                            if self.snapRect.contains(item.start):
+                                items.append(item)
+                                points.append(item.start)
+                                lengths.append((item.mapToScene(item.start) -
+                                                self.mousePressLoc).manhattanLength())
+                            elif self.snapRect.contains(item.end):
+                                items.append(item)
+                                points.append(item.end)
+                                lengths.append((item.mapToScene(item.end) -
+                                                self.mousePressLoc).manhattanLength())
+                    indexClosestPoint = lengths.index(min(lengths))
+
+                    self.mousePressLoc = items[indexClosestPoint].mapToScene(points[
+                                                                    indexClosestPoint])
+                self.wires = self.addWires(self.mousePressLoc, self.wirePen)
+
+            elif self.changeOrigin:  # change origin of the symbol
+                self.origin = self.mousePressLoc
             elif self.itemSelect:
-                self.parent.parent.messageLine.setText("Select an item")
+                self.schematicWindow.messageLine.setText("Select an item")
                 #     # find the view rectangle every time mouse is pressed.
-                self.viewRect = self.parent.view.mapToScene(
-                    self.parent.view.viewport().rect()).boundingRect()
-                itemsAtMousePress = self.items(mouse_event.scenePos())
+                if modifiers == Qt.ShiftModifier:
+                    self.schematicWindow.messageLine.setText("Select an Area")
+                    self.selectionRectItem = QGraphicsRectItem(QRect(
+                        self.mousePressLoc,self.mousePressLoc))
+                    self.selectionRectItem.setPen(self.draftPen)
+                    self.addItem(self.selectionRectItem)
+                itemsAtMousePress = self.items(self.mousePressLoc)
                 if itemsAtMousePress:
                     # normally only one item is selected
                     self.selectedItems = [item for item in itemsAtMousePress if
                                           item.isSelected()]
-                    self.parent.parent.messageLine.setText("Item selected")
+                    self.schematicWindow.messageLine.setText("Item selected")
                 else:
                     self.selectedItems = None
-                    self.parent.parent.messageLine.setText("Nothing selected")
+                    self.schematicWindow.messageLine.setText("Nothing selected")
             elif self.drawPin:
-                self.draftPin = shp.schematicPin(self.start, self.draftPen, self.pinName,
+                self.draftPin = shp.schematicPin(self.start, self.draftPen,
+                                                 self.pinName,
                                                  self.pinDir, self.pinType,
                                                  self.gridTuple, )
                 self.addItem(self.draftPin)
@@ -1568,25 +1617,21 @@ class schematic_scene(editor_scene):
                     self.rotateSelectedItems(self.start)
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseMoveEvent(mouse_event)
-        self.mouseMoveLoc = mouse_event.scenePos().toPoint()
-        self.current = self.snapToGrid(self.mouseMoveLoc, self.gridTuple)
+
+        self.mouseMoveLoc = self.snapToGrid(mouse_event.scenePos().toPoint(),
+                                            self.gridTuple)
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
-            if hasattr(self, "draftItem"):
-                self.removeItem(self.draftItem)
-                del self.draftItem
-            if self.drawWire and hasattr(self, "start"):
-                self.parent.parent.messageLine.setText("Wire Mode")
-                self.draftItem = net.schematicNet(self.start, self.current, self.draftPen)
-                self.addItem(self.draftItem)
+
+            if self.drawWire:
+                # self.currentWire.end = self.mouseMoveLoc
+                self.extendWires(self.wires, self.mousePressLoc,
+                                         self.mouseMoveLoc)
             elif self.itemSelect:
                 if modifiers == Qt.ShiftModifier:
-                    self.draftItem = QGraphicsRectItem(
-                        QRect.span(self.start, self.current))
-                    self.draftItem.setPen(self.draftPen)
-                    self.addItem(self.draftItem)
-                    self.parent.parent.messageLine.setText("Select an Area")
+                    self.selectionRectItem.setRect(QRect(
+                        self.mousePressLoc, self.mouseMoveLoc))
+
             elif self.drawPin:
                 self.draftPin.setPos(
                     self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
@@ -1595,23 +1640,27 @@ class schematic_scene(editor_scene):
                 self.draftText.setPos(
                     self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
                                     self.gridTuple))
-        self.parent.parent.statusLine.showMessage(
-            "Cursor Position: " + str(self.current.toTuple()))
+        self.schematicWindow.statusLine.showMessage(
+            "Cursor Position: " + str(self.mouseMoveLoc.toTuple()))
+        super().mouseMoveEvent(mouse_event)
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
-        self.mouseReleaseLoc = mouse_event.scenePos().toPoint()
-        self.current = self.snapToGrid(self.mouseReleaseLoc, self.gridTuple)
-
+        self.mouseReleaseLoc = self.snapToGrid(mouse_event.scenePos().toPoint(),
+                                               self.gridTuple)
+        modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.button() == Qt.LeftButton:
-            if self.addInstance:
-                instance = self.drawInstance(self.current)
+            if self.drawWire:
+                self.pruneWires(self.wires, self.wirePen)
+                pass
+            elif self.addInstance:
+                instance = self.drawInstance(self.mouseReleaseLoc)
                 instance.setSelected(True)
                 self.itemSelect = False
                 self.addInstance = False
             elif self.drawText:
                 self.removeItem(self.draftText)
-                note = self.addNote(self.snapToGrid(self.mouseReleaseLoc, self.gridTuple))
+                note = self.addNote(self.mouseReleaseLoc)
                 self.rotateAnItem(self.current, note, float(self.noteOrient[1:]))
                 self.addItem(note)
                 note.setSelected(True)
@@ -1624,22 +1673,28 @@ class schematic_scene(editor_scene):
                 pin.setSelected(True)
                 self.parent.parent.messageLine.setText("Pin added")
                 self.drawPin = False
-            elif hasattr(self, "draftItem") and hasattr(self, "start"):
-                if self.itemSelect and isinstance(self.draftItem, QGraphicsRectItem):
-                    self.selectedItems = [item for item in
-                                          self.items(self.draftItem.rect(),
-                                                     mode=Qt.IntersectsItemBoundingRect)
-                                          if (item.childItems() or isinstance(item,
-                            net.schematicNet))]
-                    for item in self.selectedItems:
-                        item.setSelected(True)
-                if self.drawWire:
-                    drawnNet = self.netDraw(self.start, self.current, self.wirePen)
-                    self.removeDotsInView(self.viewRect)
-                    self.mergeNets(drawnNet, self.viewRect)
-                    self.splitNets(self.viewRect)
-                    self.findDotPoints(self.viewRect)
-                    self.drawWire = False
+            elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                # self.selectionRect.setBottomRight(self.mouseReleaseLoc)
+                self.selectedItems = [item for item in
+                 self.items(self.selectionRectItem.rect().toRect(),
+                            mode=Qt.IntersectsItemBoundingRect)]
+                [item.setSelected(True) for item in self.selectedItems]
+                if self.selectedItems:
+                    self.schematicWindow.messageLine.setText("Items selected")
+                self.removeItem(self.selectionRectItem)
+                self.itemSelect = False
+                self.selectionRectItem = None
+            # elif hasattr(self, "draftItem") and hasattr(self, "start"):
+            #     if self.itemSelect and isinstance(self.draftItem,
+            #                                       QGraphicsRectItem):
+            #         self.selectedItems = [item for item in
+            #             self.items(self.draftItem.rect(),
+            #             mode=Qt.IntersectsItemBoundingRect)
+            #             if (item.childItems() or isinstance(item,
+            #                                                 net.schematicNet))]
+            #         for item in self.selectedItems:
+            #             item.setSelected(True)
+            if hasattr(self, 'draftItem'):
                 self.removeItem(self.draftItem)
                 del self.draftItem
                 del self.start
@@ -1690,7 +1745,7 @@ class schematic_scene(editor_scene):
                     mergedRect = dBNetRect.united(netItemBRect).toRect()
                     self.removeItem(netItem)  # remove the old net from the scene
                     self.removeItem(drawnNet)  # remove the drawn net from the scene
-                    mergedNet = self.netDraw(
+                    mergedNet = self.addWires(
                         self.snapToGrid(mergedRect.bottomLeft(), self.gridTuple),
                         self.snapToGrid(mergedRect.bottomRight(), self.gridTuple),
                         self.wirePen, )
@@ -1704,7 +1759,7 @@ class schematic_scene(editor_scene):
                     mergedRect = dBNetRect.united(netItemBRect).toRect()
                     self.removeItem(netItem)  # remove the old net from the scene
                     self.removeItem(drawnNet)  # remove the drawn net from the scene
-                    mergedNet = self.netDraw(
+                    mergedNet = self.addWires(
                         self.snapToGrid(mergedRect.bottomRight(), self.gridTuple),
                         self.snapToGrid(mergedRect.topRight(), self.gridTuple),
                         self.wirePen, )  # create a new net with the merged rectangle
@@ -1753,7 +1808,7 @@ class schematic_scene(editor_scene):
                         del hNetItem
                         break
         for addedNet in addedNets:
-            self.netDraw(addedNet[0], addedNet[1], self.wirePen)
+            self.addWires(addedNet[0], addedNet[1], self.wirePen)
 
     def groupAllNets(self) -> None:
         """
@@ -1972,12 +2027,54 @@ class schematic_scene(editor_scene):
         self.selectedItems = []
         self.parent.parent.messageLine.setText("Select Mode")
 
-    def netDraw(self, start: QPoint, current: QPoint, pen: QPen) -> net.schematicNet:
-        line = net.schematicNet(start, current, pen)
-        self.addItem(line)
-        undoCommand = us.addShapeUndo(self, line)
-        self.undoStack.push(undoCommand)
-        return line
+    def addWires(self, start: QPoint, pen: QPen) -> net.schematicNet:
+        """
+        Add a net or nets to the scene.
+        """
+        lines = [net.schematicNet(start,start,pen), net.schematicNet(start,start,pen),
+                 net.schematicNet(start,start,pen)]
+        return lines
+
+    def extendWires(self, lines: list, start: QPoint, end:QPoint):
+        '''
+        This method is to shape the wires drawn using addWires method.
+        __|^^^
+        '''
+        
+        firstPointX = self.snapToBase((end.x()-start.x())/3+start.x(),
+                                      self.gridTuple[0])
+        firstPointY = start.y()
+        firstPoint = QPoint(firstPointX, firstPointY)
+        secondPoint = QPoint(firstPointX, end.y())
+        lines[0].end= firstPoint
+        lines[1].start = firstPoint
+        lines[1].end = secondPoint
+        lines[2].start = secondPoint
+        lines[2].end = end
+        [self.addItem(line) for line in lines]
+
+    def pruneWires(self, lines, pen):
+        zeroLength = False
+        for line in lines:
+            if line.length == 0:
+                zeroLength = True
+        print(zeroLength)
+        if zeroLength:
+            newLine= net.schematicNet(lines[0].start,lines[2].end,pen)
+            self.addItem(newLine)
+            undoCommand = us.addShapeUndo(self, newLine)
+            self.undoStack.push(undoCommand)
+            for line in lines:
+                self.removeItem(line)
+                del line
+        else:
+            for line in lines:
+                # self.addItem(line)
+                undoCommand = us.addShapeUndo(self, line)
+                self.undoStack.push(undoCommand)
+
+
+
 
     def addPin(self, pos: QPoint):
         pin = shp.schematicPin(pos, self.pinPen, self.pinName, self.pinDir, self.pinType,

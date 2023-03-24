@@ -21,9 +21,10 @@
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
 # net class definition.
-from PySide6.QtCore import (QPoint, Qt)
+from PySide6.QtCore import (QPoint, Qt, QLineF)
 from PySide6.QtGui import (QPen, QStaticText, )
-from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem, QGraphicsEllipseItem)
+from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem,
+                               QGraphicsEllipseItem,)
 
 
 class schematicNet(QGraphicsLineItem):
@@ -42,25 +43,27 @@ class schematicNet(QGraphicsLineItem):
         self._nameSet = False  # if a name has been set
         self._nameConflict = False  # if a name conflict has been detected
 
-        x1, y1 = self._start.x(), self._start.y()
-        x2, y2 = self._end.x(), self._end.y()
-
-        if abs(x1 - x2) >= abs(y1 - y2):  # horizontal
-            self._horizontal = True
-            self._start = QPoint(min(x1, x2), y1)
-            self._end = QPoint(max(x1, x2), y1)
-            super().__init__(self._start.x(), y1, self._end.x(), y1)
-        else:
-            self._horizontal = False
-            self._start = QPoint(x1, min(y1, y2))
-            self._end = QPoint(x1, max(y1, y2))
-            super().__init__(x1, self._start.y(), x1, self._end.y())
-
+        self.lineInit()
+        self.setLine(QLineF(self._start, self._end))
         self.setPen(self._pen)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
+
+    def lineInit(self):
+        x1, y1 = self._start.x(), self._start.y()
+        x2, y2 = self._end.x(), self._end.y()
+        if abs(x1 - x2) >= abs(y1 - y2):  # horizontal
+            self._horizontal = True
+            self._start = QPoint(x1, y1)
+            self._end = QPoint(x2, y1)
+            super().__init__(self._start.x(), y1, self._end.x(), y1)
+        else:
+            self._horizontal = False
+            self._start = QPoint(x1, y1)
+            self._end = QPoint(x1, y2)
+            super().__init__(x1, self._start.y(), x1, self._end.y())
 
     def paint(self, painter, option, widget) -> None:
         if self.isSelected():
@@ -86,13 +89,28 @@ class schematicNet(QGraphicsLineItem):
         except AttributeError:
             return False
 
+    def lineDirection(self, x1, x2, y1, y2):
+        if abs(x1 - x2) >= abs(y1 - y2):  # horizontal
+            self._horizontal = True
+            self._start = QPoint(x1, y1)
+            self._end = QPoint(x2, y1)
+
+        else:
+            self._horizontal = False
+            self._start = QPoint(x1, y1)
+            self._end = QPoint(x1, y2)
+
     @property
     def start(self):
         return self._start
 
     @start.setter
     def start(self, start: QPoint):
-        self._start = start
+        x1, y1 = start.x(), start.y()
+        x2, y2 = self._end.x(), self._end.y()
+        self.lineDirection(x1, x2, y1, y2)
+        self.setLine(QLineF(self._start, self._end))
+
 
     @property
     def end(self):
@@ -100,7 +118,11 @@ class schematicNet(QGraphicsLineItem):
 
     @end.setter
     def end(self, end: QPoint):
-        self._end = end
+        x1, y1 = self._start.x(), self._start.y()
+        x2, y2 = end.x(), end.y()
+        self.lineDirection(x1, x2, y1, y2)
+
+        self.setLine(QLineF(self._start, self._end))
 
     @property
     def pen(self):
@@ -123,9 +145,6 @@ class schematicNet(QGraphicsLineItem):
     def horizontal(self):
         return self._horizontal
 
-    @horizontal.setter
-    def horizontal(self, value: bool):
-        self._horizontal = value
 
     @property
     def nameSet(self) -> bool:
@@ -144,6 +163,10 @@ class schematicNet(QGraphicsLineItem):
     def nameConflict(self, value: bool):
         assert isinstance(value,bool)
         self._nameConflict = value
+
+    @property
+    def length(self):
+        return self.line().length()
 
     def itemChange(self, change, value):
 
