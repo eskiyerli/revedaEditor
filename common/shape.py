@@ -28,6 +28,8 @@ from PySide6.QtGui import (QPen, QFont, QFontMetrics, QPainterPath,
                            QTextOption, QFontDatabase)
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent, )
 from quantiphy import Quantity
+import revedaEditor.common.net as net
+import revedaEditor.backend.dataDefinitions as ddef
 
 
 class shape(QGraphicsItem):
@@ -828,6 +830,9 @@ class pin(shape):
         self._connected = False  # True if the pin is connected to a net.
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
 
+    def __str__(self):
+        return "pin: {self._pinName} {self._pinDir} {self._pinType}"
+
     def boundingRect(self):
         return self._rect  #
 
@@ -1390,6 +1395,7 @@ class symbolShape(shape):
         self._pins = dict()  # dict of pins
         self.pinLocations = dict()  # pinName: pinRect
         self.pinNetMap = dict()  # pinName: netName
+        self.pinNetTupleList = list()
         for item in self.shapes:
             item.setFlag(QGraphicsItem.ItemIsSelectable, False)
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
@@ -1426,6 +1432,36 @@ class symbolShape(shape):
         except AttributeError:
             return False
 
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged and value == 1 and self.scene(
+        ): # item is selected
+            self.pinNetTupleList = list()
+            view = self.scene().parent.view
+            viewNets = [item for item in view.items() if
+                        isinstance(item,net.schematicNet)]
+            pins = [item for item in self.pins.values()]
+            for pinItem in pins:
+                for viewNet in viewNets:
+                    if pinItem.sceneBoundingRect().contains(viewNet.start):
+                        self.pinNetTupleList.append(ddef.pinNetTuple(pinItem, viewNet,
+                                                                     'start'))
+                    elif pinItem.sceneBoundingRect().contains(viewNet.end):
+                        self.pinNetTupleList.append(ddef.pinNetTuple(pinItem, viewNet,
+                                                                     'end'))
+
+        elif change == QGraphicsItem.ItemPositionChange:
+            # item's position has changed
+            # do something here
+            for item in self.pinNetTupleList:
+                if item.netEnd == 'end':
+                    item.net.end=item.pin.mapToScene(item.pin.start).toPoint()
+                elif item.netEnd == 'start':
+                    item.net.start=item.pin.mapToScene(item.pin.start).toPoint()
+
+
+
+
+        return super().itemChange(change, value)
     @property
     def libraryName(self):
         return self._libraryName
@@ -1490,10 +1526,10 @@ class symbolShape(shape):
     def pins(self):
         return self._pins
 
-    @pins.setter
-    def pins(self, item: pin):
-        assert isinstance(item, pin)
-        self._pins[item.pinName] = item
+    # @pins.setter
+    # def pins(self, item: pin):
+    #     assert isinstance(item, pin)
+    #     self._pins[item.pinName] = item
 
     def createNetlistLine(self):
         """
@@ -1512,7 +1548,7 @@ class symbolShape(shape):
                         f'[|{pinName}:%]', netName)
             return nlpDeviceFormatLine
         except KeyError:
-            self.scene().parent.parent.logger.error(
+            self.scene().schematicWindow.logger.error(
                 f'Netlist line is not defined for '
                 f'{self.instanceName}')
             # if there is no NLPDeviceFormat line, create a warning line

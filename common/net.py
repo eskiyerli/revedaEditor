@@ -51,6 +51,10 @@ class schematicNet(QGraphicsLineItem):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
 
+    def __repr__(self):
+        return f"schematicNet(start={self.mapToScene(self._start)}, " \
+               f"end={self.mapToScene(self._end)}"
+
     def lineInit(self):
         x1, y1 = self._start.x(), self._start.y()
         x2, y2 = self._end.x(), self._end.y()
@@ -121,7 +125,6 @@ class schematicNet(QGraphicsLineItem):
         x1, y1 = self._start.x(), self._start.y()
         x2, y2 = end.x(), end.y()
         self.lineDirection(x1, x2, y1, y2)
-
         self.setLine(QLineF(self._start, self._end))
 
     @property
