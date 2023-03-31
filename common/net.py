@@ -24,7 +24,8 @@
 from PySide6.QtCore import (QPoint, Qt, QLineF)
 from PySide6.QtGui import (QPen, QStaticText, )
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem,
-                               QGraphicsEllipseItem,)
+                               QGraphicsEllipseItem, QGraphicsSceneMouseEvent)
+import revedaEditor.common.pens as pens
 
 
 class schematicNet(QGraphicsLineItem):
@@ -32,6 +33,7 @@ class schematicNet(QGraphicsLineItem):
     Base schematic net class.
     '''
     uses = ["SIGNAL", "ANALOG", "CLOCK", "GROUND", "POWER", ]
+
 
     def __init__(self, start: QPoint, end: QPoint, pen: QPen):
         assert isinstance(pen, QPen)
@@ -42,9 +44,8 @@ class schematicNet(QGraphicsLineItem):
         self._end = end
         self._nameSet = False  # if a name has been set
         self._nameConflict = False  # if a name conflict has been detected
-
-        self.lineInit()
-        self.setLine(QLineF(self._start, self._end))
+        self._connections = dict()  # dictionary of connections
+        super().__init__(QLineF(self._start, self._end))
         self.setPen(self._pen)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -55,21 +56,9 @@ class schematicNet(QGraphicsLineItem):
         return f"schematicNet(start={self.mapToScene(self._start)}, " \
                f"end={self.mapToScene(self._end)}"
 
-    def lineInit(self):
-        x1, y1 = self._start.x(), self._start.y()
-        x2, y2 = self._end.x(), self._end.y()
-        if abs(x1 - x2) >= abs(y1 - y2):  # horizontal
-            self._horizontal = True
-            self._start = QPoint(x1, y1)
-            self._end = QPoint(x2, y1)
-            super().__init__(self._start.x(), y1, self._end.x(), y1)
-        else:
-            self._horizontal = False
-            self._start = QPoint(x1, y1)
-            self._end = QPoint(x1, y2)
-            super().__init__(x1, self._start.y(), x1, self._end.y())
 
     def paint(self, painter, option, widget) -> None:
+
         if self.isSelected():
             painter.setPen(QPen(Qt.white, 2, Qt.SolidLine))
         else:
@@ -93,26 +82,13 @@ class schematicNet(QGraphicsLineItem):
         except AttributeError:
             return False
 
-    def lineDirection(self, x1, x2, y1, y2):
-        if abs(x1 - x2) >= abs(y1 - y2):  # horizontal
-            self._horizontal = True
-            self._start = QPoint(x1, y1)
-            self._end = QPoint(x2, y1)
-
-        else:
-            self._horizontal = False
-            self._start = QPoint(x1, y1)
-            self._end = QPoint(x1, y2)
-
     @property
     def start(self):
         return self._start
 
     @start.setter
     def start(self, start: QPoint):
-        x1, y1 = start.x(), start.y()
-        x2, y2 = self._end.x(), self._end.y()
-        self.lineDirection(x1, x2, y1, y2)
+        self._start = start
         self.setLine(QLineF(self._start, self._end))
 
 
@@ -122,9 +98,7 @@ class schematicNet(QGraphicsLineItem):
 
     @end.setter
     def end(self, end: QPoint):
-        x1, y1 = self._start.x(), self._start.y()
-        x2, y2 = end.x(), end.y()
-        self.lineDirection(x1, x2, y1, y2)
+        self._end = end
         self.setLine(QLineF(self._start, self._end))
 
     @property
@@ -170,6 +144,63 @@ class schematicNet(QGraphicsLineItem):
     @property
     def length(self):
         return self.line().length()
+
+    @property
+    def horizontal(self):
+        if self._end.y() == self._start.y():
+            self._horizontal = True
+        elif self._end.x() == self._start.x():
+            self._horizontal = False
+        else:
+            self._horizontal = True
+        return self._horizontal
+
+
+    def findConnections(self):
+        sceneNetItems = {item for item in self.scene().items() if isinstance(item,
+                                                                             schematicNet)}
+        startStartSet = set()  # set of nets whose start point is connected to self.start
+        startEndSet = set()  # set of nets whose end point is connected to self.start
+        endStartSet = set()  # set of nets whose start point is connected to self.end
+        endEndSet = set()
+        for netItem in sceneNetItems:
+            if self.start == netItem.start:
+                startStartSet.add(netItem)
+            elif self.end == netItem.start:
+                endStartSet.add(netItem)
+            elif self.start == netItem.end:
+                startEndSet.add(netItem)
+            elif self.end == netItem.end:
+                endEndSet.add(netItem)
+
+        self._connections["startStart"] = startStartSet
+        self._connections["startEnd"] = startEndSet
+        self._connections["endStart"] = endStartSet
+        self._connections["endEnd"] = endEndSet
+
+    @property
+    def connections(self):
+        self.findConnections()
+        return self._connections
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            self.setSelected(True)
+            self.findConnections()
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        for netItem in self._connections["startStart"]:
+            netItem.start = netItem.mapFromItem(self, self.start)
+        for netItem in self._connections["startEnd"]:
+            netItem.end = netItem.mapFromItem(self, self.start)
+        for netItem in self._connections["endStart"]:
+            netItem.start = netItem.mapFromItem(self, self.end)
+        for netItem in self._connections["endEnd"]:
+            netItem.end = netItem.mapFromItem(self, self.end)
+
 
     def itemChange(self, change, value):
 

@@ -969,6 +969,7 @@ class editor_scene(QGraphicsScene):
         self.pinPen = pens.pen.returnPen("pinPen")
         self.labelPen = pens.pen.returnPen("labelPen")
         self.textPen = pens.pen.returnPen("textPen")
+        self.otherPen = pens.pen.returnPen("otherPen")
 
     def defineSceneLayers(self):
         self.wireLayer = cel.wireLayer
@@ -1594,7 +1595,9 @@ class schematic_scene(editor_scene):
                     self.rotateSelectedItems(self.start)
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-
+        self.mouseMoveLoc = self.snapToGrid(
+            mouse_event.scenePos().toPoint(),
+            self.gridTuple)
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
 
@@ -1603,38 +1606,26 @@ class schematic_scene(editor_scene):
                 # sceneBoundingBoxes = (item.sceneBoundingRect() for item in
                 #                       self.parent.view.items()
                 #                       if isinstance(item,shp.symbolShape))
-                self.mouseMoveLoc = self.snapToGrid(
-                    mouse_event.scenePos().toPoint(),
-                    self.gridTuple)
 
                 self.extendWires(self.wires, self.mousePressLoc,
                                                 self.mouseMoveLoc)
 
             elif self.itemSelect:
-                self.mouseMoveLoc = self.snapToGrid(
-                    mouse_event.scenePos().toPoint(),
-                    self.gridTuple)
+
                 if modifiers == Qt.ShiftModifier:
                     self.selectionRectItem.setRect(QRect(
                         self.mousePressLoc, self.mouseMoveLoc))
 
             elif self.drawPin:
-                self.mouseMoveLoc = self.snapToGrid(
-                    mouse_event.scenePos().toPoint(),
-                    self.gridTuple)
                 self.draftPin.setPos(
                     self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
                                     self.gridTuple))
             elif self.drawText:
-                self.mouseMoveLoc = self.snapToGrid(
-                    mouse_event.scenePos().toPoint(),
-                    self.gridTuple)
+
                 self.draftText.setPos(
                     self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
                                     self.gridTuple))
-        self.mouseMoveLoc = self.snapToGrid(
-            mouse_event.scenePos().toPoint(),
-            self.gridTuple)
+
         self.schematicWindow.statusLine.showMessage(
             "Cursor Position: " + str(self.mouseMoveLoc.toTuple()))
         super().mouseMoveEvent(mouse_event)
@@ -1652,7 +1643,6 @@ class schematic_scene(editor_scene):
                                  self.mouseReleaseLoc)
 
                 self.pruneWires(self.wires, self.wirePen)
-                pass
             elif self.addInstance:
                 self.addInstance = False
 
@@ -2090,11 +2080,11 @@ class schematic_scene(editor_scene):
         lines[2].end = end
 
     def pruneWires(self, lines, pen):
-        zeroLength = False
-        for line in lines:
-            if line.length == 0:
-                zeroLength = True
-        if zeroLength:
+        if lines[0].start == lines[2].end: # if the first and last points are the same
+            for line in lines:
+                self.removeItem(line)
+                del line
+        elif lines[0].length==0 or lines[1].length == 0 or lines[2].length ==0:
             newLine = net.schematicNet(lines[0].start, lines[2].end, pen)
             self.addItem(newLine)
             undoCommand = us.addShapeUndo(self, newLine)
@@ -2104,11 +2094,8 @@ class schematic_scene(editor_scene):
                 del line
         else:
             for line in lines:
-                # self.addItem(line)
                 undoCommand = us.addShapeUndo(self, line)
                 self.undoStack.push(undoCommand)
-
-
 
 
     def addPin(self, pos: QPoint):
