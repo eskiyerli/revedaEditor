@@ -174,3 +174,4 @@
 2023-02-22 22:32:18,224 - gui.appWindow - INFO - Removed Library Path.
 2023-02-22 22:32:19,983 - gui.appWindow - INFO - Removed Library Path.
 2023-02-22 22:32:33,758 - gui.appWindow - INFO - Wrote library definition file in /home/eskiyerli/OneDrive_reveda/Projects/revedaRelease/library.json
+2023-03-25 16:49:40,017 - reveda - WARNING - Created schematic at /home/eskiyerli/OneDrive_reveda/Projects/revedaRelease/exampleLibraries/designs/commonGateAmp/schematic.json

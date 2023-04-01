@@ -23,11 +23,22 @@ import math
 
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
-from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QLine, QLineF)
-from PySide6.QtGui import (QPen, QFont, QFontMetrics, QPainterPath,
-                           QTextOption, QFontDatabase)
-from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent, )
+from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QLine, QLineF
+from PySide6.QtGui import (
+    QPen,
+    QFont,
+    QFontMetrics,
+    QPainterPath,
+    QTextOption,
+    QFontDatabase,
+)
+from PySide6.QtWidgets import (
+    QGraphicsItem,
+    QGraphicsSceneMouseEvent,
+)
 from quantiphy import Quantity
+import revedaEditor.common.net as net
+import revedaEditor.backend.dataDefinitions as ddef
 
 
 class shape(QGraphicsItem):
@@ -49,10 +60,8 @@ class shape(QGraphicsItem):
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
             viewRect = self.scene().views()[0].viewport().rect()
-            newPos.setX(
-                round(newPos.x() / self._gridTuple[0]) * self._gridTuple[0])
-            newPos.setY(
-                round(newPos.y() / self._gridTuple[1]) * self._gridTuple[1])
+            newPos.setX(round(newPos.x() / self._gridTuple[0]) * self._gridTuple[0])
+            newPos.setY(round(newPos.y() / self._gridTuple[1]) * self._gridTuple[1])
 
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -115,9 +124,9 @@ class shape(QGraphicsItem):
             self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
     def sceneEvent(self, event):
-        '''
+        """
         Do not propagate event if shape needs to keep still.
-        '''
+        """
 
         if self.scene() and (self.scene().changeOrigin or self.scene().drawMode):
             return False
@@ -147,26 +156,35 @@ class shape(QGraphicsItem):
         self.scene().itemContextMenu.exec_(event.screenPos())
 
     def snapToBase(self, number, base):
-        '''
+        """
         Restrict a number to the multiples of base
-        '''
+        """
         return base * int(round(number / base))
 
     def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
         """
         snap point to grid. Divides and multiplies by grid size.
         """
-        return QPoint(gridTuple[0] * int(round(point.x() / gridTuple[0])),
-                      gridTuple[1] * int(round(point.y() / gridTuple[1])), )
+        return QPoint(
+            gridTuple[0] * int(round(point.x() / gridTuple[0])),
+            gridTuple[1] * int(round(point.y() / gridTuple[1])),
+        )
 
 
 class rectangle(shape):
     """
     rect: QRect defined by top left corner and bottom right corner. QRect(Point1,Point2)
     """
-    sides = ['Left', 'Right', 'Top', 'Bottom']
 
-    def __init__(self, start: QPoint, end: QPoint, pen: QPen, grid: tuple, ):
+    sides = ["Left", "Right", "Top", "Bottom"]
+
+    def __init__(
+        self,
+        start: QPoint,
+        end: QPoint,
+        pen: QPen,
+        grid: tuple,
+    ):
         super().__init__(pen, grid)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
@@ -185,13 +203,11 @@ class rectangle(shape):
                 if self._stretchSide == rectangle.sides[0]:
                     painter.drawLine(self.rect.topLeft(), self.rect.bottomLeft())
                 elif self._stretchSide == rectangle.sides[1]:
-                    painter.drawLine(self.rect.topRight(),
-                                     self.rect.bottomRight())
+                    painter.drawLine(self.rect.topRight(), self.rect.bottomRight())
                 elif self._stretchSide == rectangle.sides[2]:
                     painter.drawLine(self.rect.topLeft(), self.rect.topRight())
                 elif self._stretchSide == rectangle.sides[3]:
-                    painter.drawLine(self.rect.bottomLeft(),
-                                     self.rect.bottomRight())
+                    painter.drawLine(self.rect.bottomLeft(), self.rect.bottomRight())
         else:
             painter.setPen(self.pen)
             painter.drawRect(self.rect)
@@ -225,8 +241,10 @@ class rectangle(shape):
 
     @property
     def centre(self):
-        return QPoint(int(self._rect.x() + self._rect.width() / 2),
-                      int(self._rect.y() + self._rect.height() / 2), )
+        return QPoint(
+            int(self._rect.x() + self._rect.width() / 2),
+            int(self._rect.y() + self._rect.height() / 2),
+        )
 
     @property
     def height(self):
@@ -307,23 +325,21 @@ class rectangle(shape):
         eventPos = self.snapToGrid(event.pos(), self.gridTuple)
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(),
-                                               self.gridTuple[0]):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = rectangle.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(),
-                                                 self.gridTuple[0]):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = rectangle.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(),
-                                                 self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = rectangle.sides[2]
-            elif eventPos.y() == self.snapToBase(self._rect.bottom(),
-                                                 self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(
+                self._rect.bottom(), self.gridTuple[1]
+            ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = rectangle.sides[3]
@@ -364,8 +380,9 @@ class circle(shape):
         super().__init__(pen, gridTuple)
         xlen = abs(end.x() - centre.x())
         ylen = abs(end.y() - centre.y())
-        self._radius = self.snapToBase(int(math.sqrt(xlen ** 2 + ylen ** 2)),
-                                       self.gridTuple[0])
+        self._radius = self.snapToBase(
+            int(math.sqrt(xlen**2 + ylen**2)), self.gridTuple[0]
+        )
         self._centre = centre
         self._topLeft = self._centre - QPoint(self._radius, self._radius)
         self._rightBottom = self._centre + QPoint(self._radius, self._radius)
@@ -448,8 +465,9 @@ class circle(shape):
         return "CIRCLE"
 
     def boundingRect(self):
-        return QRectF(self._topLeft, self._rightBottom).normalized().adjusted(-2,
-            -2, 2, 2)
+        return (
+            QRectF(self._topLeft, self._rightBottom).normalized().adjusted(-2, -2, 2, 2)
+        )
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -457,10 +475,13 @@ class circle(shape):
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             # eventPos = self.snap2grid(event.pos(), self._gridTuple)
             eventPos = event.pos()
-            distance = self.snapToBase(math.sqrt(
-                (eventPos.x() - self._centre.x()) ** 2 + (
-                        eventPos.y() - self._centre.y()) ** 2),
-                self._gridTuple[0])
+            distance = self.snapToBase(
+                math.sqrt(
+                    (eventPos.x() - self._centre.x()) ** 2
+                    + (eventPos.y() - self._centre.y()) ** 2
+                ),
+                self._gridTuple[0],
+            )
             if distance == self._radius:
                 self._startStretch = True
                 self.setCursor(Qt.DragMoveCursor)
@@ -469,10 +490,13 @@ class circle(shape):
         super().mouseMoveEvent(event)
         if self._startStretch:
             eventPos = self.snapToGrid(event.pos(), self._gridTuple)
-            distance = self.snapToBase(math.sqrt(
-                (eventPos.x() - self._centre.x()) ** 2 + (
-                        eventPos.y() - self._centre.y()) ** 2),
-                self._gridTuple[0])
+            distance = self.snapToBase(
+                math.sqrt(
+                    (eventPos.x() - self._centre.x()) ** 2
+                    + (eventPos.y() - self._centre.y()) ** 2
+                ),
+                self._gridTuple[0],
+            )
             self.prepareGeometryChange()
             self._radius = distance
 
@@ -492,8 +516,9 @@ class arc(shape):
     """
     Class to draw arc shapes. Can have four directions.
     """
-    arcTypes = ['Up', 'Right', 'Down', 'Left']
-    sides = ['Left', 'Right', 'Top', 'Bottom']
+
+    arcTypes = ["Up", "Right", "Down", "Left"]
+    sides = ["Left", "Right", "Top", "Bottom"]
 
     def __init__(self, start: QPoint, end: QPoint, pen: QPen, gridTuple: tuple):
         super().__init__(pen, gridTuple)
@@ -524,16 +549,13 @@ class arc(shape):
                 painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
                 self.arcDraw(painter)
                 if self._stretchSide == arc.sides[0]:
-                    painter.drawLine(self._rect.topLeft(),
-                                     self._rect.bottomLeft())
+                    painter.drawLine(self._rect.topLeft(), self._rect.bottomLeft())
                 elif self._stretchSide == arc.sides[1]:
-                    painter.drawLine(self._rect.topRight(),
-                                     self._rect.bottomRight())
+                    painter.drawLine(self._rect.topRight(), self._rect.bottomRight())
                 elif self._stretchSide == arc.sides[2]:
                     painter.drawLine(self._rect.topLeft(), self._rect.topRight())
                 elif self._stretchSide == arc.sides[3]:
-                    painter.drawLine(self._rect.bottomLeft(),
-                                     self._rect.bottomRight())
+                    painter.drawLine(self._rect.bottomLeft(), self._rect.bottomRight())
         else:
             painter.setPen(self._pen)
             self.arcDraw(painter)
@@ -607,24 +629,22 @@ class arc(shape):
         eventPos = self.snapToGrid(event.pos(), self.gridTuple)
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(),
-                                               self.gridTuple[0]):
-                if (self._rect.top() <= eventPos.y() <= self._rect.bottom()):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+                if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = arc.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(),
-                                                 self.gridTuple[0]):
-                if (self._rect.top() <= eventPos.y() <= self._rect.bottom()):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+                if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = arc.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(),
-                                                 self.gridTuple[1]):
-                if (self._rect.left() <= eventPos.x() <= self._rect.right()):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+                if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = arc.sides[2]
-            elif eventPos.y() == self.snapToBase(self._rect.bottom(),
-                                                 self.gridTuple[1]):
-                if (self._rect.left() <= eventPos.x() <= self._rect.right()):
+            elif eventPos.y() == self.snapToBase(
+                self._rect.bottom(), self.gridTuple[1]
+            ):
+                if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = arc.sides[3]
 
@@ -657,22 +677,16 @@ class arc(shape):
             self.setCursor(Qt.ArrowCursor)
 
             if self._arcType == arc.arcTypes[0]:
-                self._start = self.snapToGrid(self._rect.bottomLeft(),
-                                              self.gridTuple)
+                self._start = self.snapToGrid(self._rect.bottomLeft(), self.gridTuple)
                 self._end = self.snapToGrid(self._rect.topRight(), self.gridTuple)
             elif self._arcType == arc.arcTypes[1]:
-                self._start = self.snapToGrid(self._rect.topLeft(),
-                                              self.gridTuple)
-                self._end = self.snapToGrid(self._rect.bottomRight(),
-                                            self.gridTuple)
+                self._start = self.snapToGrid(self._rect.topLeft(), self.gridTuple)
+                self._end = self.snapToGrid(self._rect.bottomRight(), self.gridTuple)
             elif self._arcType == arc.arcTypes[2]:
-                self._start = self.snapToGrid(self._rect.topRight(),
-                                              self.gridTuple)
-                self._end = self.snapToGrid(self._rect.bottomLeft(),
-                                            self.gridTuple)
+                self._start = self.snapToGrid(self._rect.topRight(), self.gridTuple)
+                self._end = self.snapToGrid(self._rect.bottomLeft(), self.gridTuple)
             elif self._arcType == arc.arcTypes[3]:
-                self._start = self.snapToGrid(self._rect.bottomRight(),
-                                              self.gridTuple)
+                self._start = self.snapToGrid(self._rect.bottomRight(), self.gridTuple)
                 self._end = self.snapToGrid(self._rect.topLeft(), self.gridTuple)
             self._rect = QRectF(self._start, self._end).normalized()
 
@@ -681,9 +695,16 @@ class line(shape):
     """
     line class definition for symbol drawing.
     """
-    stretchSides = ['start', 'end']
 
-    def __init__(self, start: QPoint, end: QPoint, pen: QPen, grid: tuple, ):
+    stretchSides = ["start", "end"]
+
+    def __init__(
+        self,
+        start: QPoint,
+        end: QPoint,
+        pen: QPen,
+        grid: tuple,
+    ):
         super().__init__(pen, grid)
         self._end = end
         self._start = start
@@ -708,11 +729,11 @@ class line(shape):
             if self._stretch:
                 painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
                 if self._stretchSide == line.stretchSides[0]:
-                    painter.drawEllipse(self._start, self.gridTuple[0],
-                                        self.gridTuple[1])
+                    painter.drawEllipse(
+                        self._start, self.gridTuple[0], self.gridTuple[1]
+                    )
                 elif self._stretchSide == line.stretchSides[1]:
-                    painter.drawEllipse(self._end, self.gridTuple[0],
-                                        self.gridTuple[1])
+                    painter.drawEllipse(self._end, self.gridTuple[0], self.gridTuple[1])
         else:
             painter.setPen(self._pen)
         painter.drawLine(self._line)
@@ -773,8 +794,10 @@ class line(shape):
 
     @property
     def length(self):
-        return math.sqrt((self.start.x() - self._end.x()) ** 2 + (
-                    self.start.y() - self._end.y()) ** 2)
+        return math.sqrt(
+            (self.start.x() - self._end.x()) ** 2
+            + (self.start.y() - self._end.y()) ** 2
+        )
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -813,12 +836,19 @@ class pin(shape):
     """
     symbol pin class definition for symbol drawing.
     """
+
     pinDirs = ["Input", "Output", "Inout"]
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
 
-    def __init__(self, start: QPoint, pen: QPen, pinName: str = "",
-                 pinDir: str = pinDirs[0], pinType: str = pinTypes[0],
-                 grid: tuple = (10, 10), ):
+    def __init__(
+        self,
+        start: QPoint,
+        pen: QPen,
+        pinName: str = "",
+        pinDir: str = pinDirs[0],
+        pinType: str = pinTypes[0],
+        grid: tuple = (10, 10),
+    ):
         super().__init__(pen, grid)
 
         self._start = start  # centre of pin
@@ -828,6 +858,9 @@ class pin(shape):
         self._connected = False  # True if the pin is connected to a net.
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
 
+    def __repr__(self):
+        return f"pin: {self._pinName} {self.mapToScene(self._start)}"
+
     def boundingRect(self):
         return self._rect  #
 
@@ -836,8 +869,9 @@ class pin(shape):
         painter.setBrush(self._pen.color())
         painter.drawRect(self._rect)
         painter.setFont(QFont("Arial", 12))
-        painter.drawText(QPoint(self._start.x() - 5, self._start.y() - 10),
-                         self._pinName)
+        painter.drawText(
+            QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName
+        )
         if self.isSelected():
             painter.setPen(QPen(Qt.yellow, 2, Qt.DashLine))
             painter.setBrush(Qt.yellow)
@@ -891,21 +925,31 @@ class pin(shape):
             self._connected = value
 
     def toSchematicPin(self, start: QPoint, pen: QPen, gridTuple):
-        return schematicPin(start, pen, self.pinName, self.pinDir, self.pinType,
-                            gridTuple)
+        return schematicPin(
+            start, pen, self.pinName, self.pinDir, self.pinType, gridTuple
+        )
 
 
 class text(shape):
     """
     This class is for text annotations on symbol or schematics.
     """
+
     textAlignments = ["Left", "Center", "Right"]
     textOrients = ["R0", "R90", "R180", "R270"]
 
-    def __init__(self, start: QPoint, pen: QPen, textContent: str = "",
-                 grid: tuple = (10, 10), fontFamily='Helvetica',
-                 fontStyle='Regular', textHeight: str = "12",
-                 textAlign: str = "Left", textOrient: str = "R0"):
+    def __init__(
+        self,
+        start: QPoint,
+        pen: QPen,
+        textContent: str = "",
+        grid: tuple = (10, 10),
+        fontFamily="Helvetica",
+        fontStyle="Regular",
+        textHeight: str = "12",
+        textAlign: str = "Left",
+        textOrient: str = "R0",
+    ):
         super().__init__(pen, grid)
 
         self._start = start
@@ -930,19 +974,23 @@ class text(shape):
 
     def boundingRect(self):
         if self._textAlign == text.textAlignments[0]:
-            self._rect = self._fm.boundingRect(QRect(0, 0, 400, 400),
-                                               Qt.AlignmentFlag.AlignLeft,
-                                               self._textContent)
+            self._rect = self._fm.boundingRect(
+                QRect(0, 0, 400, 400), Qt.AlignmentFlag.AlignLeft, self._textContent
+            )
         elif self._textAlign == text.textAlignments[1]:
-            self._rect = self._fm.boundingRect(QRect(0, 0, 400, 400),
-                                               Qt.AlignmentFlag.AlignCenter,
-                                               self._textContent)
+            self._rect = self._fm.boundingRect(
+                QRect(0, 0, 400, 400), Qt.AlignmentFlag.AlignCenter, self._textContent
+            )
         elif self._textAlign == text.textAlignments[2]:
-            self._rect = self._fm.boundingRect(QRect(0, 0, 400, 400),
-                                               Qt.AlignmentFlag.AlignRight,
-                                               self._textContent)
-        return QRect(self._start.x(), self._start.y() - self._rect.height(),
-                     self._rect.width(), self._rect.height())
+            self._rect = self._fm.boundingRect(
+                QRect(0, 0, 400, 400), Qt.AlignmentFlag.AlignRight, self._textContent
+            )
+        return QRect(
+            self._start.x(),
+            self._start.y() - self._rect.height(),
+            self._rect.width(),
+            self._rect.height(),
+        )
 
     def paint(self, painter, option, widget):
         painter.setFont(self._textFont)
@@ -951,8 +999,7 @@ class text(shape):
             painter.drawRect(self.boundingRect())
         else:
             painter.setPen(self._pen)
-        painter.drawText(self.boundingRect(), self._textContent,
-                         o=self._textOptions)
+        painter.drawText(self.boundingRect(), self._textContent, o=self._textOptions)
 
     @property
     def start(self):
@@ -971,7 +1018,7 @@ class text(shape):
         if isinstance(inputText, str):
             self._textContent = inputText
         else:
-            self.scene().logger.error(f'Not a string: {inputText}')
+            self.scene().logger.error(f"Not a string: {inputText}")
 
     @property
     def fontFamily(self) -> str:
@@ -980,12 +1027,13 @@ class text(shape):
     @fontFamily.setter
     def fontFamily(self, familyName):
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
-        fixedFamilies = [family for family in fontFamilies if
-                         QFontDatabase.isFixedPitch(family)]
+        fixedFamilies = [
+            family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
+        ]
         if familyName in fixedFamilies:
             self._textFont.setFamily(familyName)
         else:
-            self.scene().logger.error(f'Not a valid font name: {familyName}')
+            self.scene().logger.error(f"Not a valid font name: {familyName}")
 
     @property
     def fontStyle(self) -> str:
@@ -996,7 +1044,7 @@ class text(shape):
         if value in QFontDatabase.styles(self._textFont.family()):
             self._textFont.setStyleName(value)
         else:
-            self.scene().logger.error(f'Not a valid font style: {value}')
+            self.scene().logger.error(f"Not a valid font style: {value}")
 
     @property
     def textHeight(self) -> int:
@@ -1004,14 +1052,17 @@ class text(shape):
 
     @textHeight.setter
     def textHeight(self, value: int):
-        fontSizes = [str(size) for size in
-                     QFontDatabase.pointSizes(self._textFont.family(),
-                                              self._textFont.styleName())]
+        fontSizes = [
+            str(size)
+            for size in QFontDatabase.pointSizes(
+                self._textFont.family(), self._textFont.styleName()
+            )
+        ]
         if value in fontSizes:
             self._textHeight = value
         else:
-            self.scene().logger.error(f'Not a valid font height: {value}')
-            self.scene().logger.warning(f'Valid font heights are: {fontSizes}')
+            self.scene().logger.error(f"Not a valid font height: {value}")
+            self.scene().logger.warning(f"Valid font heights are: {fontSizes}")
 
     @property
     def textFont(self) -> QFont:
@@ -1031,8 +1082,7 @@ class text(shape):
         if value in text.textAlignments:
             self._textAlign = value
         else:
-            self.scene().logger.error(
-                f'Not a valid text alignment value: {value}')
+            self.scene().logger.error(f"Not a valid text alignment value: {value}")
 
     @property
     def textOrient(self):
@@ -1043,7 +1093,7 @@ class text(shape):
         if value in text.textOrients:
             self._textOrient = value
         else:
-            self.scene().logger.error(f'Not a valid text orientation: {value}')
+            self.scene().logger.error(f"Not a valid text orientation: {value}")
 
 
 class label(shape):
@@ -1056,13 +1106,26 @@ class label(shape):
     labelOrients = ["R0", "R90", "R180", "R270", "MX", "MX90", "MY", "MY90"]
     labelUses = ["Normal", "Instance", "Pin", "Device", "Annotation"]
     labelTypes = ["Normal", "NLPLabel", "PyLabel"]
-    predefinedLabels = ["[@libName]", "[@cellName]", "[@viewName]", "[@instName]",
-                        "[@modelName]"]
+    predefinedLabels = [
+        "[@libName]",
+        "[@cellName]",
+        "[@viewName]",
+        "[@instName]",
+        "[@modelName]",
+    ]
 
-    def __init__(self, start: QPoint, pen: QPen, labelDefinition: str = "",
-                 grid: tuple = (10, 10), labelType: str = "Normal",
-                 labelHeight: str = "12", labelAlign: str = "Left",
-                 labelOrient: str = "R0", labelUse: str = "Normal", ):
+    def __init__(
+        self,
+        start: QPoint,
+        pen: QPen,
+        labelDefinition: str = "",
+        grid: tuple = (10, 10),
+        labelType: str = "Normal",
+        labelHeight: str = "12",
+        labelAlign: str = "Left",
+        labelOrient: str = "R0",
+        labelUse: str = "Normal",
+    ):
         super().__init__(pen, grid)
         self._start = start  # top left corner
         self._pen = pen
@@ -1086,8 +1149,9 @@ class label(shape):
         self._rect = self._fm.boundingRect(self._labelDefinition)
 
     def boundingRect(self):
-        return QRect(self._start.x(), self._start.y(), self._rect.width(),
-                     self._rect.height())  #
+        return QRect(
+            self._start.x(), self._start.y(), self._rect.width(), self._rect.height()
+        )  #
 
     def paint(self, painter, option, widget):
         # self._rect = self.fm.boundingRect(self.labelName)
@@ -1101,11 +1165,13 @@ class label(shape):
         if self._labelText:
             painter.drawText(
                 QPoint(self._start.x(), self._start.y() + self._rect.height()),
-                self._labelText, )
+                self._labelText,
+            )
         else:
             painter.drawText(
                 QPoint(self._start.x(), self._start.y() + self._rect.height()),
-                self._labelDefinition, )
+                self._labelDefinition,
+            )
         self._fm = QFontMetrics(self._labelFont)
         self._rect = self._fm.boundingRect(self._labelDefinition)
 
@@ -1289,19 +1355,25 @@ class label(shape):
                 elif self._labelDefinition.strip() == "[@elementNum]":
                     self._labelName = "elementNum"
                 else:
-                    if self._labelDefinition[:2] == '[@' and \
-                            self._labelDefinition[
-                                -1] == "]":  # check if it is a correct start and end
-                        self._labelName = \
-                            self._labelDefinition.lstrip('[@').rstrip(']').rstrip(
-                                ':').split(':')[0].strip()
+                    if (
+                        self._labelDefinition[:2] == "[@"
+                        and self._labelDefinition[-1] == "]"
+                    ):  # check if it is a correct start and end
+                        self._labelName = (
+                            self._labelDefinition.lstrip("[@")
+                            .rstrip("]")
+                            .rstrip(":")
+                            .split(":")[0]
+                            .strip()
+                        )
                     else:
-                        self.scene().logger.error('Error in label definition.')
+                        self.scene().logger.error("Error in label definition.")
             except Exception as e:
                 print(e)
         elif self._labelType == "PyLabel":
-            self._labelName = \
-                [string.strip() for string in self.labelDefinition.split("=")][0]
+            self._labelName = [
+                string.strip() for string in self.labelDefinition.split("=")
+            ][0]
 
     def labelDefs(self):
         """
@@ -1332,24 +1404,32 @@ class label(shape):
                             self._labelValue = ""
                         self._labelText = self._labelValue
                     case "[@elementNum]":
-                        self._labelValue = f'{self.parentItem().counter}'
+                        self._labelValue = f"{self.parentItem().counter}"
                         self._labelText = self._labelValue
                     case other:
-                        labelFields = self._labelDefinition.lstrip('[@').rstrip(
-                            ']').rstrip(':').split(':')
+                        labelFields = (
+                            self._labelDefinition.lstrip("[@")
+                            .rstrip("]")
+                            .rstrip(":")
+                            .split(":")
+                        )
                         match len(labelFields):
                             case 1:
                                 self._labelText = self._labelValue
                             case 2:
-                                self._labelText = labelFields[1].strip().replace(
-                                    '%', self._labelValue)
+                                self._labelText = (
+                                    labelFields[1]
+                                    .strip()
+                                    .replace("%", self._labelValue)
+                                )
                             case 3:
-                                tempLabelValue = \
-                                    labelFields[2].strip().split('=')[-1].split()[
-                                        -1]
+                                tempLabelValue = (
+                                    labelFields[2].strip().split("=")[-1].split()[-1]
+                                )
                                 if self._labelValueSet:
                                     self._labelText = labelFields[2].replace(
-                                        tempLabelValue, self._labelValue)
+                                        tempLabelValue, self._labelValue
+                                    )
                                 else:
                                     self._labelText = labelFields[2]
                                     self._labelValue = tempLabelValue
@@ -1357,21 +1437,22 @@ class label(shape):
                 print(e)
         elif self._labelType == label.labelTypes[2]:  # pyLabel
             try:
-                labelFields = self._labelDefinition.strip().split('=')
+                labelFields = self._labelDefinition.strip().split("=")
                 self._labelName = labelFields[0].strip()
                 labelFunction = labelFields[1].strip()
                 # pass the PDK callback class named with "cellName" the labels
                 # dictionary of instance.
-                expression = f'cb.{self.parentItem().cellName}(self.parentItem(' \
-                             f').labels).{labelFunction}'
+                expression = (
+                    f"cb.{self.parentItem().cellName}(self.parentItem("
+                    f").labels).{labelFunction}"
+                )
                 self._labelValue = Quantity(eval(expression)).render(prec=3)
-                self._labelText = f'{self._labelName}={self._labelValue}'
+                self._labelText = f"{self._labelName}={self._labelValue}"
             except Exception as e:
                 print(e)
 
 
 class symbolShape(shape):
-
     def __init__(self, pen: QPen, gridTuple: tuple, shapes: list, attr: dict):
         super().__init__(pen, gridTuple)
         assert shapes is not None  # must not be an empty list
@@ -1390,6 +1471,7 @@ class symbolShape(shape):
         self._pins = dict()  # dict of pins
         self.pinLocations = dict()  # pinName: pinRect
         self.pinNetMap = dict()  # pinName: netName
+        self.pinNetTupleList = list()
         for item in self.shapes:
             item.setFlag(QGraphicsItem.ItemIsSelectable, False)
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
@@ -1407,6 +1489,11 @@ class symbolShape(shape):
         if self._drawings[1:]:
             for draw in self._drawings[1:]:
                 self.borderRect = self.borderRect.united(draw.sceneBoundingRect())
+        self.dashLines = dict()
+
+    def __repr__(self):
+        return f"symbolShape(name={self.cellName}, scene position= {self.scenePos()}, " \
+               f"pins = {self.pins}, labels = {self.labels}, "
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1425,6 +1512,71 @@ class symbolShape(shape):
                 return True
         except AttributeError:
             return False
+
+
+    def itemChange(self, change, value):
+
+        if self.scene() and change == QGraphicsItem.ItemPositionChange:
+            # item's position has changed
+            # do something here
+            for item in self.pinNetTupleList:
+                if item.net.isVisible():
+                    item.net.hide()
+
+                self.dashLines[item.net].start = item.pin.mapToScene(
+                    item.pin.start
+                )
+        return super().itemChange(change, value)
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        
+        super().mouseMoveEvent(event)
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        self.dashLines = dict()
+        self.pinNetTupleList = list()
+        view = self.scene().parent.view
+        viewNets = [
+            item for item in view.items() if isinstance(item, net.schematicNet)
+        ]
+        pins = [item for item in self.pins.values()]
+        for pinItem in pins:
+            for viewNet in viewNets:
+                if pinItem.sceneBoundingRect().adjusted(-2, -2, 2, 2).contains(
+                        viewNet.start):
+                    self.pinNetTupleList.append(
+                        ddef.pinNetTuple(pinItem, viewNet, "start")
+                    )
+                elif pinItem.sceneBoundingRect().adjusted(-2, -2, 2, 2).contains(
+                        viewNet.end):
+                    self.pinNetTupleList.append(
+                        ddef.pinNetTuple(pinItem, viewNet, "end")
+                    )
+
+        for item in self.pinNetTupleList:
+            pinSceneLoc = item.pin.mapToScene(item.pin.start)
+            if item.netEnd == 'start':
+                self.dashLines[item.net] = net.schematicNet(pinSceneLoc,
+                                                            item.net.end,
+                                                            self.scene().otherPen)
+            elif item.netEnd == 'end':
+                self.dashLines[item.net] = net.schematicNet(pinSceneLoc,
+                                                            item.net.start,
+                                                            self.scene().otherPen)
+            self.scene().addItem(self.dashLines[item.net])
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        for key, net in self.dashLines.items():
+            # print(f' net start:{net.start}')
+            # print(f' net end:{net.end}')
+            wires = self.scene().addWires(net.start, self.scene().wirePen)
+
+            self.scene().extendWires(wires,net.start,net.end)
+            self.scene().pruneWires(wires,self.scene().wirePen)
+            self.scene().removeItem(key)
+            self.scene().removeItem(net)
+        # self.dashLines =dict()
+        super().mouseReleaseEvent(event)
 
     @property
     def libraryName(self):
@@ -1490,10 +1642,10 @@ class symbolShape(shape):
     def pins(self):
         return self._pins
 
-    @pins.setter
-    def pins(self, item: pin):
-        assert isinstance(item, pin)
-        self._pins[item.pinName] = item
+    # @pins.setter
+    # def pins(self, item: pin):
+    #     assert isinstance(item, pin)
+    #     self._pins[item.pinName] = item
 
     def createNetlistLine(self):
         """
@@ -1501,33 +1653,37 @@ class symbolShape(shape):
         """
         try:
             nlpDeviceFormatLine = self.attr["NLPDeviceFormat"].strip()
-            nlpDeviceFormatLine.replace("[@instName]", f'{self.instanceName}')
+            nlpDeviceFormatLine.replace("[@instName]", f"{self.instanceName}")
             for labelItem in self.labels.values():
                 if labelItem.labelDefinition in nlpDeviceFormatLine:
                     nlpDeviceFormatLine = nlpDeviceFormatLine.replace(
-                        labelItem.labelDefinition, labelItem.labelText)
+                        labelItem.labelDefinition, labelItem.labelText
+                    )
             for pinName, netName in self.pinNetMap.items():
                 if pinName in nlpDeviceFormatLine:
                     nlpDeviceFormatLine = nlpDeviceFormatLine.replace(
-                        f'[|{pinName}:%]', netName)
+                        f"[|{pinName}:%]", netName
+                    )
             return nlpDeviceFormatLine
         except KeyError:
-            self.scene().parent.parent.logger.error(
-                f'Netlist line is not defined for '
-                f'{self.instanceName}')
+            self.scene().schematicWindow.logger.error(
+                f"Netlist line is not defined for " f"{self.instanceName}"
+            )
             # if there is no NLPDeviceFormat line, create a warning line
             return f"*Netlist line is not defined for symbol of {self.instanceName}"  # return empty string
 
 
 class schematicPin(shape):
-    '''
+    """
     schematic pin class.
-    '''
+    """
+
     pinDirs = ["Input", "Output", "Inout"]
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
 
-    def __init__(self, start: QPoint, pen: QPen, pinName, pinDir, pinType,
-                 gridTuple: tuple):
+    def __init__(
+        self, start: QPoint, pen: QPen, pinName, pinDir, pinType, gridTuple: tuple
+    ):
         super().__init__(pen, gridTuple)
         self._start = start
         self._pinName = pinName
@@ -1542,37 +1698,50 @@ class schematicPin(shape):
         match self.pinDir:
             case "Input":
                 painter.drawPolygon(
-                    [QPoint(self._start.x() - 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 20, self._start.y()),
-                     QPoint(self._start.x() + 10, self._start.y() + 10),
-                     QPoint(self._start.x() - 10, self._start.y() + 10)])
+                    [
+                        QPoint(self._start.x() - 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 20, self._start.y()),
+                        QPoint(self._start.x() + 10, self._start.y() + 10),
+                        QPoint(self._start.x() - 10, self._start.y() + 10),
+                    ]
+                )
             case "Output":
                 painter.drawPolygon(
-                    [QPoint(self._start.x() - 20, self._start.y()),
-                     QPoint(self._start.x() - 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 10, self._start.y() + 10),
-                     QPoint(self._start.x() - 10, self._start.y() + 10)])
+                    [
+                        QPoint(self._start.x() - 20, self._start.y()),
+                        QPoint(self._start.x() - 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 10, self._start.y() + 10),
+                        QPoint(self._start.x() - 10, self._start.y() + 10),
+                    ]
+                )
             case "Inout":
                 painter.drawPolygon(
-                    [QPoint(self._start.x() - 20, self._start.y()),
-                     QPoint(self._start.x() - 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 10, self._start.y() - 10),
-                     QPoint(self._start.x() + 20, self._start.y()),
-                     QPoint(self._start.x() + 10, self._start.y() + 10),
-                     QPoint(self._start.x() - 10, self._start.y() + 10)])
+                    [
+                        QPoint(self._start.x() - 20, self._start.y()),
+                        QPoint(self._start.x() - 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 10, self._start.y() - 10),
+                        QPoint(self._start.x() + 20, self._start.y()),
+                        QPoint(self._start.x() + 10, self._start.y() + 10),
+                        QPoint(self._start.x() - 10, self._start.y() + 10),
+                    ]
+                )
         painter.drawText(self._start.x(), self._start.y() - 20, self.pinName)
         if self.isSelected():
             painter.setPen(QPen(Qt.yellow, 2, Qt.DashLine))
             # painter.setBrush(Qt.yellow)
             painter.drawRect(
-                QRect.span(QPoint(self._start.x() - 10, self._start.y() - 10),
-                           QPoint(self._start.x() + 10, self._start.y() + 10)))
+                QRect.span(
+                    QPoint(self._start.x() - 10, self._start.y() - 10),
+                    QPoint(self._start.x() + 10, self._start.y() + 10),
+                )
+            )
 
     def boundingRect(self):
         return QRect(self._start.x() - 10, self._start.y() - 10, 30, 20).adjusted(
-            -5, -10, 5, 5)
+            -5, -10, 5, 5
+        )
 
     def sceneEvent(self, event):
         if self.scene().drawWire:
