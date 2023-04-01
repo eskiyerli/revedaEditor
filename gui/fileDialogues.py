@@ -21,16 +21,16 @@
 
 import pathlib
 
+import revedaEditor.backend.libraryMethods as libm
+import revedaEditor.common.shape as shp
+import revedaEditor.gui.editFunctions as edf
 from PySide6.QtCore import (Qt, QDir)
-from PySide6.QtGui import (QStandardItemModel, QStandardItem, QCursor, QAction)
+from PySide6.QtGui import (QStandardItemModel, QStandardItem)
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout,
-                               QPushButton, QGroupBox, QTableView, QMenu, )
-
-import backend.schBackEnd as scb
-import common.shape as shp
-import gui.editFunctions as edf
-import backend.libraryMethods as libm
+                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QVBoxLayout,
+                               QPushButton, QGroupBox, QTableView, QMenu,
+                               QCheckBox)
 
 
 class createCellDialog(QDialog):
@@ -69,17 +69,6 @@ class createCellDialog(QDialog):
         self.cellCB.clear()
         self.cellCB.addItems(cellList)
 
-    # @staticmethod
-    # def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryItem:
-    #     return libm.getLibItem(libraryModel, libName)
-    #
-    # @staticmethod
-    # def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> scb.cellItem:
-    #     return libm.getCellItem(libItem,cellNameInp)
-    #
-    # @staticmethod
-    # def getViewItem(cellItem: scb.cellItem, viewNameInp: str) -> scb.viewItem:
-    #     return libm.getViewItem(cellItem, viewNameInp)
 
 
 class deleteCellDialog(createCellDialog):
@@ -440,6 +429,12 @@ class importVerilogaCellDialogue(QDialog):
         self.vaViewName = edf.longLineEdit()
         layout.addRow(edf.boldLabel('Verilog-A view:'), self.vaViewName)
         mainLayout.addLayout(layout)
+        symbolGroupBox = QGroupBox('Symbol Creation')
+        symbolGBLayout = QVBoxLayout()
+        self.symbolCheckBox = QCheckBox('Create a new symbol?')
+        symbolGBLayout.addWidget(self.symbolCheckBox)
+        symbolGroupBox.setLayout(symbolGBLayout)
+        mainLayout.addWidget(symbolGroupBox)
         mainLayout.addSpacing(20)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -500,9 +495,6 @@ class appProperties(QDialog):
     def __init__(self, parent):
         self.parent = parent
         super().__init__(parent)
-        self.initUI()
-
-    def initUI(self):
         self.setMinimumSize(550, 200)
         self.setWindowTitle('Revolution EDA Options')
         mainLayout = QVBoxLayout()
@@ -534,6 +526,12 @@ class appProperties(QDialog):
         switchViewsLayout.addRow(edf.boldLabel('Stop Views:'), self.stopViewsEdit)
         switchViewsGroup.setLayout(switchViewsLayout)
         mainLayout.addWidget(switchViewsGroup)
+        saveGroupBox = QGroupBox('Save Options')
+        saveGBLayout = QVBoxLayout()
+        self.optionSaveBox = QCheckBox('Save options to configuration file?')
+        saveGBLayout.addWidget(self.optionSaveBox)
+        saveGroupBox.setLayout(saveGBLayout)
+        mainLayout.addWidget(saveGroupBox)
         mainLayout.addSpacing(20)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)

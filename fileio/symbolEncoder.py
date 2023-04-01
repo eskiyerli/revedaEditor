@@ -21,8 +21,8 @@
 
 import json
 
-import common.net as net
-import common.shape as shp
+import revedaEditor.common.net as net
+import revedaEditor.common.shape as shp
 
 
 class symbolAttribute(object):

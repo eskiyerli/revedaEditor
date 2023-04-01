@@ -24,13 +24,12 @@
 
 import json
 
-from PySide6.QtCore import (QPoint, Qt, )  # QtCore
-from PySide6.QtGui import (QColor, QPen, )
+from PySide6.QtCore import (QPoint, )  # QtCore
 
-import common.shape as shp
-import fileio.symbolEncoder as se
-import common.net as net
-import common.pens as pens
+import revedaEditor.common.net as net
+import revedaEditor.common.pens as pens
+import revedaEditor.common.shape as shp
+import revedaEditor.fileio.symbolEncoder as se
 
 
 def createSymbolItems(item, gridTuple):

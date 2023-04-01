@@ -20,10 +20,22 @@
 #   License: Mozilla Public License 2.0
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
-# cellview class
+import time
+import logging
 
-class cellview:
-    def __init__(self,library, cell, view):
-        self.library = library
-        self.cell = cell
-        self.view = view
+def debug_decorator(func):
+    def wrapper(*args, **kwargs):
+        print(f"Calling {func.__name__} called with {args} and kwargs: {kwargs}")
+        return func(*args, **kwargs)
+
+    return wrapper
+
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        duration = (end_time - start_time) * 1000
+        logging.debug(f"  Took {duration:0.4f} ms")
+        return result
+    return wrapper

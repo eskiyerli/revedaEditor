@@ -29,9 +29,9 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QGroupBox, QRadioButton, QGridLayout, QTextEdit,
                                QMenu)
 
-import common.net as net
-import common.shape as shp
-import gui.editFunctions as edf
+import revedaEditor.common.net as net
+import revedaEditor.common.shape as shp
+import revedaEditor.gui.editFunctions as edf
 
 
 class rectPropertyDialog(QDialog):

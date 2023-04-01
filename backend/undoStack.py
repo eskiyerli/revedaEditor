@@ -22,8 +22,8 @@
 
 import json
 
-import fileio.loadJSON as lj
-import fileio.symbolEncoder as se
+import revedaEditor.fileio.loadJSON as lj
+import revedaEditor.fileio.symbolEncoder as se
 from PySide6.QtGui import (QUndoCommand)
 
 
