@@ -1690,6 +1690,8 @@ class schematicPin(shape):
         self._pinDir = pinDir
         self._pinType = pinType
 
+    def __repr__(self):
+        return f"schematicPin({self._start}, {self._pen}, {self._pinName}, {self._pinDir}, {self._pinType})"
     def paint(self, painter, option, widget):
 
         painter.setPen(self._pen)
