@@ -22,9 +22,10 @@
 
 # net class definition.
 from PySide6.QtCore import (QPoint, Qt, QLineF, QRectF, QPointF)
-from PySide6.QtGui import (QPen, QStaticText, )
+from PySide6.QtGui import (QPen, QStaticText,)
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem,
-                               QGraphicsEllipseItem, QGraphicsRectItem)
+                               QGraphicsEllipseItem, QGraphicsRectItem,
+                               QGraphicsSceneMouseEvent)
 # import revedaEditor.common.pens as pens
 import revedaEditor.backend.dataDefinitions as ddef
 
@@ -78,7 +79,7 @@ class schematicNet(QGraphicsLineItem):
                 ).p1().y())
             elif not self._horizontal:
                 textLoc = QPoint(self.line().p1().x(),0.5*(self.line().p1().y()+self.line(
-                ).p2.y()))
+                ).p2().y()))
             painter.drawStaticText(textLoc, QStaticText(self.name))
 
         painter.drawLine(self.line())
@@ -147,8 +148,9 @@ class schematicNet(QGraphicsLineItem):
 
     @name.setter
     def name(self, name):
-        self._name = name
-        # self._nameSet = True
+        if name != "": # net name should not be an empty string
+            self._name = name
+            self.nameSet = True
 
     @property
     def horizontal(self):
@@ -221,10 +223,11 @@ class schematicNet(QGraphicsLineItem):
         '''
 
         try:
-            horizontalNetsInView = {item for item in self.scene().parent.view.viewNetItemsSet if
+            sceneNetsSet = self.scene().findSceneNetsSet()
+            horizontalNetsInView = {item for item in sceneNetsSet if
                                     item.horizontal}
 
-            verticalNetsInView = {item for item in self.scene().parent.view.viewNetItemsSet if
+            verticalNetsInView = {item for item in sceneNetsSet if
                                     not item.horizontal}
             sceneSelfP1 = self.mapToScene(self.line().p1())
             sceneSelfP2 = self.mapToScene(self.line().p2())
@@ -304,11 +307,10 @@ class schematicNet(QGraphicsLineItem):
                                     item.horizontal}
 
             verticalNetsInView = {item for item in self.scene().parent.view.viewNetItemsSet if
-                                    not item.horizontal}
+                                    not item.horizontal }
             sceneSelfP1 = self.mapToScene(self.line().p1())
             sceneSelfP2 = self.mapToScene(self.line().p2())
             if self.horizontal:
-
                 for netItem in verticalNetsInView:
                     sceneNetItemP1 = netItem.mapToScene(netItem.line().p1())
                     sceneNetItemP2 = netItem.mapToScene(netItem.line().p2())
@@ -368,7 +370,8 @@ class schematicNet(QGraphicsLineItem):
                 for netItem in horizontalNetsInView :
                     netItemBRect = netItem.sceneBoundingRect()
                     if dBNetRect.intersects(netItemBRect):
-                        newXstart = min([self.start.x(), self.end.x(), netItem.start.x(),
+                        newXstart = min([self.start.x(), self.end.x(),
+                                         netItem.start.x(),
                                         netItem.end.x()])
                         newXend = max([self.start.x(), self.end.x(), netItem.start.x(),
                                         netItem.end.x()])
@@ -377,7 +380,7 @@ class schematicNet(QGraphicsLineItem):
                         self.scene().removeItem(netItem)  # remove the old net from the scene
                         del netItem
                         self.scene().schematicWindow.messageLine.setText("Merged Nets")
-            elif len(verticalNetsInView) > 1 and not self.horizontal:
+            elif not self.horizontal and verticalNetsInView is not None:
                 for netItem in verticalNetsInView - {self, }:
                     netItemBRect = netItem.sceneBoundingRect()
                     if dBNetRect.intersects(netItemBRect):
@@ -391,7 +394,7 @@ class schematicNet(QGraphicsLineItem):
                         del netItem
                         self.scene().schematicWindow.messageLine.setText("Merged Nets")
         except Exception as e:
-            print(f'Error in net.mergeNets: {e}')
+            self.scene().logger.error(f'Error in net.mergeNets: {e}')
 
     def findConnections(self):
         sceneNetItems = {item for item in self.scene().items() if isinstance(item,
@@ -432,9 +435,11 @@ class schematicNet(QGraphicsLineItem):
             newPos.setX(round(newPos.x() / gridTuple[0]) * gridTuple[0])
             newPos.setY(round(newPos.y() / gridTuple[1]) * gridTuple[1])
 
+            self.mergeNets()
             for netItem in self._touchingNets:
                 netItem.findDotPoints()
             self.findDotPoints()
+            
             # Keep the item inside the view rect.
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -456,7 +461,20 @@ class schematicNet(QGraphicsLineItem):
     def contextMenuEvent(self, event):
         self.scene().itemContextMenu.exec_(event.screenPos())
 
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        # try:
+        #     for netEnd in self.endPoints:
+        #         print(netEnd)
+        # except Exception as e:
+        #     print(f'Error in net.mousePressEvent: {e}')
+        super().mousePressEvent(event)
 
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        self.mergeNets()
+        for netItem in self._touchingNets:
+            netItem.findDotPoints()
+        self.findDotPoints()
+        super().mouseReleaseEvent(event)
 
 class crossingDot(QGraphicsEllipseItem):
     def __init__(self, point: QPoint, radius: int, pen: QPen):

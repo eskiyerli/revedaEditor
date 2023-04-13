@@ -27,18 +27,16 @@ import math
 # from hashlib import new
 import pathlib
 import shutil
-import os
 
 # import numpy as np
-from PySide6.QtCore import (QDir, Qt, QRect, QPoint, QMargins, QRectF, QProcess, QPointF,
-                            QRunnable, Signal, Slot)
+from PySide6.QtCore import (Qt, QRect, QPoint, QMargins, QRectF, QProcess, QPointF,
+                            QRunnable)
 from PySide6.QtGui import (QAction, QKeySequence, QColor, QIcon, QPainter, QPen, QImage,
                            QStandardItemModel, QCursor, QUndoStack, QTextDocument,
                            QGuiApplication, QCloseEvent, QFont, QStandardItem)
 from PySide6.QtPrintSupport import (QPrintDialog, )
 from PySide6.QtWidgets import (QDialog, QApplication, QFileDialog, QFormLayout,
-                               QGraphicsScene, QHBoxLayout, QLabel, QLineEdit,
-                               QMainWindow, QMenu, QMessageBox, QToolBar, QTreeView,
+                               QGraphicsScene, QLabel, QMainWindow, QMenu, QMessageBox, QToolBar, QTreeView,
                                QVBoxLayout, QWidget, QGraphicsRectItem,
                                QGraphicsEllipseItem, QGraphicsView, QGridLayout,
                                QGraphicsSceneMouseEvent, QAbstractItemView, QTableView,
@@ -57,7 +55,6 @@ import revedaEditor.fileio.symbolEncoder as se
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.editFunctions as edf
-import revedaEditor.resources.resources
 import revedasim.simMainWindow as smw
 
 
@@ -214,10 +211,10 @@ class editorWindow(QMainWindow):
         self.createPinAction = QAction(createPinIcon, "Create Pin...", self)
 
         goUpIcon = QIcon(":/icons/arrow-step-out.png")
-        self.goUpAction = QAction(goUpIcon, "Go Up   ↑", self)
+        self.goUpAction = QAction(goUpIcon, "Go Up   Ã¢â€ â€˜", self)
 
         goDownIcon = QIcon(":/icons/arrow-step.png")
-        self.goDownAction = QAction(goDownIcon, "Go Down ↓", self)
+        self.goDownAction = QAction(goDownIcon, "Go Down Ã¢â€ â€œ", self)
 
         self.selectAllIcon = QIcon(":/icons/node-select-all.png")
         self.selectAllAction = QAction(self.selectAllIcon, "Select All", self)
@@ -612,6 +609,10 @@ class schematicEditor(editorWindow):
         with open(self.file) as tempFile:
             items = json.load(tempFile)
         self.centralW.scene.loadSchematicCell(items)
+        sceneNetsSet = self.centralW.scene.findSceneNetsSet()
+        # because do not save dot points, it is necessary to recreate them.
+        for netItem in sceneNetsSet:
+            netItem.findDotPoints()
 
     def createConfigView(self, configItem: scb.viewItem, configDict: dict,
                          newConfigDict: dict, processedCells: set):
@@ -1517,11 +1518,6 @@ class schematic_scene(editor_scene):
         self.crossDots = set()  # list of cross dots
         self.draftItem = None
         self.viewRect = None
-        self.viewportCrossDots = (
-            set())  # an empty set of crossing points in the viewport
-        self.sceneCrossDots = set()  # an empty set of all crossing points in the scene
-        self.crossDotsMousePress = (
-            set())  # a temporary set to hold the crossdots locations
         # add instance attributes
         self.addInstance = False
         self.instanceSymbolFile = None
@@ -1652,6 +1648,7 @@ class schematic_scene(editor_scene):
 
                 lines=self.pruneWires(self.wires, self.wirePen)
                 for line in lines:
+                    line.mergeNets()
                     line.findDotPoints()
                 self.wires = None
 
@@ -1736,14 +1733,14 @@ class schematic_scene(editor_scene):
             self.logger.error(e)  # no items found
             return eventLoc
 
-
-    def removeDotsInView(self, viewRect: QRect) -> None:
-        dotsInView = {item for item in self.items(viewRect) if
-                      isinstance(item, net.crossingDot)}
-        for dot in dotsInView:
-            self.removeItem(dot)
-            del dot
-        self.viewportCrossDots = set()
+    #
+    # def removeDotsInView(self, viewRect: QRect) -> None:
+    #     dotsInView = {item for item in self.items(viewRect) if
+    #                   isinstance(item, net.crossingDot)}
+    #     for dot in dotsInView:
+    #         self.removeItem(dot)
+    #         del dot
+    #     self.viewportCrossDots = set()
 
 
     #
@@ -1990,10 +1987,10 @@ class schematic_scene(editor_scene):
             else:
                 return False
 
-    def createCrossDot(self, center: QPoint, radius: int):
-        crossDot = net.crossingDot(center, radius, self.wirePen)
-        self.addItem(crossDot)
-        return crossDot
+    # def createCrossDot(self, center: QPoint, radius: int):
+    #     crossDot = net.crossingDot(center, radius, self.wirePen)
+    #     self.addItem(crossDot)
+    #     return crossDot
 
     def keyPressEvent(self, key_event):
         if key_event.key() == Qt.Key_Escape:
@@ -2088,6 +2085,7 @@ class schematic_scene(editor_scene):
         """
         instance = self.instSymbol(self.instanceSymbolFile, pos)
         self.addItem(instance)
+        self.itemCounter += 1
         undoCommand = us.addShapeUndo(self, instance)
         self.undoStack.push(undoCommand)
         return instance
@@ -2120,6 +2118,7 @@ class schematic_scene(editor_scene):
                 symbolInstance.setPos(pos)
                 # For each instance assign a counter number from the scene
                 symbolInstance.counter = self.itemCounter
+
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
                 symbolInstance.libraryName = file.parent.parent.stem
                 symbolInstance.cellName = file.parent.stem
@@ -2207,7 +2206,6 @@ class schematic_scene(editor_scene):
 
         # increment item counter for next symbol
         self.itemCounter += 1
-        # self.findDotPoints(self.sceneRect())
         # self.addItem(shp.text(QPoint(0, 200), self.textPen, 'Revolution EDA'))
         self.update()
 
@@ -2266,11 +2264,13 @@ class schematic_scene(editor_scene):
                 elif isinstance(item, net.schematicNet):
                     dlg = pdlg.netProperties(self.parent.parent, item)
                     if dlg.exec() == QDialog.Accepted:
+
+
                         item.name = dlg.netNameEdit.text().strip()
-                        if item.name == "":
-                            item.nameSet = False
-                        else:
-                            item.nameSet = True
+                        # if item.name == "":
+                        #     item.nameSet = False
+                        # else:
+                        #     item.nameSet = True
                         item.update()
                 elif isinstance(item, shp.text):
                     dlg = pdlg.noteTextEditProperties(self.parent.parent, item)
@@ -2312,7 +2312,6 @@ class schematic_scene(editor_scene):
 
     def generateSymbol(self, symbolViewName: str):
         # openPath = pathlib.Path(cellItem.data(Qt.UserRole + 2))
-        cellPath = self.schematicWindow.file.parent
         libName = self.schematicWindow.libName
         cellName = self.schematicWindow.cellName
         libItem = libm.getLibItem(self.schematicWindow.libraryView.libraryModel, libName)
@@ -2544,7 +2543,7 @@ class schematic_view(editor_view):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
-        self.visibleRect = QRect(0, 0, 0, 0)  # initialize to an empty rectangle
+        self.visibleRect = None # initialize to an empty rectangle
         self.viewSymbolItemsSet = set()
         self.viewNetItemsSet = set()
         self.viewSymbolPinItemsSet = set()
@@ -3030,7 +3029,6 @@ class designLibrariesView(QTreeView):
                 viewPath = self.selectedItem.data(Qt.UserRole + 2)
                 selectedLibItem = libm.getLibItem(self.libraryModel,
                                                   dlg.libNamesCB.currentText())
-                selectedLibPath = selectedLibItem.libraryPath
                 cellName = dlg.cellCB.currentText()
                 libCellNames = [selectedLibItem.child(row).cellName for row in
                                 range(selectedLibItem.rowCount())]
