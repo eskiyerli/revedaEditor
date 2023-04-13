@@ -27,18 +27,16 @@ import math
 # from hashlib import new
 import pathlib
 import shutil
-import os
 
 # import numpy as np
-from PySide6.QtCore import (QDir, Qt, QRect, QPoint, QMargins, QRectF, QProcess,
-                            QRunnable, Signal, Slot)
+from PySide6.QtCore import (Qt, QRect, QPoint, QMargins, QRectF, QProcess, QPointF,
+                            QRunnable)
 from PySide6.QtGui import (QAction, QKeySequence, QColor, QIcon, QPainter, QPen, QImage,
                            QStandardItemModel, QCursor, QUndoStack, QTextDocument,
                            QGuiApplication, QCloseEvent, QFont, QStandardItem)
 from PySide6.QtPrintSupport import (QPrintDialog, )
 from PySide6.QtWidgets import (QDialog, QApplication, QFileDialog, QFormLayout,
-                               QGraphicsScene, QHBoxLayout, QLabel, QLineEdit,
-                               QMainWindow, QMenu, QMessageBox, QToolBar, QTreeView,
+                               QGraphicsScene, QLabel, QMainWindow, QMenu, QMessageBox, QToolBar, QTreeView,
                                QVBoxLayout, QWidget, QGraphicsRectItem,
                                QGraphicsEllipseItem, QGraphicsView, QGridLayout,
                                QGraphicsSceneMouseEvent, QAbstractItemView, QTableView,
@@ -57,7 +55,6 @@ import revedaEditor.fileio.symbolEncoder as se
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.editFunctions as edf
-import revedaEditor.resources.resources
 import revedasim.simMainWindow as smw
 
 
@@ -214,10 +211,10 @@ class editorWindow(QMainWindow):
         self.createPinAction = QAction(createPinIcon, "Create Pin...", self)
 
         goUpIcon = QIcon(":/icons/arrow-step-out.png")
-        self.goUpAction = QAction(goUpIcon, "Go Up   ↑", self)
+        self.goUpAction = QAction(goUpIcon, "Go Up   Ã¢â€ â€˜", self)
 
         goDownIcon = QIcon(":/icons/arrow-step.png")
-        self.goDownAction = QAction(goDownIcon, "Go Down ↓", self)
+        self.goDownAction = QAction(goDownIcon, "Go Down Ã¢â€ â€œ", self)
 
         self.selectAllIcon = QIcon(":/icons/node-select-all.png")
         self.selectAllAction = QAction(self.selectAllIcon, "Select All", self)
@@ -612,6 +609,10 @@ class schematicEditor(editorWindow):
         with open(self.file) as tempFile:
             items = json.load(tempFile)
         self.centralW.scene.loadSchematicCell(items)
+        sceneNetsSet = self.centralW.scene.findSceneNetsSet()
+        # because do not save dot points, it is necessary to recreate them.
+        for netItem in sceneNetsSet:
+            netItem.findDotPoints()
 
     def createConfigView(self, configItem: scb.viewItem, configDict: dict,
                          newConfigDict: dict, processedCells: set):
@@ -1517,11 +1518,6 @@ class schematic_scene(editor_scene):
         self.crossDots = set()  # list of cross dots
         self.draftItem = None
         self.viewRect = None
-        self.viewportCrossDots = (
-            set())  # an empty set of crossing points in the viewport
-        self.sceneCrossDots = set()  # an empty set of all crossing points in the scene
-        self.crossDotsMousePress = (
-            set())  # a temporary set to hold the crossdots locations
         # add instance attributes
         self.addInstance = False
         self.instanceSymbolFile = None
@@ -1535,9 +1531,13 @@ class schematic_scene(editor_scene):
         self.snapRect = None
         self.selectionRectItem = None
         self.newInstance = None
+        self.newPin = None
+        self.newText = None
+        self.snapPointRect = None
 
 
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
+        # print('scene mouse press event')
         super().mousePressEvent(mouse_event)
         modifiers = QGuiApplication.keyboardModifiers()
         self.viewRect = self.parent.view.mapToScene(
@@ -1546,19 +1546,36 @@ class schematic_scene(editor_scene):
         if mouse_event.button() == Qt.LeftButton:
             self.mousePressLoc = self.snapToGrid(mouse_event.scenePos(
             ).toPoint(), self.gridTuple)
+
             if self.addInstance:
                 self.newInstance = self.drawInstance(self.mousePressLoc)
                 self.newInstance.setSelected(True)
 
             elif self.drawWire:
                 self.schematicWindow.messageLine.setText("Wire Mode")
-                self.mousePressLoc = self.findSnapPoint(self.mousePressLoc,
-                                             self.snapDistance,{})
+                # self.mousePressLoc = self.findSnapPoint(self.mousePressLoc,
+                #                              self.snapDistance, set())
 
                 self.wires = self.addWires(self.mousePressLoc, self.wirePen)
 
             elif self.changeOrigin:  # change origin of the symbol
                 self.origin = self.mousePressLoc
+
+            elif self.drawPin:
+                self.schematicWindow.messageLine.setText("Add a pin")
+                self.newPin = self.addPin(self.mousePressLoc)
+
+                self.newPin.setSelected(True)
+
+            elif self.drawText:
+                self.schematicWindow.messageLine.setText('Add a text note')
+                self.newText = self.addNote(self.mousePressLoc)
+                self.rotateAnItem(self.mousePressLoc, self.newText,
+                                  float(self.noteOrient[1:]))
+                self.newText.setSelected(True)
+            elif self.rotateItem:
+                if self.selectedItems:
+                    self.rotateSelectedItems(self.mousePressLoc)
             elif self.itemSelect:
                 self.schematicWindow.messageLine.setText("Select an item")
                 #     # find the view rectangle every time mouse is pressed.
@@ -1577,22 +1594,6 @@ class schematic_scene(editor_scene):
                 else:
                     self.selectedItems = None
                     self.schematicWindow.messageLine.setText("Nothing selected")
-            elif self.drawPin:
-                self.draftPin = shp.schematicPin(self.start, self.draftPen,
-                                                 self.pinName,
-                                                 self.pinDir, self.pinType,
-                                                 self.gridTuple, )
-                self.addItem(self.draftPin)
-            elif self.drawText:
-                self.draftText = shp.text(self.start, self.draftPen, self.noteText,
-                                          self.gridTuple, self.noteFontFamily,
-                                          self.noteFontStyle, self.noteFontSize,
-                                          self.noteAlign, self.noteOrient, )
-                self.rotateAnItem(self.start, self.draftText, float(self.noteOrient[1:]))
-                self.addItem(self.draftText)
-            elif self.rotateItem:
-                if self.selectedItems:
-                    self.rotateSelectedItems(self.start)
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         self.mouseMoveLoc = self.snapToGrid(
@@ -1600,31 +1601,31 @@ class schematic_scene(editor_scene):
             self.gridTuple)
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
+            if self.addInstance:
+                self.newInstance.setPos(self.mouseMoveLoc-self.mousePressLoc)
 
-            if self.drawWire:
-                # inBoundingBox = False
-                # sceneBoundingBoxes = (item.sceneBoundingRect() for item in
-                #                       self.parent.view.items()
-                #                       if isinstance(item,shp.symbolShape))
+            elif self.drawWire:
+                self.mouseMoveLoc = self.findSnapPoint(self.mouseMoveLoc,self.snapDistance,
+                                                       set(self.wires))
+                if self.snapPointRect is None:
+                    rect = QRectF(QPointF(-5,-5), QPointF(5,5))
+                    self.snapPointRect = QGraphicsRectItem(rect)
+                    self.snapPointRect.setPen(self.draftPen)
+                    self.addItem(self.snapPointRect)
+                self.snapPointRect.setPos(self.mouseMoveLoc)
 
                 self.extendWires(self.wires, self.mousePressLoc,
-                                                self.mouseMoveLoc)
+                                 self.mouseMoveLoc)
+            elif self.drawPin and self.newPin.isSelected():
+                self.newPin.setPos(self.mouseMoveLoc-self.mousePressLoc)
+
+            elif self.drawText and self.newText.isSelected():
+                self.newText.setPos(self.mouseMoveLoc-self.mousePressLoc)
 
             elif self.itemSelect:
-
                 if modifiers == Qt.ShiftModifier:
                     self.selectionRectItem.setRect(QRect(
                         self.mousePressLoc, self.mouseMoveLoc))
-
-            elif self.drawPin:
-                self.draftPin.setPos(
-                    self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
-                                    self.gridTuple))
-            elif self.drawText:
-
-                self.draftText.setPos(
-                    self.snapToGrid(self.mouseMoveLoc - self.mousePressLoc,
-                                    self.gridTuple))
 
         self.schematicWindow.statusLine.showMessage(
             "Cursor Position: " + str(self.mouseMoveLoc.toTuple()))
@@ -1638,29 +1639,31 @@ class schematic_scene(editor_scene):
         if mouse_event.button() == Qt.LeftButton:
             if self.drawWire:
                 self.mouseReleaseLoc = self.findSnapPoint(self.mouseReleaseLoc,
-                                                self.snapDistance,  self.wires)
+                                                self.snapDistance,  set(self.wires))
                 self.extendWires(self.wires, self.mousePressLoc,
                                  self.mouseReleaseLoc)
+                if self.snapPointRect:
+                    self.removeItem(self.snapPointRect)
+                    self.snapPointRect = None
 
-                self.pruneWires(self.wires, self.wirePen)
+                lines=self.pruneWires(self.wires, self.wirePen)
+                for line in lines:
+                    line.mergeNets()
+                    line.findDotPoints()
+                self.wires = None
+
             elif self.addInstance:
                 self.addInstance = False
+                self.newInstance = None
 
             elif self.drawText:
-                self.removeItem(self.draftText)
-                note = self.addNote(self.mouseReleaseLoc)
-                self.rotateAnItem(self.current, note, float(self.noteOrient[1:]))
-                self.addItem(note)
-                note.setSelected(True)
                 self.parent.parent.messageLine.setText("Note added.")
                 self.drawText = False
+                self.newText = None
             elif self.drawPin:
-                self.removeItem(self.draftPin)
-                pin = self.addPin(self.snapToGrid(self.mouseReleaseLoc, self.gridTuple))
-                self.addItem(pin)
-                pin.setSelected(True)
                 self.parent.parent.messageLine.setText("Pin added")
                 self.drawPin = False
+                self.newPin = None
             elif self.itemSelect and modifiers == Qt.ShiftModifier:
                 # self.selectionRect.setBottomRight(self.mouseReleaseLoc)
                 self.selectedItems = [item for item in
@@ -1685,156 +1688,104 @@ class schematic_scene(editor_scene):
             if hasattr(self, 'draftItem'):
                 self.removeItem(self.draftItem)
                 del self.draftItem
-                del self.start
+                del self.mouseReleaseLoc
 
-    def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet:
-    set):
+
+    def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet: set):
         snapRect = QRect(eventLoc.x(
         ) - snapDistance, eventLoc.y() - snapDistance,
                          2 * snapDistance, 2 * snapDistance)
         snapItems = {item for item in self.items(
             snapRect) if isinstance(item, shp.pin) or
                      isinstance(item, net.schematicNet)}
-        snapItems = snapItems.difference(ignoredNetSet)
-        lengths = list()
-        points = list()
-        items = list()
-        if snapItems:
-            for item in snapItems:
-                if isinstance(item, shp.pin):
-                    items.append(item)
-                    points.append(item.start)
-                    lengths.append((item.mapToScene(item.start) -
-                                    eventLoc).manhattanLength())
-                elif isinstance(item, net.schematicNet):
-                    if snapRect.contains(item.start):
+
+        try:
+            snapItems -= ignoredNetSet
+            lengths = list()
+            points = list()
+            items = list()
+            if len(snapItems) > 0:
+                for item in snapItems:
+                    if isinstance(item, shp.pin):
                         items.append(item)
-                        points.append(item.start)
+                        points.append(item.mapToScene(item.start))
                         lengths.append((item.mapToScene(item.start) -
                                         eventLoc).manhattanLength())
-                    elif snapRect.contains(item.end):
-                        items.append(item)
-                        points.append(item.end)
-                        lengths.append((item.mapToScene(item.end) -
-                                        eventLoc).manhattanLength())
-            try:
-                indexClosestPoint = lengths.index(min(lengths))
-                eventLoc = items[indexClosestPoint].mapToScene(
-                    points[indexClosestPoint])
-            except ValueError:
-                pass  # no min value found
-        return eventLoc
+                    elif isinstance(item, net.schematicNet):
+                        if snapRect.contains(item.line().p1().toPoint()):
+                            items.append(item)
+                            # print(f'net start:{item.start}')
+                            points.append(item.line().p1().toPoint())
+                            lengths.append((item.mapToScene(item.line().p1()) -
+                                            eventLoc).manhattanLength())
+                        elif snapRect.contains(item.line().p2().toPoint()):
+                            items.append(item)
+                            points.append(item.line().p2().toPoint())
+                            # print(f'net end:{item.end}')
+                            lengths.append((item.mapToScene(item.line().p2()) -
+                                            eventLoc).manhattanLength())
+                if len(lengths)>0:
+                    indexClosestPoint = lengths.index(min(lengths))
+                    eventLoc = points[indexClosestPoint]
 
-    def removeDotsInView(self, viewRect: QRect) -> None:
-        dotsInView = {item for item in self.items(viewRect) if
-                      isinstance(item, net.crossingDot)}
-        for dot in dotsInView:
-            self.removeItem(dot)
-            del dot
-        self.viewportCrossDots = set()
+            return eventLoc
+        except Exception as e:
+            self.logger.error(e)  # no items found
+            return eventLoc
 
-    def findDotPoints(self, viewRect: QRect) -> None:
-        self.viewportCrossDots = set()  # empty the set.
-        netsInView = {item for item in self.items(viewRect) if
-                      isinstance(item, net.schematicNet)}
-        for netItem in netsInView:
-            netItemEnd = netItem.mapToScene(netItem.end)
-            for netItem2 in netsInView.difference({netItem, }):
-                netItem2Start = netItem.mapToScene(netItem2.start)
-                if ((netItem.horizontal and netItem2.horizontal) and (
-                        netItemEnd == netItem2Start) or (
-                        not (netItem.horizontal or netItem2.horizontal) and (
-                        netItemEnd == netItem2Start))):
-                    for netItem3 in netsInView.difference({netItem, }).difference(
-                            {netItem2, }):
-                        netItem3End = netItem3.mapToScene(netItem3.end)
-                        netItem3Start = netItem3.mapToScene(netItem3.start)
-                        if (netItemEnd == netItem3End) or (netItemEnd == netItem3Start):
-                            cornerPoint = netItemEnd.toPoint()
-                            self.viewportCrossDots.add(cornerPoint)
+    #
+    # def removeDotsInView(self, viewRect: QRect) -> None:
+    #     dotsInView = {item for item in self.items(viewRect) if
+    #                   isinstance(item, net.crossingDot)}
+    #     for dot in dotsInView:
+    #         self.removeItem(dot)
+    #         del dot
+    #     self.viewportCrossDots = set()
 
-        for cornerPoint in self.viewportCrossDots:
-            self.createCrossDot(cornerPoint, 3)
 
-    def mergeNets(self, drawnNet, viewRect: QRect) -> None:
-        # check any overlapping nets in the view
-        # editing is done in the view and thus there is no need to check all nets in the scene
-        horizontalNetsInView = {item for item in self.items(viewRect) if
-                                (isinstance(item, net.schematicNet) and item.horizontal)}
-        verticalNetsInView = {item for item in self.items(viewRect) if (
-                isinstance(item, net.schematicNet) and not item.horizontal)}
-        dBNetRect = drawnNet.sceneBoundingRect()
-        if len(horizontalNetsInView) > 1 and drawnNet.horizontal:
-            for netItem in horizontalNetsInView - {drawnNet, }:
-                netItemBRect = netItem.sceneBoundingRect()
-                if dBNetRect.intersects(netItemBRect):
-                    mergedRect = dBNetRect.united(netItemBRect).toRect()
-                    self.removeItem(netItem)  # remove the old net from the scene
-                    self.removeItem(drawnNet)  # remove the drawn net from the scene
-                    mergedNet = self.addWires(
-                        self.snapToGrid(mergedRect.bottomLeft(), self.gridTuple),
-                        self.snapToGrid(mergedRect.bottomRight(), self.gridTuple),
-                        self.wirePen, )
-                    horizontalNetsInView.discard(netItem)
-                    self.mergeNets(mergedNet, viewRect)
-                    self.parent.parent.messageLine.setText("Merged Nets")
-        elif len(verticalNetsInView) > 1 and not drawnNet.horizontal:
-            for netItem in verticalNetsInView - {drawnNet, }:
-                netItemBRect = netItem.sceneBoundingRect()
-                if dBNetRect.intersects(netItemBRect):
-                    mergedRect = dBNetRect.united(netItemBRect).toRect()
-                    self.removeItem(netItem)  # remove the old net from the scene
-                    self.removeItem(drawnNet)  # remove the drawn net from the scene
-                    mergedNet = self.addWires(
-                        self.snapToGrid(mergedRect.bottomRight(), self.gridTuple),
-                        self.snapToGrid(mergedRect.topRight(), self.gridTuple),
-                        self.wirePen, )  # create a new net with the merged rectangle
-                    verticalNetsInView.discard(netItem)
-                    self.mergeNets(mergedNet, viewRect)
-                    self.parent.parent.messageLine.setText("Net merged")
-
-    def splitNets(self, viewRect: QRect) -> None:
-        horizontalNetsInView = {item for item in self.items(viewRect) if
-                                (isinstance(item, net.schematicNet) and item.horizontal)}
-        verticalNetsInView = {item for item in self.items(viewRect) if (
-                isinstance(item, net.schematicNet) and not item.horizontal)}
-        addedNets = set()
-        for hNetItem in horizontalNetsInView:
-            verticalNetsInView = {item for item in self.items(viewRect) if (
-                    isinstance(item, net.schematicNet) and not item.horizontal)}
-            hNetBRect = hNetItem.sceneBoundingRect().toRect()
-            for vNetItem in verticalNetsInView:
-                vNetBRect = vNetItem.sceneBoundingRect().toRect()
-                if vNetBRect.intersects(hNetBRect):
-                    crossPoint = self.snapToGrid(
-                        vNetBRect.intersected(hNetBRect).center(), self.gridTuple)
-                    if crossPoint != vNetItem.end and crossPoint != vNetItem.start:
-                        addedNets.add(
-                            (vNetItem.mapToScene(vNetItem.start).toPoint(), crossPoint))
-                        addedNets.add(
-                            (crossPoint, vNetItem.mapToScene(vNetItem.end).toPoint()))
-                        self.removeItem(vNetItem)
-                        del vNetItem
-                        break
-        for vNetItem in verticalNetsInView:
-            horizontalNetsInView = {item for item in self.items(viewRect) if (
-                    isinstance(item, net.schematicNet) and item.horizontal)}
-            vNetBRect = vNetItem.sceneBoundingRect().toRect()
-            for hNetItem in horizontalNetsInView:
-                hNetBRect = hNetItem.sceneBoundingRect().toRect()
-                if hNetBRect.intersects(vNetBRect):
-                    crossPoint = self.snapToGrid(
-                        hNetBRect.intersected(vNetBRect).center(), self.gridTuple)
-                    if crossPoint != hNetItem.end and crossPoint != hNetItem.start:
-                        addedNets.add(
-                            (hNetItem.mapToScene(hNetItem.start).toPoint(), crossPoint))
-                        addedNets.add(
-                            (crossPoint, hNetItem.mapToScene(hNetItem.end).toPoint()))
-                        self.removeItem(hNetItem)
-                        del hNetItem
-                        break
-        for addedNet in addedNets:
-            self.addWires(addedNet[0], addedNet[1], self.wirePen)
+    #
+    # def splitNets(self, viewRect: QRect) -> None:
+    #     horizontalNetsInView = {item for item in self.items(viewRect) if
+    #                             (isinstance(item, net.schematicNet) and item.horizontal)}
+    #     verticalNetsInView = {item for item in self.items(viewRect) if (
+    #             isinstance(item, net.schematicNet) and not item.horizontal)}
+    #     addedNets = set()
+    #     for hNetItem in horizontalNetsInView:
+    #         verticalNetsInView = {item for item in self.items(viewRect) if (
+    #                 isinstance(item, net.schematicNet) and not item.horizontal)}
+    #         hNetBRect = hNetItem.sceneBoundingRect().toRect()
+    #         for vNetItem in verticalNetsInView:
+    #             vNetBRect = vNetItem.sceneBoundingRect().toRect()
+    #             if vNetBRect.intersects(hNetBRect):
+    #                 crossPoint = self.snapToGrid(
+    #                     vNetBRect.intersected(hNetBRect).center(), self.gridTuple)
+    #                 if crossPoint != vNetItem.end and crossPoint != vNetItem.start:
+    #                     addedNets.add(
+    #                         (vNetItem.mapToScene(vNetItem.start).toPoint(), crossPoint))
+    #                     addedNets.add(
+    #                         (crossPoint, vNetItem.mapToScene(vNetItem.end).toPoint()))
+    #                     self.removeItem(vNetItem)
+    #                     del vNetItem
+    #                     break
+    #     for vNetItem in verticalNetsInView:
+    #         horizontalNetsInView = {item for item in self.items(viewRect) if (
+    #                 isinstance(item, net.schematicNet) and item.horizontal)}
+    #         vNetBRect = vNetItem.sceneBoundingRect().toRect()
+    #         for hNetItem in horizontalNetsInView:
+    #             hNetBRect = hNetItem.sceneBoundingRect().toRect()
+    #             if hNetBRect.intersects(vNetBRect):
+    #                 crossPoint = self.snapToGrid(
+    #                     hNetBRect.intersected(vNetBRect).center(), self.gridTuple)
+    #                 if crossPoint != hNetItem.end and crossPoint != hNetItem.start:
+    #                     addedNets.add(
+    #                         (hNetItem.mapToScene(hNetItem.start).toPoint(), crossPoint))
+    #                     addedNets.add(
+    #                         (crossPoint, hNetItem.mapToScene(hNetItem.end).toPoint()))
+    #                     self.removeItem(hNetItem)
+    #                     del hNetItem
+    #                     break
+    #     for addedNet in addedNets:
+    #         self.addWires(addedNet[0], addedNet[1], self.wirePen)
 
     def groupAllNets(self) -> None:
         """
@@ -2036,10 +1987,10 @@ class schematic_scene(editor_scene):
             else:
                 return False
 
-    def createCrossDot(self, center: QPoint, radius: int):
-        crossDot = net.crossingDot(center, radius, self.wirePen)
-        self.addItem(crossDot)
-        return crossDot
+    # def createCrossDot(self, center: QPoint, radius: int):
+    #     crossDot = net.crossingDot(center, radius, self.wirePen)
+    #     self.addItem(crossDot)
+    #     return crossDot
 
     def keyPressEvent(self, key_event):
         if key_event.key() == Qt.Key_Escape:
@@ -2084,7 +2035,9 @@ class schematic_scene(editor_scene):
             for line in lines:
                 self.removeItem(line)
                 del line
-        elif lines[0].length==0 or lines[1].length == 0 or lines[2].length ==0:
+            return None
+        # if the line is vertical or horizontal
+        elif lines[0].start.x()== lines[2].end.x() or lines[0].start.y()== lines[2].end.y():
             newLine = net.schematicNet(lines[0].start, lines[2].end, pen)
             self.addItem(newLine)
             undoCommand = us.addShapeUndo(self, newLine)
@@ -2092,15 +2045,24 @@ class schematic_scene(editor_scene):
             for line in lines:
                 self.removeItem(line)
                 del line
+            return [newLine]
         else:
             for line in lines:
-                undoCommand = us.addShapeUndo(self, line)
-                self.undoStack.push(undoCommand)
+                if line.length == 0:
+                    self.removeItem(line)
+                    lines.remove(line)
+                    del line
+                else:
+                    undoCommand = us.addShapeUndo(self, line)
+                    self.undoStack.push(undoCommand)
+
+            return lines
 
 
     def addPin(self, pos: QPoint):
         pin = shp.schematicPin(pos, self.pinPen, self.pinName, self.pinDir, self.pinType,
                                self.gridTuple)
+        self.addItem(pin)
         undoCommand = us.addShapeUndo(self, pin)
         self.undoStack.push(undoCommand)
         return pin
@@ -2112,6 +2074,7 @@ class schematic_scene(editor_scene):
         text = shp.text(pos, self.textPen, self.noteText, self.gridTuple,
                         self.noteFontFamily, self.noteFontStyle, self.noteFontSize,
                         self.noteAlign, self.noteOrient, )
+        self.addItem(text)
         undoCommand = us.addShapeUndo(self, text)
         self.undoStack.push(undoCommand)
         return text
@@ -2122,6 +2085,7 @@ class schematic_scene(editor_scene):
         """
         instance = self.instSymbol(self.instanceSymbolFile, pos)
         self.addItem(instance)
+        self.itemCounter += 1
         undoCommand = us.addShapeUndo(self, instance)
         self.undoStack.push(undoCommand)
         return instance
@@ -2154,6 +2118,7 @@ class schematic_scene(editor_scene):
                 symbolInstance.setPos(pos)
                 # For each instance assign a counter number from the scene
                 symbolInstance.counter = self.itemCounter
+
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
                 symbolInstance.libraryName = file.parent.parent.stem
                 symbolInstance.cellName = file.parent.stem
@@ -2184,8 +2149,7 @@ class schematic_scene(editor_scene):
                 if isinstance(item, shp.symbolShape):
                     self.itemCounter += 1
                     itemCopyDict["name"] = f"I{self.itemCounter}"
-                    itemCopyDict["labelDict"]["instName"] = ["@instName",
-                                                             f"I{self.itemCounter}", ]
+                    itemCopyDict["ld"]["instName"][0] = f"I{self.itemCounter}"
                     shape = lj.createSchematicItems(itemCopyDict, self.libraryDict,
                                                     item.viewName, self.gridTuple)
 
@@ -2242,7 +2206,6 @@ class schematic_scene(editor_scene):
 
         # increment item counter for next symbol
         self.itemCounter += 1
-        self.findDotPoints(self.sceneRect())
         # self.addItem(shp.text(QPoint(0, 200), self.textPen, 'Revolution EDA'))
         self.update()
 
@@ -2301,11 +2264,13 @@ class schematic_scene(editor_scene):
                 elif isinstance(item, net.schematicNet):
                     dlg = pdlg.netProperties(self.parent.parent, item)
                     if dlg.exec() == QDialog.Accepted:
+
+
                         item.name = dlg.netNameEdit.text().strip()
-                        if item.name == "":
-                            item.nameSet = False
-                        else:
-                            item.nameSet = True
+                        # if item.name == "":
+                        #     item.nameSet = False
+                        # else:
+                        #     item.nameSet = True
                         item.update()
                 elif isinstance(item, shp.text):
                     dlg = pdlg.noteTextEditProperties(self.parent.parent, item)
@@ -2347,7 +2312,6 @@ class schematic_scene(editor_scene):
 
     def generateSymbol(self, symbolViewName: str):
         # openPath = pathlib.Path(cellItem.data(Qt.UserRole + 2))
-        cellPath = self.schematicWindow.file.parent
         libName = self.schematicWindow.libName
         cellName = self.schematicWindow.cellName
         libItem = libm.getLibItem(self.schematicWindow.libraryView.libraryModel, libName)
@@ -2494,6 +2458,7 @@ class editor_view(QGraphicsView):
         self.parent = parent
         self.editor = self.parent.parent
         self.scene = scene
+        self.logger = self.scene.logger
         self.majorGrid = self.editor.majorGrid
         self.gridTuple = self.editor.gridTuple
         self.gridbackg = True
@@ -2578,20 +2543,31 @@ class schematic_view(editor_view):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
-        self.visibleRect = QRect(0, 0, 0, 0)  # initialize to an empty rectangle
-        self.viewItems = []
-        self.netItems = []
+        self.visibleRect = None # initialize to an empty rectangle
+        self.viewSymbolItemsSet = set()
+        self.viewNetItemsSet = set()
+        self.viewSymbolPinItemsSet = set()
+
+    def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
+        if mouse_event.button() == Qt.LeftButton:
+            try:
+                self.visibleRect = self.viewport().geometry()
+                self.viewSymbolItemsSet = {item for item in self.items(self.visibleRect,
+                                                              mode=Qt.IntersectsItemShape)
+                                  if isinstance(item, shp.symbolShape)}
+                self.viewNetItemsSet = {item for item in
+                                 self.items(self.visibleRect, mode=Qt.IntersectsItemShape)
+                                 if isinstance(item, net.schematicNet)}
+                self.viewSymbolPinItemsSet = {item for item in
+                                           self.items(self.visibleRect, mode=Qt.IntersectsItemShape)
+                                           if isinstance(item, shp.pin)}
+            except Exception as e:
+                self.logger.error(e)
+        super().mousePressEvent(mouse_event)
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         if mouse_event.button() == Qt.LeftButton:
-            if self.scene.drawWire:
-                self.visibleRect = self.viewport().geometry()
-                self.viewItems = [item for item in self.items(self.visibleRect,
-                                                              mode=Qt.IntersectsItemShape)
-                                  if isinstance(item, shp.symbolShape)]
-                self.netItems = [item for item in
-                                 self.items(self.visibleRect, mode=Qt.IntersectsItemShape)
-                                 if isinstance(item, net.schematicNet)]
+            pass
         super().mouseReleaseEvent(mouse_event)
 
 
@@ -3053,7 +3029,6 @@ class designLibrariesView(QTreeView):
                 viewPath = self.selectedItem.data(Qt.UserRole + 2)
                 selectedLibItem = libm.getLibItem(self.libraryModel,
                                                   dlg.libNamesCB.currentText())
-                selectedLibPath = selectedLibItem.libraryPath
                 cellName = dlg.cellCB.currentText()
                 libCellNames = [selectedLibItem.child(row).cellName for row in
                                 range(selectedLibItem.rowCount())]
