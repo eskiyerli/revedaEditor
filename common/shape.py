@@ -1528,9 +1528,7 @@ class symbolShape(shape):
                 )
         return super().itemChange(change, value)
 
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        
-        super().mouseMoveEvent(event)
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.dashLines = dict()
         self.pinNetTupleList = list()
@@ -1538,6 +1536,8 @@ class symbolShape(shape):
         viewNets = [
             item for item in view.items() if isinstance(item, net.schematicNet)
         ]
+        # create a named tuple to record whether the pin is located at the start or at
+        # the end of the net.
         pins = [item for item in self.pins.values()]
         for pinItem in pins:
             for viewNet in viewNets:
@@ -1572,7 +1572,10 @@ class symbolShape(shape):
             wires = self.scene().addWires(net.start, self.scene().wirePen)
 
             self.scene().extendWires(wires,net.start,net.end)
-            self.scene().pruneWires(wires,self.scene().wirePen)
+            finalWires = self.scene().pruneWires(wires,self.scene().wirePen)
+            if key.nameSet:
+                for wire in finalWires:
+                    wire.name = key.name
             self.scene().removeItem(key)
             self.scene().removeItem(net)
         # self.dashLines =dict()
@@ -1690,6 +1693,8 @@ class schematicPin(shape):
         self._pinDir = pinDir
         self._pinType = pinType
 
+    def __repr__(self):
+        return f"schematicPin({self._start}, {self._pen}, {self._pinName}, {self._pinDir}, {self._pinType})"
     def paint(self, painter, option, widget):
 
         painter.setPen(self._pen)
