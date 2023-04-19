@@ -30,10 +30,11 @@ import shutil
 
 # import numpy as np
 from PySide6.QtCore import (Qt, QRect, QPoint, QMargins, QRectF, QProcess, QPointF,
-                            QRunnable)
+                            QRunnable, QEvent)
 from PySide6.QtGui import (QAction, QKeySequence, QColor, QIcon, QPainter, QPen, QImage,
                            QStandardItemModel, QCursor, QUndoStack, QTextDocument,
-                           QGuiApplication, QCloseEvent, QFont, QStandardItem)
+                           QGuiApplication, QCloseEvent, QFont, QStandardItem,
+                           QMouseEvent)
 from PySide6.QtPrintSupport import (QPrintDialog, )
 from PySide6.QtWidgets import (QDialog, QApplication, QFileDialog, QFormLayout,
                                QGraphicsScene, QLabel, QMainWindow, QMenu, QMessageBox, QToolBar, QTreeView,
@@ -56,8 +57,6 @@ import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.editFunctions as edf
 import revedasim.simMainWindow as smw
-
-
 
 
 class editorWindow(QMainWindow):
@@ -91,6 +90,7 @@ class editorWindow(QMainWindow):
         self.statusLine.addPermanentWidget(self.messageLine)
         self.majorGrid = 10  # snapping grid size
         self.gridTuple = (self.majorGrid, self.majorGrid)
+
         self.init_UI()
 
     def init_UI(self):
@@ -653,8 +653,8 @@ class schematicEditor(editorWindow):
                 processedCells.add(itemCellTuple)
 
     def closeEvent(self, event):
-        super().closeEvent(event)
         self.centralW.scene.saveSchematicCell(self.file)
+        super().closeEvent(event)
         event.accept()
 
     def createNetlistClick(self, s):
@@ -962,15 +962,16 @@ class editor_scene(QGraphicsScene):
         self.logger = self.appMainW.logger
         self.messageLine = self.editor.messageLine
         self.statusLine = self.editor.statusLine
+        self.installEventFilter(self)
 
     def setPens(self):
-        self.wirePen = pens.pen.returnPen("wirePen")
-        self.symbolPen = pens.pen.returnPen("symbolPen")
-        self.selectedWirePen = pens.pen.returnPen("selectedWirePen")
-        self.pinPen = pens.pen.returnPen("pinPen")
-        self.labelPen = pens.pen.returnPen("labelPen")
-        self.textPen = pens.pen.returnPen("textPen")
-        self.otherPen = pens.pen.returnPen("otherPen")
+        self.wirePen = pens.sPen.returnPen("wirePen")
+        self.symbolPen = pens.sPen.returnPen("symbolPen")
+        self.selectedWirePen = pens.sPen.returnPen("selectedWirePen")
+        self.pinPen = pens.sPen.returnPen("pinPen")
+        self.labelPen = pens.sPen.returnPen("labelPen")
+        self.textPen = pens.sPen.returnPen("textPen")
+        self.otherPen = pens.sPen.returnPen("otherPen")
 
     def defineSceneLayers(self):
         self.wireLayer = cel.wireLayer
@@ -987,12 +988,18 @@ class editor_scene(QGraphicsScene):
         '''
         return int(base * int(round(number / base)))
 
+    # def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
+    #     """
+    #     snap point to grid. Divides and multiplies by grid size.
+    #     """
+    #     return QPoint(int(gridTuple[0] * int(round(point.x() / gridTuple[0]))),
+    #                   int(gridTuple[1] * int(round(point.y() / gridTuple[1]))))
     def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
         """
         snap point to grid. Divides and multiplies by grid size.
         """
-        return QPoint(int(gridTuple[0] * int(round(point.x() / gridTuple[0]))),
-                      int(gridTuple[1] * int(round(point.y() / gridTuple[1]))))
+        return QPoint(self.snapToBase(point.x(), gridTuple[0]),
+                      self.snapToBase(point.y(), gridTuple[1]))
 
     def rotateSelectedItems(self, point: QPoint):
         """
@@ -1011,6 +1018,19 @@ class editor_scene(QGraphicsScene):
         undoCommand = us.undoRotateShape(self, item, item.angle)
         self.undoStack.push(undoCommand)
 
+    def eventFilter(self,source, event):
+        '''
+        Mouse events should snap to background grid points.
+        '''
+        if (event.type() == QEvent.GraphicsSceneMouseMove or event.type() ==
+                QEvent.GraphicsSceneMousePress or event.type(
+                ) == QEvent.GraphicsSceneMouseRelease):
+            event.setScenePos(self.snapToGrid(event.scenePos(),
+                                               self.gridTuple).toPointF())
+            # print(self.editor.mapToGlobal(event.scenePos()))
+            return False
+        else:
+            return super().eventFilter(source,event)
 
 class symbol_scene(editor_scene):
     """
@@ -1178,7 +1198,7 @@ class symbol_scene(editor_scene):
                 self.changeOrigin = False
             self.itemSelect = True
 
-    def lineDraw(self, start: QPoint, current: QPoint, pen: QPen, gridTuple: tuple):
+    def lineDraw(self, start: QPoint, current: QPoint, pen: pens.sPen, gridTuple: tuple):
         line = shp.line(start, current, pen, gridTuple)
         self.addItem(line)
         undoCommand = us.addShapeUndo(self, line)
@@ -1186,7 +1206,7 @@ class symbol_scene(editor_scene):
         self.drawLine = False
         return line
 
-    def rectDraw(self, start: QPoint, end: QPoint, pen: QPen, gridTuple: tuple):
+    def rectDraw(self, start: QPoint, end: QPoint, pen: pens.sPen, gridTuple: tuple):
         """
         Draws a rectangle on the scene
         """
@@ -1198,7 +1218,7 @@ class symbol_scene(editor_scene):
         self.drawRect = False
         return rect
 
-    def circleDraw(self, start: QPoint, end: QPoint, pen: QPen,
+    def circleDraw(self, start: QPoint, end: QPoint, pen: pens.sPen,
                    gridTuple: tuple[int, int]):
         """
         Draws a circle on the scene
@@ -1211,7 +1231,7 @@ class symbol_scene(editor_scene):
         self.drawCircle = False
         return circle
 
-    def arcDraw(self, start: QPoint, end: QPoint, pen: QPen, gridTuple: tuple[int, int]):
+    def arcDraw(self, start: QPoint, end: QPoint, pen: pens.sPen, gridTuple: tuple[int, int]):
         '''
         Draws an arc inside the rectangle defined by start and end points.
         '''
@@ -1222,7 +1242,7 @@ class symbol_scene(editor_scene):
         self.drawArc = False
         return arc
 
-    def pinDraw(self, current, pen: QPen, pinName: str, pinDir, pinType,
+    def pinDraw(self, current, pen: pens.sPen, pinName: str, pinDir, pinType,
                 gridTuple: tuple):
         pin = shp.pin(current, pen, pinName, pinDir, pinType, gridTuple)
         self.addItem(pin)
@@ -1231,7 +1251,7 @@ class symbol_scene(editor_scene):
         self.drawPin = False
         return pin
 
-    def labelDraw(self, current, pen: QPen, labelDefinition, gridTuple, labelType,
+    def labelDraw(self, current, pen: pens.sPen, labelDefinition, gridTuple, labelType,
                   labelHeight, labelAlignment, labelOrient, labelUse, ):
         label = shp.label(current, pen, labelDefinition, gridTuple, labelType,
                           labelHeight, labelAlignment, labelOrient, labelUse, )
@@ -1527,7 +1547,7 @@ class schematic_scene(editor_scene):
         self.pinDir = "Input"
         self.parentView = None
         self.wires = None
-        self.snapDistance = 40
+        self.snapDistance = 20
         self.snapRect = None
         self.selectionRectItem = None
         self.newInstance = None
@@ -1537,15 +1557,14 @@ class schematic_scene(editor_scene):
 
 
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        # print('scene mouse press event')
+
         super().mousePressEvent(mouse_event)
         modifiers = QGuiApplication.keyboardModifiers()
         self.viewRect = self.parent.view.mapToScene(
             self.parent.view.viewport().rect()).boundingRect()
         
         if mouse_event.button() == Qt.LeftButton:
-            self.mousePressLoc = self.snapToGrid(mouse_event.scenePos(
-            ).toPoint(), self.gridTuple)
+            self.mousePressLoc = mouse_event.scenePos().toPoint()
 
             if self.addInstance:
                 self.newInstance = self.drawInstance(self.mousePressLoc)
@@ -1578,6 +1597,7 @@ class schematic_scene(editor_scene):
                     self.rotateSelectedItems(self.mousePressLoc)
             elif self.itemSelect:
                 self.schematicWindow.messageLine.setText("Select an item")
+                self.snapToNet(self.mousePressLoc, self.gridTuple[0]*0.5)
                 #     # find the view rectangle every time mouse is pressed.
                 if modifiers == Qt.ShiftModifier:
                     self.schematicWindow.messageLine.setText("Select an Area")
@@ -1596,9 +1616,11 @@ class schematic_scene(editor_scene):
                     self.schematicWindow.messageLine.setText("Nothing selected")
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        self.mouseMoveLoc = self.snapToGrid(
-            mouse_event.scenePos().toPoint(),
-            self.gridTuple)
+        # self.mouseMoveLoc = self.snapToGrid(
+        #     mouse_event.scenePos().toPoint(),
+        #     self.gridTuple)
+        self.mouseMoveLoc = mouse_event.scenePos().toPoint()
+
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
             if self.addInstance:
@@ -1633,8 +1655,9 @@ class schematic_scene(editor_scene):
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
-        self.mouseReleaseLoc = self.snapToGrid(mouse_event.scenePos().toPoint(),
-                                               self.gridTuple)
+        # self.mouseReleaseLoc = self.snapToGrid(mouse_event.scenePos().toPoint(),
+        #                                        self.gridTuple)
+        self.mouseReleaseLoc = mouse_event.scenePos().toPoint()
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.button() == Qt.LeftButton:
             if self.drawWire:
@@ -1647,9 +1670,10 @@ class schematic_scene(editor_scene):
                     self.snapPointRect = None
 
                 lines=self.pruneWires(self.wires, self.wirePen)
-                for line in lines:
-                    line.mergeNets()
-                    line.findDotPoints()
+                if lines:
+                    for line in lines:
+                        line.mergeNets()
+                        line.findDotPoints()
                 self.wires = None
 
             elif self.addInstance:
@@ -1689,6 +1713,20 @@ class schematic_scene(editor_scene):
                 self.removeItem(self.draftItem)
                 del self.draftItem
                 del self.mouseReleaseLoc
+
+    def snapToNet(self, eventLoc: QPoint, snapDistance:int):
+
+        snapRect = QRect(eventLoc.x(
+        ) - snapDistance, eventLoc.y() - snapDistance,
+                         2 * snapDistance, 2 * snapDistance)
+        snapNets = [item for item in self.items(
+            snapRect) if isinstance(item, net.schematicNet)]
+        try:
+            if snapNets:
+                for netItem in snapNets:
+                    netItem.setSelected(True)
+        except Exception as e:
+            self.logger.error(e)
 
 
     def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet: set):
@@ -2004,7 +2042,7 @@ class schematic_scene(editor_scene):
         self.selectedItems = []
         self.parent.parent.messageLine.setText("Select Mode")
 
-    def addWires(self, start: QPoint, pen: QPen) -> net.schematicNet:
+    def addWires(self, start: QPoint, pen: pens.sPen) -> net.schematicNet:
         """
         Add a net or nets to the scene.
         """
@@ -2488,21 +2526,31 @@ class editor_view(QGraphicsView):
         super().wheelEvent(mouse_event)
 
     def snapToBase(self, number, base):
-        return base * int(math.floor(number / base))
+        '''
+        Restrict a number to the multiples of base
+        '''
+        return int(base * int(round(number / base)))
+
+    def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
+        """
+        snap point to grid. Divides and multiplies by grid size.
+        """
+        return QPoint(self.snapToBase(point.x(), gridTuple[0]),
+                      self.snapToBase(point.y(), gridTuple[1]))
 
     def drawBackground(self, painter, rect):
         if self.gridbackg:
             rectCoord = rect.getRect()
             painter.fillRect(rect, QColor("black"))
             painter.setPen(QColor("gray"))
-            grid_x_start = math.ceil(rectCoord[0] / self.majorGrid) * self.majorGrid
-            grid_y_start = math.ceil(rectCoord[1] / self.majorGrid) * self.majorGrid
-            num_x_points = math.floor(rectCoord[2] / self.majorGrid)
-            num_y_points = math.floor(rectCoord[3] / self.majorGrid)
+            grid_x_start = math.ceil(rectCoord[0] / self.gridTuple[0]) * self.gridTuple[0]
+            grid_y_start = math.ceil(rectCoord[1] / self.gridTuple[1]) * self.gridTuple[1]
+            num_x_points = math.floor(rectCoord[2] / self.gridTuple[0])
+            num_y_points = math.floor(rectCoord[3] / self.gridTuple[1])
             for i in range(int(num_x_points)):  # rect width
                 for j in range(int(num_y_points)):  # rect length
-                    painter.drawPoint(grid_x_start + i * self.majorGrid,
-                                      grid_y_start + j * self.majorGrid, )
+                    painter.drawPoint(grid_x_start + i * self.gridTuple[0],
+                                      grid_y_start + j * self.gridTuple[1], )
         else:
             super().drawBackground(painter, rect)
 
@@ -2564,11 +2612,6 @@ class schematic_view(editor_view):
             except Exception as e:
                 self.logger.error(e)
         super().mousePressEvent(mouse_event)
-
-    def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        if mouse_event.button() == Qt.LeftButton:
-            pass
-        super().mouseReleaseEvent(mouse_event)
 
 
 class libraryBrowser(QMainWindow):
@@ -2764,6 +2807,8 @@ class libraryBrowser(QMainWindow):
             self.createNewCellView(libItem, cellItem, viewItem)
 
     def createNewCellView(self, libItem, cellItem, viewItem):
+        viewTuple = ddef.viewTuple(libItem.libraryName,
+                                   cellItem.cellName, viewItem.viewName)
         match viewItem.viewType:
             case "config":
                 schViewsList = [cellItem.child(row).viewName for row in
@@ -2804,18 +2849,21 @@ class libraryBrowser(QMainWindow):
                     with configFilePathObj.open(mode="w+") as configFile:
                         json.dump(items, configFile, indent=4)
 
-                    self.openConfigEditWindow(schematicWindow.configDict, selectedSchItem,
-                                              viewItem)
+                    configWindow = self.openConfigEditWindow(
+                        schematicWindow.configDict, selectedSchItem, viewItem)
+                    self.appMainW.openViews[viewTuple] = configWindow
             case "schematic":
                 # scb.createCellView(self.appMainW, viewItem.viewName, cellItem)
                 schematicWindow = schematicEditor(viewItem, self.libraryDict,
                                                   self.libBrowserCont.designView)
+                self.appMainW.openViews[viewTuple] = schematicWindow
                 schematicWindow.loadSchematic()
                 schematicWindow.show()
             case "symbol":
                 # scb.createCellView(self.appMainW, viewItem.viewName, cellItem)
                 symbolWindow = symbolEditor(viewItem, self.libraryDict,
                                             self.libBrowserCont.designView)
+                self.appMainW.openViews[viewTuple] = symbolWindow
                 symbolWindow.loadSymbol()
                 symbolWindow.show()
             case "veriloga":
@@ -2868,6 +2916,7 @@ class libraryBrowser(QMainWindow):
         viewName = viewItem.viewName
         cellName = cellItem.cellName
         libName = libItem.libraryName
+        print(f'view type: {viewItem.viewType}')
         openCellViewTuple=ddef.viewTuple(libName, cellName, viewName)
         if openCellViewTuple in self.appMainW.openViews.keys():
             self.appMainW.openViews[openCellViewTuple].raise_()
