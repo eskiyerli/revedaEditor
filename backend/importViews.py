@@ -81,9 +81,9 @@ def createVaSymbol(parent: QMainWindow,
         libraryDict,
         libraryBrowser.libBrowserCont.designView,
     )
-    symbolPen = pens.pen.returnPen("symbolPen")
-    labelPen = pens.pen.returnPen("labelPen")
-    pinPen = pens.pen.returnPen(("pinPen"))
+    symbolPen = pens.sPen.returnPen("symbolPen")
+    labelPen = pens.sPen.returnPen("labelPen")
+    pinPen = pens.sPen.returnPen(("pinPen"))
     dlg = pdlg.symbolCreateDialog(
         parent,
         importedVaObj.inPins,

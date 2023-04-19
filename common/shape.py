@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 from quantiphy import Quantity
 import revedaEditor.common.net as net
 import revedaEditor.backend.dataDefinitions as ddef
+import revedaEditor.pdk.callbacks as cb
 
 
 class shape(QGraphicsItem):
@@ -810,7 +811,8 @@ class line(shape):
                 self._stretchSide = line.stretchSides[1]
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+        # eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+        eventPos = event.pos()
         if self._stretchSide == line.stretchSides[0]:
             self.prepareGeometryChange()
             self.start = eventPos
@@ -1516,16 +1518,15 @@ class symbolShape(shape):
 
     def itemChange(self, change, value):
 
-        if self.scene() and change == QGraphicsItem.ItemPositionChange:
+        if self.scene() and change == QGraphicsItem.ItemPositionHasChanged:
             # item's position has changed
             # do something here
             for item in self.pinNetTupleList:
                 if item.net.isVisible():
                     item.net.hide()
-
-                self.dashLines[item.net].start = item.pin.mapToScene(
-                    item.pin.start
-                )
+                self.dashLines[item.net].start = \
+                    item.pin.mapToScene(
+                    item.pin.start)
         return super().itemChange(change, value)
 
 

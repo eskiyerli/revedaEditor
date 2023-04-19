@@ -27,4 +27,6 @@ cellTuple = namedtuple('cellTuple', ['libraryName', 'cellName'])
 viewItemTuple = namedtuple('viewItemTuple', ['libraryItem', 'cellItem',
                                              'viewItem'])
 pinNetTuple = namedtuple('pinNetTuple',  ['pin', 'net', 'netEnd'])
-netsEndTuple = namedtuple('netsEndTuple', ['newNets', 'selfEnd'])
+netEndTuple = namedtuple('netEndTuple', ['selfNet', 'selfNetEnd', 'otherNet',
+                                         'otherNetEnd'])
+
