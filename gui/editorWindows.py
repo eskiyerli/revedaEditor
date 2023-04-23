@@ -988,12 +988,6 @@ class editor_scene(QGraphicsScene):
         '''
         return int(base * int(round(number / base)))
 
-    # def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
-    #     """
-    #     snap point to grid. Divides and multiplies by grid size.
-    #     """
-    #     return QPoint(int(gridTuple[0] * int(round(point.x() / gridTuple[0]))),
-    #                   int(gridTuple[1] * int(round(point.y() / gridTuple[1]))))
     def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
         """
         snap point to grid. Divides and multiplies by grid size.
@@ -1597,7 +1591,7 @@ class schematic_scene(editor_scene):
                     self.rotateSelectedItems(self.mousePressLoc)
             elif self.itemSelect:
                 self.schematicWindow.messageLine.setText("Select an item")
-                self.snapToNet(self.mousePressLoc, self.gridTuple[0]*0.5)
+                # self.snapToNet(self.mousePressLoc, self.gridTuple[0]*0.5)
                 #     # find the view rectangle every time mouse is pressed.
                 if modifiers == Qt.ShiftModifier:
                     self.schematicWindow.messageLine.setText("Select an Area")
@@ -1670,10 +1664,10 @@ class schematic_scene(editor_scene):
                     self.snapPointRect = None
 
                 lines=self.pruneWires(self.wires, self.wirePen)
-                if lines:
-                    for line in lines:
-                        line.mergeNets()
-                        line.findDotPoints()
+                # if lines:
+                #     for line in lines:
+                #         line.mergeNets()
+                #         line.findDotPoints()
                 self.wires = None
 
             elif self.addInstance:
@@ -1714,19 +1708,19 @@ class schematic_scene(editor_scene):
                 del self.draftItem
                 del self.mouseReleaseLoc
 
-    def snapToNet(self, eventLoc: QPoint, snapDistance:int):
-
-        snapRect = QRect(eventLoc.x(
-        ) - snapDistance, eventLoc.y() - snapDistance,
-                         2 * snapDistance, 2 * snapDistance)
-        snapNets = [item for item in self.items(
-            snapRect) if isinstance(item, net.schematicNet)]
-        try:
-            if snapNets:
-                for netItem in snapNets:
-                    netItem.setSelected(True)
-        except Exception as e:
-            self.logger.error(e)
+    # def snapToNet(self, eventLoc: QPoint, snapDistance:int):
+    #
+    #     snapRect = QRect(eventLoc.x(
+    #     ) - snapDistance, eventLoc.y() - snapDistance,
+    #                      2 * snapDistance, 2 * snapDistance)
+    #     snapNets = [item for item in self.items(
+    #         snapRect) if isinstance(item, net.schematicNet)]
+    #     try:
+    #         if snapNets:
+    #             for netItem in snapNets:
+    #                 netItem.setSelected(True)
+    #     except Exception as e:
+    #         self.logger.error(e)
 
 
     def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet: set):
@@ -1914,9 +1908,7 @@ class schematic_scene(editor_scene):
         return symbolSceneSet
 
     def findSceneNetsSet(self) -> set[net.schematicNet]:
-        netsSceneSet = {item for item in self.items() if
-                        isinstance(item, net.schematicNet)}
-        return netsSceneSet
+        return set(item for item in self.items() if isinstance(item, net.schematicNet))
 
     def findScenePinsSet(self) -> set[shp.schematicPin]:
         pinsSceneSet = {item for item in self.items() if
@@ -2048,7 +2040,7 @@ class schematic_scene(editor_scene):
         """
         lines = [net.schematicNet(start,start,pen), net.schematicNet(start,start,pen),
                  net.schematicNet(start,start,pen)]
-        [self.addItem(line) for line in lines]
+
         return lines
 
     def extendWires(self, lines: list, start: QPoint, end:QPoint):
@@ -2067,6 +2059,7 @@ class schematic_scene(editor_scene):
         lines[1].end = secondPoint
         lines[2].start = secondPoint
         lines[2].end = end
+        [self.addItem(line) for line in lines]
 
     def pruneWires(self, lines, pen):
         if lines[0].start == lines[2].end: # if the first and last points are the same
@@ -2576,7 +2569,6 @@ class editor_view(QGraphicsView):
         self.render(painter)
         self.gridbackg = True
         painter.end()
-
 
 class symbol_view(editor_view):
     def __init__(self, scene, parent):
