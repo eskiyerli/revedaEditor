@@ -22,7 +22,7 @@
 
 # net class definition.
 from PySide6.QtCore import (QPoint, Qt, QLineF, QRectF, QPointF, QRect)
-from PySide6.QtGui import (QPen, QStaticText,)
+from PySide6.QtGui import (QPen, QStaticText, QPainterPath, QColor, QFont,)
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem,
                                QGraphicsEllipseItem, QGraphicsRectItem,
                                QGraphicsSceneMouseEvent)
@@ -58,33 +58,44 @@ class schematicNet(QGraphicsLineItem):
         self._dots = set()
         self._dotPoints = set()
         self._touchingNets = set()
-        self._endsNetsTupleList = list()
+        self._dashedLines = dict()
         self._newWires = list()
 
     def __repr__(self):
         return f"schematicNet(start={self.mapToScene(self._start)}, " \
                f"end={self.mapToScene(self._end)}"
 
+    # def boundingRect(self) -> QRectF:
+    #     '''
+    #     Return the bounding rectangle of the net.
+    #     '''
+    #     gridTuple = self.scene().gridTuple
+    #     return QRectF(self.line().p1(),self.line().p2()).normalized().adjusted(
+    #         -0.5*gridTuple[0], -0.5*gridTuple[1], 0.5*gridTuple[0], 0.5*gridTuple[1])
+
+    def shape(self):
+        '''
+        Return the shape of the net.
+        '''
+        gridTuple = self.scene().gridTuple
+        path = QPainterPath()
+        path.addRect(QRectF(self.line().p1(),self.line().p2()).normalized().adjusted(
+            -0.5*gridTuple[0], -0.5*gridTuple[1], 0.5*gridTuple[0], 0.5*gridTuple[1]))
+        return path
 
     def paint(self, painter, option, widget) -> None:
-
+        line = self.line()
         painter.setPen(self._pen)
         if self.isSelected():
             painter.setPen(QPen(Qt.blue, 2, Qt.SolidLine))
         if self.name is not None:
-            # textLoc = self.line().p1()
             if self._nameConflict:
                 painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
-            if self._horizontal:
-                # if there is name conflict, draw the line and name in red.
-                textLoc = QPoint(0.5*(self.line().p1().x()+self.line().p2().x()),self.line(
-                ).p1().y())
-            elif not self._horizontal:
-                textLoc = QPoint(self.line().p1().x(),0.5*(self.line().p1().y()+self.line(
-                ).p2().y()))
+            # if there is name conflict, draw the line and name in red.
+            textLoc = line.center()
             painter.drawStaticText(textLoc, QStaticText(self.name))
+        painter.drawLine(line)
 
-        painter.drawLine(self.line())
 
 
     def sceneEvent(self, event):
@@ -106,18 +117,15 @@ class schematicNet(QGraphicsLineItem):
     def start(self, start: QPoint):
 
         self._start = start
-        # self.line().setP1(start)
         self.setLine(QLineF(self._start, self._end))
 
     @property
     def end(self):
         return self.line().p2()
-        # return self._end
 
     @end.setter
     def end(self, end: QPoint):
         self._end = end
-        # self.line().setP2(end)
         self.setLine(QLineF(self._start, self._end))
 
     @property
@@ -127,6 +135,7 @@ class schematicNet(QGraphicsLineItem):
     @pen.setter
     def pen(self, pen: QPen):
         self._pen = pen
+        self.setPen(pen)
 
     @property
     def name(self):
@@ -210,12 +219,13 @@ class schematicNet(QGraphicsLineItem):
         '''
 
         try:
-            sceneNetsSet = self.scene().findSceneNetsSet()
-            horizontalNetsInView = {item for item in sceneNetsSet if
+            viewNetsSet = {item for item in self.scene().parent.view.items() if
+                           isinstance(item, schematicNet)}.difference({self})
+
+            horizontalNetsInView = {item for item in viewNetsSet if
                                     item.horizontal}
 
-            verticalNetsInView = {item for item in sceneNetsSet if
-                                    not item.horizontal}
+            verticalNetsInView = viewNetsSet.difference(horizontalNetsInView)
             sceneSelfP1 = self.mapToScene(self.line().p1())
             sceneSelfP2 = self.mapToScene(self.line().p2())
 
@@ -249,7 +259,7 @@ class schematicNet(QGraphicsLineItem):
             [self.scene().addItem(dot) for dot in self._dots]
 
         except Exception as e:
-            print(f'add dot error: {e}')
+            self.scene().logger.error(f'add dot error: {e}')
 
     def vertEndAtHor(self, horNetSceneP1, horNetSceneP2, vertNetSceneP1,
                      vertNetSceneP2,netItem):
@@ -290,11 +300,11 @@ class schematicNet(QGraphicsLineItem):
         divide that net in to two. Does not work well.
         '''
         try:
-            horizontalNetsInView = {item for item in self.scene().parent.view.viewNetItemsSet if
-                                    item.horizontal}
+            netsInView = {item for item in self.scene().parent.view.items() if isinstance(
+                                            item,schematicNet)}
+            horizontalNetsInView = {item for item in netsInView if item.horizontal}
 
-            verticalNetsInView = {item for item in self.scene().parent.view.viewNetItemsSet if
-                                    not item.horizontal }
+            verticalNetsInView = netsInView.difference(horizontalNetsInView)
             sceneSelfP1 = self.mapToScene(self.line().p1())
             sceneSelfP2 = self.mapToScene(self.line().p2())
             if self.horizontal:
@@ -346,26 +356,24 @@ class schematicNet(QGraphicsLineItem):
         # editing is done in the view and thus there is no need to check all nets in the scene
         try:
             netsInView = {item for item in self.scene().parent.view.items() if
-                          isinstance(item,schematicNet) and item is not self}
+                          isinstance(item,schematicNet)}.difference({self})
             horizontalNetsInView = {item for item in netsInView if
                                     item.horizontal}
 
-            verticalNetsInView = {item for item in netsInView if
-                                    not item.horizontal}
+            verticalNetsInView = netsInView.difference(horizontalNetsInView)
 
             dBNetRect = self.sceneBoundingRect()
             if self.horizontal and horizontalNetsInView is not None:
                 for netItem in horizontalNetsInView :
                     netItemBRect = netItem.sceneBoundingRect()
                     if dBNetRect.intersects(netItemBRect):
-                        newXstart = max([self.start.x(), self.end.x(),
+                        newXstart = min([self.start.x(), self.end.x(),
                                          netItem.start.x(),
                                         netItem.end.x()])
-                        newXend = min([self.start.x(), self.end.x(),
+                        newXend = max([self.start.x(), self.end.x(),
                                      netItem.start.x(),
                                         netItem.end.x()])
-                        self.start = QPoint(newXstart, self.start.y())
-                        self.end = QPoint(newXend, self.end.y())
+                        self.setLine(QLineF(QPoint(newXstart, self.start.y()), QPoint(newXend, self.end.y())))
                         self.scene().removeItem(netItem)  # remove the old net from the scene
                         del netItem
                         self.scene().schematicWindow.messageLine.setText("Merged Nets")
@@ -379,49 +387,57 @@ class schematicNet(QGraphicsLineItem):
                         newYend = min([self.start.y(), self.end.y(),
                                      netItem.start.y(),
                                         netItem.end.y()])
-                        self.start = QPoint(self.start.x(), newYstart)
-                        self.end = QPoint(self.end.x(), newYend)
+                        self.setLine(QLineF(QPoint(self.start.x(), newYstart), QPoint(self.end.x(), newYend)))
                         self.scene().removeItem(netItem)  # remove the old net from the scene
                         del netItem
                         self.scene().schematicWindow.messageLine.setText("Merged Nets")
         except Exception as e:
             self.scene().logger.error(f'Error in net.mergeNets: {e}')
 
-    def findConnections(self):
-        self._endsNetsTupleList = list()
-        sceneNetItems = {item for item in self.scene().items() if
-                         isinstance(item,schematicNet) and item is not self}
-        for netItem in sceneNetItems:
-            for endPoint in netItem.endPoints:
-                for selfEndPoint in self.endPoints:
-                    if (netItem.mapToScene(endPoint).toPoint() ==
-                            self.mapToScene(selfEndPoint).toPoint()):
-                        self._endsNetsTupleList.append(ddef.netEndTuple(self,
-                        self.mapToScene(selfEndPoint),netItem,
-                        netItem.mapToScene(endPoint)))
+    def createDashLines(self):
+        try:
 
+            sceneNetItems = {item for item in self.scene().items() if
+                             isinstance(item,schematicNet)}.difference({self})
+            for selfEnd in self.endPoints:
+                if isinstance(selfEnd,QPointF):
+                    selfEnd = selfEnd.toPoint()
+                self._dashedLines[selfEnd] = list()
+                for netItem in sceneNetItems:
+                    for endPoint in netItem.endPoints:
+                        if (netItem.mapToScene(endPoint).toPoint() ==
+                                self.mapToScene(selfEnd).toPoint()):
+                            self._dashedLines[selfEnd].append(schematicNet(
+                                self.mapToScene(selfEnd).toPoint(),
+                                netItem.mapToScene(endPoint).toPoint(), self.scene().otherPen))
+                for netItem in self._dashedLines[selfEnd]:
+                    self.scene().addItem(netItem)
+        except Exception as e:
 
-    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+            self.scene().logger.error(f'Error in net.createDashLines: {e}')
 
-        super().mousePressEvent(event)
+    def extendDashLines(self):
+
+        try:
+            for selfEnd in self.endPoints:
+                if isinstance(selfEnd, QPointF):
+                    selfEnd = selfEnd.toPoint()
+                for netItem in self._dashedLines[selfEnd]:
+                    netItem.setLine(QLineF(self.mapToScene(selfEnd).toPoint(),
+                                           netItem.line().p2()))
+        except Exception as e:
+            self.scene().logger.error(f'Error in net.extendDashLines: {e}')
+
 
     def itemChange(self, change, value):
 
-        if change == QGraphicsItem.ItemPositionHasChanged and self.scene():
+        if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
             gridTuple = self.scene().gridTuple
             viewRect = self.scene().views()[0].viewport().rect()
             newPos.setX(round(newPos.x() / gridTuple[0]) * gridTuple[0])
             newPos.setY(round(newPos.y() / gridTuple[1]) * gridTuple[1])
-
-
-            for netItem in self._touchingNets:
-                netItem.findDotPoints()
-
-            self.mergeNets()
-            self.findDotPoints()
-            self.splitNets()
 
             # Keep the item inside the view rect.
             if not sceneRect.contains(newPos):
@@ -439,21 +455,61 @@ class schematicNet(QGraphicsLineItem):
                     sceneRect.setTop(newPos.y())
                     viewRect.setTop(newPos.y())
             return newPos
+
+        elif change == QGraphicsItem.ItemSelectedHasChanged and self.scene():
+            if value:
+                self.scene().schematicWindow.messageLine.setText("Selected Net")
+            else:
+                # for nets in self._dashedLines.values():
+                #     for netItem in nets:
+                #         self.scene().removeItem(netItem)
+                self.mergeNets()
+                self.scene().schematicWindow.messageLine.setText("Unselected Net")
         return super().itemChange(change, value)
 
     def contextMenuEvent(self, event):
         self.scene().itemContextMenu.exec_(event.screenPos())
 
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.LeftButton:
+            self.createDashLines()
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        self.extendDashLines()
+
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-
-
-
-        for netItem in self._touchingNets:
-            netItem.findDotPoints()
-        self.findDotPoints()
-        self.mergeNets()
-        self.splitNets()
         super().mouseReleaseEvent(event)
+        try:
+            viewNets = {item for item in self.scene().parent.view.items() if isinstance(item,
+                                                            schematicNet)}
+            for netItem in viewNets:
+                netItem.findDotPoints()
+
+            for nets in self._dashedLines.values():
+                for netItem in nets:
+                    self.scene().removeItem(netItem)
+
+                    self.addWires(netItem)
+                    del netItem
+
+            self._dashedLines.clear()
+
+        except Exception as e:
+            self.scene().logger.error(f'Error in net.mouseReleaseEvent: {e}')
+
+    def addWires(self,dashedLine:QGraphicsLineItem):
+        start = dashedLine.line().p1()
+        end = dashedLine.line().p2()
+        lines = []
+        firstPointX = end.x()
+        firstPointY = start.y()
+        firstPoint = QPoint(firstPointX, firstPointY)
+
+        lines.append(schematicNet(start,firstPoint, self.scene().wirePen))
+        lines.append(schematicNet(firstPoint,end, self.scene().wirePen))
+        [self.scene().addItem(line) for line in lines]
 
 class crossingDot(QGraphicsEllipseItem):
     def __init__(self, point: QPoint, radius: int, pen: QPen):
