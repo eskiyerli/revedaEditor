@@ -30,7 +30,7 @@ import shutil
 
 # import numpy as np
 from PySide6.QtCore import (Qt, QRect, QPoint, QMargins, QRectF, QProcess, QPointF,
-                            QRunnable, QEvent)
+                            QRunnable, QEvent, QLineF)
 from PySide6.QtGui import (QAction, QKeySequence, QColor, QIcon, QPainter, QPen, QImage,
                            QStandardItemModel, QCursor, QUndoStack, QTextDocument,
                            QGuiApplication, QCloseEvent, QFont, QStandardItem,
@@ -1669,6 +1669,7 @@ class schematic_scene(editor_scene):
                 #         line.mergeNets()
                 #         line.findDotPoints()
                 self.wires = None
+                # self.mergeNets()
 
             elif self.addInstance:
                 self.addInstance = False
@@ -2040,7 +2041,7 @@ class schematic_scene(editor_scene):
         """
         lines = [net.schematicNet(start,start,pen), net.schematicNet(start,start,pen),
                  net.schematicNet(start,start,pen)]
-
+        [self.addItem(line) for line in lines]
         return lines
 
     def extendWires(self, lines: list, start: QPoint, end:QPoint):
@@ -2048,18 +2049,22 @@ class schematic_scene(editor_scene):
         This method is to shape the wires drawn using addWires method.
         __|^^^
         '''
+        try:
+            firstPointX = self.snapToBase((end.x() - start.x()) / 3 + start.x(),
+                                          self.gridTuple[0])
+            firstPointY = start.y()
+            firstPoint = QPoint(firstPointX, firstPointY)
+            secondPoint = QPoint(firstPointX, end.y())
+            lines[0].start = start
+            lines[0].end = firstPoint
+            lines[1].start = firstPoint
+            lines[1].end = secondPoint
+            lines[2].start = secondPoint
+            lines[2].end = end
 
-        firstPointX = self.snapToBase((end.x() - start.x()) / 3 + start.x(),
-                                      self.gridTuple[0])
-        firstPointY = start.y()
-        firstPoint = QPoint(firstPointX, firstPointY)
-        secondPoint = QPoint(firstPointX, end.y())
-        lines[0].end = firstPoint
-        lines[1].start = firstPoint
-        lines[1].end = secondPoint
-        lines[2].start = secondPoint
-        lines[2].end = end
-        [self.addItem(line) for line in lines]
+
+        except Exception as e:
+            self.logger.error(e)
 
     def pruneWires(self, lines, pen):
         if lines[0].start == lines[2].end: # if the first and last points are the same
@@ -2086,7 +2091,6 @@ class schematic_scene(editor_scene):
                 else:
                     undoCommand = us.addShapeUndo(self, line)
                     self.undoStack.push(undoCommand)
-
             return lines
 
 
