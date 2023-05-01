@@ -1664,10 +1664,10 @@ class schematic_scene(editor_scene):
                     self.snapPointRect = None
 
                 lines=self.pruneWires(self.wires, self.wirePen)
-                # if lines:
-                #     for line in lines:
-                #         line.mergeNets()
-                #         line.findDotPoints()
+                if lines:
+                    for line in lines:
+                        line.mergeNets()
+                        line.findDotPoints()
                 self.wires = None
                 # self.mergeNets()
 
@@ -2041,7 +2041,6 @@ class schematic_scene(editor_scene):
         """
         lines = [net.schematicNet(start,start,pen), net.schematicNet(start,start,pen),
                  net.schematicNet(start,start,pen)]
-        [self.addItem(line) for line in lines]
         return lines
 
     def extendWires(self, lines: list, start: QPoint, end:QPoint):
@@ -2055,14 +2054,13 @@ class schematic_scene(editor_scene):
             firstPointY = start.y()
             firstPoint = QPoint(firstPointX, firstPointY)
             secondPoint = QPoint(firstPointX, end.y())
+            [self.addItem(line) for line in lines if line.scene() is None]
             lines[0].start = start
             lines[0].end = firstPoint
             lines[1].start = firstPoint
             lines[1].end = secondPoint
             lines[2].start = secondPoint
             lines[2].end = end
-
-
         except Exception as e:
             self.logger.error(e)
 
