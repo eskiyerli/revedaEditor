@@ -28,7 +28,7 @@ from revedaEditor.common.layers import (wireLayer, symbolLayer,
                                         textLayer, draftLayer)
 
 
-class pen(QPen):
+class sPen(QPen):
     def __init__(self, pname: str, pcolor: QColor, pwidth: int,
                  plinestyle: Qt.PenStyle = Qt.SolidLine):
         super().__init__()
