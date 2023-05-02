@@ -18,8 +18,8 @@
 #   Software: Revolution EDA
 #   License: Mozilla Public License 2.0
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
+
 import gui.appWindow as appw
 import revinit
 if __name__ == "__main__":
     appw.main()
-

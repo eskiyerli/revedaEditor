@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 from quantiphy import Quantity
 import revedaEditor.common.net as net
 import revedaEditor.backend.dataDefinitions as ddef
+import revedaEditor.pdk.callbacks as cb
 
 
 class shape(QGraphicsItem):
@@ -810,7 +811,8 @@ class line(shape):
                 self._stretchSide = line.stretchSides[1]
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+        # eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+        eventPos = event.pos()
         if self._stretchSide == line.stretchSides[0]:
             self.prepareGeometryChange()
             self.start = eventPos
@@ -1492,8 +1494,10 @@ class symbolShape(shape):
         self.dashLines = dict()
 
     def __repr__(self):
-        return f"symbolShape(name={self.cellName}, scene position= {self.scenePos()}, " \
-               f"pins = {self.pins}, labels = {self.labels}, "
+        return (
+            f"symbolShape(name={self.cellName}, scene position= {self.scenePos()}, "
+            f"pins = {self.pins}, labels = {self.labels}, "
+        )
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1513,24 +1517,19 @@ class symbolShape(shape):
         except AttributeError:
             return False
 
-
     def itemChange(self, change, value):
 
-        if self.scene() and change == QGraphicsItem.ItemPositionChange:
+        if self.scene() and change == QGraphicsItem.ItemPositionHasChanged:
             # item's position has changed
             # do something here
             for item in self.pinNetTupleList:
                 if item.net.isVisible():
                     item.net.hide()
-
-                self.dashLines[item.net].start = item.pin.mapToScene(
-                    item.pin.start
-                )
+                self.dashLines[item.net].start = item.pin.mapToScene(item.pin.start)
         return super().itemChange(change, value)
 
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        
-        super().mouseMoveEvent(event)
+
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.dashLines = dict()
         self.pinNetTupleList = list()
@@ -1538,6 +1537,8 @@ class symbolShape(shape):
         viewNets = [
             item for item in view.items() if isinstance(item, net.schematicNet)
         ]
+        # create a named tuple to record whether the pin is located at the start or at
+        # the end of the net.
         pins = [item for item in self.pins.values()]
         for pinItem in pins:
             for viewNet in viewNets:
@@ -1567,12 +1568,13 @@ class symbolShape(shape):
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         for key, net in self.dashLines.items():
-            # print(f' net start:{net.start}')
-            # print(f' net end:{net.end}')
             wires = self.scene().addWires(net.start, self.scene().wirePen)
 
-            self.scene().extendWires(wires,net.start,net.end)
-            self.scene().pruneWires(wires,self.scene().wirePen)
+            self.scene().extendWires(wires, net.start, net.end)
+            finalWires = self.scene().pruneWires(wires, self.scene().wirePen)
+            if key.nameSet:
+                for wire in finalWires:
+                    wire.name = key.name
             self.scene().removeItem(key)
             self.scene().removeItem(net)
         # self.dashLines =dict()
@@ -1642,11 +1644,6 @@ class symbolShape(shape):
     def pins(self):
         return self._pins
 
-    # @pins.setter
-    # def pins(self, item: pin):
-    #     assert isinstance(item, pin)
-    #     self._pins[item.pinName] = item
-
     def createNetlistLine(self):
         """
         Create a netlist line from a nlp device format line.
@@ -1670,7 +1667,7 @@ class symbolShape(shape):
                 f"Netlist line is not defined for " f"{self.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
-            return f"*Netlist line is not defined for symbol of {self.instanceName}"  # return empty string
+            return f"*Netlist line is not defined for symbol of {self.instanceName}"
 
 
 class schematicPin(shape):
@@ -1689,6 +1686,9 @@ class schematicPin(shape):
         self._pinName = pinName
         self._pinDir = pinDir
         self._pinType = pinType
+
+    def __repr__(self):
+        return f"schematicPin({self._start}, {self._pen}, {self._pinName}, {self._pinDir}, {self._pinType})"
 
     def paint(self, painter, option, widget):
 

@@ -66,7 +66,6 @@ class mainwContainer(QWidget):
         gLayout.addWidget(self.console)
         self.setLayout(gLayout)
 
-
 #
 class MainWindow(QMainWindow):
     def __init__(self):
