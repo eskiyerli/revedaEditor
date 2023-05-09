@@ -234,26 +234,27 @@ class MainWindow(QMainWindow):
     def loadState(self):
 
         if self.confFilePath.exists():
+            self.logger.info(f'Configuration file: {self.confFilePath} exists')
             with self.confFilePath.open(mode="r") as f:
                 items = json.load(f)
 
-                self.textEditorPath = pathlib.Path(items.get("textEditorPath"))
-                self.simulationPath = pathlib.Path(items.get("simulationPath"))
-                if items.get("switchViewList")[0] != '':
-                    self.switchViewList = items.get("switchViewList")
-                if items.get("stopViewList")[0] != '':
-                    self.stopViewList = items.get("stopViewList")
+            self.textEditorPath = pathlib.Path(items.get("textEditorPath"))
+            self.simulationPath = pathlib.Path(items.get("simulationPath"))
+            if items.get("switchViewList")[0] != '':
+                self.switchViewList = items.get("switchViewList")
+            if items.get("stopViewList")[0] != '':
+                self.stopViewList = items.get("stopViewList")
 
     def saveState(self):
-        confFilePath = self.runPath.joinpath("reveda.conf")
-
-        items = dict()
-        items.update({"textEditorPath": str(self.textEditorPath)})
-        items.update({"simulationPath": str(self.simulationPath)})
-        items.update({"switchViewList": self.switchViewList})
-        items.update({"stopViewList": self.stopViewList})
+        items = {
+            "textEditorPath": str(self.textEditorPath),
+            "simulationPath": str(self.simulationPath),
+            "switchViewList": self.switchViewList,
+            "stopViewList": self.stopViewList,
+        }
         with self.confFilePath.open(mode="w", encoding="utf") as f:
             json.dump(items, f, indent=4)
+
 
     def exitApp(self):
         self.app.closeAllWindows()

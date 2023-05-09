@@ -120,7 +120,6 @@ class schematicEncoder(json.JSONEncoder):
     def default(self, item):
         if isinstance(item, shp.symbolShape):
             # only value and visibility be changed in the symbol instance.
-
             itemLabelDict = {
                 item.labelName: [item.labelValue, item.labelVisible] for item in
                 item.labels.values()}
