@@ -138,7 +138,7 @@ class schematicNet(QGraphicsLineItem):
     def name(self, name):
         if name != "": # net name should not be an empty string
             self._name = name
-            self.nameSet = True
+            # self.nameSet = True
 
 
 

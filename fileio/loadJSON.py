@@ -183,6 +183,7 @@ def createSchematicItems(item, libraryDict, viewName: str, gridTuple: (int, int)
         symbolInstance.attributes = symbolAttributes
         for label in symbolInstance.labels.values():
             if label.labelName in labelDict.keys():
+                label.labelValueSet = True
                 label.labelValue = labelDict[label.labelName][0]
                 label.labelVisible = labelDict[label.labelName][1]
                 label.labelDefs()
