@@ -212,6 +212,7 @@ class rectangle(shape):
     @start.setter
     def start(self, start: QPoint):
         self.prepareGeometryChange()
+        self._rect = QRectF(start, self.end).normalized()
         self._start = start
 
     @property
@@ -221,6 +222,7 @@ class rectangle(shape):
     @end.setter
     def end(self, end: QPoint):
         self.prepareGeometryChange()
+        self._rect = QRectF(self.start, end).normalized()
         self._end = end
 
     @property
@@ -304,7 +306,7 @@ class rectangle(shape):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        eventPos = self.snapToGrid(event.pos(), self.gridTuple)
+        eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
@@ -325,7 +327,7 @@ class rectangle(shape):
                     self._stretchSide = rectangle.sides[3]
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        eventPos = self.snapToGrid(event.pos(), self.gridTuple)
+        eventPos = event.pos().toPoint()
         if self.stretch:
             self.prepareGeometryChange()
             if self.stretchSide == rectangle.sides[0]:
@@ -398,9 +400,9 @@ class circle(shape):
     def radius(self, radius: int):
         self.prepareGeometryChange()
         self._radius = self.snapToBase(radius, self._gridTuple[0])
-        # self.topLeft = self._centre - QPoint(self._radius, self._radius)
-        # self.rightBottom = self._centre + QPoint(self._radius, self._radius)
         self._end = self._centre + QPoint(self._radius, 0)
+        self._topLeft = self._centre - QPoint(self._radius, self._radius)
+        self._rightBottom = self._centre + QPoint(self._radius, self._radius)
 
     @property
     def centre(self):
@@ -419,6 +421,7 @@ class circle(shape):
     @end.setter
     def end(self, value: QPoint):
         if isinstance(value, QPoint):
+            self.prepareGeometryChange()
             self._end = value
 
     @property
@@ -452,7 +455,7 @@ class circle(shape):
         if self.isSelected() and self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             # eventPos = self.snap2grid(event.pos(), self._gridTuple)
-            eventPos = event.pos()
+            eventPos = event.pos().toPoint()
             distance = self.snapToBase(math.sqrt((eventPos.x() - self._centre.x()) ** 2 + (
                         eventPos.y() - self._centre.y()) ** 2), self._gridTuple[0], )
             if distance == self._radius:
@@ -462,7 +465,7 @@ class circle(shape):
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
         if self._startStretch:
-            eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+            eventPos = event.pos().toPoint()
             distance = self.snapToBase(math.sqrt((eventPos.x() - self._centre.x()) ** 2 + (
                         eventPos.y() - self._centre.y()) ** 2), self._gridTuple[0], )
             self.prepareGeometryChange()
@@ -494,11 +497,15 @@ class arc(shape):
         self._end = end
         self._rect = QRectF(self._start, self._end).normalized()
         self._arcLine = QLineF(self._start, self._end)
-        self._arcAngle = self._arcLine.angle()
+        self._arcAngle = 0
         self._width = self._rect.width()
         self._height = self._rect.height()
         self._adjustment = int(self.pen.width() / 2)
         self._stretchSide = None
+        self.findAngle()
+
+    def findAngle(self):
+        self._arcAngle = self._arcLine.angle()
         if 90 >= self._arcAngle >= 0:
             self._arcType = arc.arcTypes[0]
         elif 180 >= self._arcAngle > 90:
@@ -561,7 +568,9 @@ class arc(shape):
     @start.setter
     def start(self, point: QPoint):
         assert isinstance(point, QPoint)
+        self.prepareGeometryChange()
         self._start = self.snapToGrid(point, self.gridTuple)
+
 
     @property
     def end(self):
@@ -570,7 +579,14 @@ class arc(shape):
     @end.setter
     def end(self, point: QPoint):
         assert isinstance(point, QPoint)
-        self._end = self.snapToGrid(point, self.gridTuple)
+        self.prepareGeometryChange()
+        self._end = point
+        self._arcLine = QLineF(self._start, self._end)
+        self._arcAngle = self._arcLine.angle()
+        self.findAngle()
+        self._rect = QRectF(self._start, self._end).normalized()
+
+
 
     @property
     def width(self):
@@ -594,7 +610,7 @@ class arc(shape):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        eventPos = self.snapToGrid(event.pos(), self.gridTuple)
+        eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
@@ -617,7 +633,7 @@ class arc(shape):
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
 
-        eventPos = self.snapToGrid(event.pos(), self.gridTuple)
+        eventPos = event.pos().toPoint()
         if self._stretch:
             self.prepareGeometryChange()
             if self._stretchSide == arc.sides[0]:
@@ -683,6 +699,11 @@ class line(shape):
         path.addRect(self._rect.adjusted(-2, -2, 2, 2))
         return path
 
+    def shape(self):
+        path = QPainterPath()
+        path.addRect(self._rect.adjusted(-2, -2, 2, 2))
+        return path
+
     def paint(self, painter, option, widget):
         if self.isSelected():
             painter.setPen(QPen(Qt.yellow, 2, Qt.DashLine))
@@ -716,6 +737,7 @@ class line(shape):
         self.prepareGeometryChange()
         self._start = start
         self._line = QLine(self._start, self._end)
+        self._rect = QRect(self._start, self._end).normalized()
 
     @property
     def end(self):
@@ -726,6 +748,7 @@ class line(shape):
         self.prepareGeometryChange()
         self._end = end
         self._line = QLine(self._start, self._end)
+        self._rect = QRect(self._start, self._end).normalized()
 
     @property
     def pen(self):
@@ -759,15 +782,14 @@ class line(shape):
         super().mousePressEvent(event)
         if self.isSelected() and self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            eventPos = self.snapToGrid(event.pos(), self._gridTuple)
+            eventPos = event.pos().toPoint()
             if eventPos == self.start:
                 self._stretchSide = line.stretchSides[0]
             elif eventPos == self._end:
                 self._stretchSide = line.stretchSides[1]
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        # eventPos = self.snapToGrid(event.pos(), self._gridTuple)
-        eventPos = event.pos()
+        eventPos = event.pos().toPoint()
         if self._stretchSide == line.stretchSides[0]:
             self.prepareGeometryChange()
             self.start = eventPos
@@ -782,11 +804,12 @@ class line(shape):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseReleaseEvent(event)
         self._stretch = False
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self._stretchSide = ""
-        super().mouseReleaseEvent(event)
+
 
 
 class pin(shape):
