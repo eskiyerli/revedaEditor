@@ -1180,34 +1180,33 @@ class symbol_scene(editor_scene):
             print(f'mouse press error: {e}')
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        try:
-            super().mouseMoveEvent(mouse_event)
-            self.mouseMoveLoc = mouse_event.scenePos().toPoint()
-            modifiers = QGuiApplication.keyboardModifiers()
-            if mouse_event.buttons() == Qt.LeftButton:
-                if self.drawLine:
-                    self.symbolWindow.messageLine.setText("Release mouse on the end point")
-                    self.newLine.end=self.mouseMoveLoc
-                elif self.drawPin and self.newPin.isSelected():
-                    self.newPin.setPos(self.mouseMoveLoc - self.mousePressLoc)
-                elif self.drawRect:
-                    self.symbolWindow.messageLine.setText("Release mouse on the bottom "
-                                                          "left point")
-                    self.newRect.end = self.mouseMoveLoc
-                elif self.drawCircle:
-                    self.symbolWindow.messageLine.setText('Extend Circle')
-                    radius = ((self.mouseMoveLoc.x() - self.mousePressLoc.x())**2 + (
-                            self.mouseMoveLoc.y() - self.mousePressLoc.y())**2)**0.5
-                    self.newCircle.radius = radius
-                elif self.drawArc:
-                    self.symbolWindow.messageLine.setText('Extend Arc')
-                    self.newArc.end = self.mouseMoveLoc
-                elif self.itemSelect and modifiers == Qt.ShiftModifier:
-                    self.selectionRect.end = self.mouseMoveLoc
-            self.statusLine.showMessage(
-                "Cursor Position: " + str((self.mouseMoveLoc - self.origin).toTuple()))
-        except Exception as e:
-            print(f'mouse move error: {e}')
+
+        super().mouseMoveEvent(mouse_event)
+        self.mouseMoveLoc = mouse_event.scenePos().toPoint()
+        modifiers = QGuiApplication.keyboardModifiers()
+        if mouse_event.buttons() == Qt.LeftButton:
+            if self.drawLine:
+                self.symbolWindow.messageLine.setText("Release mouse on the end point")
+                self.newLine.end=self.mouseMoveLoc
+            elif self.drawPin and self.newPin.isSelected():
+                self.newPin.setPos(self.mouseMoveLoc - self.mousePressLoc)
+            elif self.drawRect:
+                self.symbolWindow.messageLine.setText("Release mouse on the bottom "
+                                                      "left point")
+                self.newRect.end = self.mouseMoveLoc
+            elif self.drawCircle:
+                self.symbolWindow.messageLine.setText('Extend Circle')
+                radius = ((self.mouseMoveLoc.x() - self.mousePressLoc.x())**2 + (
+                        self.mouseMoveLoc.y() - self.mousePressLoc.y())**2)**0.5
+                self.newCircle.radius = radius
+            elif self.drawArc:
+                self.symbolWindow.messageLine.setText('Extend Arc')
+                self.newArc.end = self.mouseMoveLoc
+            elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                self.selectionRect.end = self.mouseMoveLoc
+        self.statusLine.showMessage(
+            "Cursor Position: " + str((self.mouseMoveLoc - self.origin).toTuple()))
+
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
@@ -1223,8 +1222,6 @@ class symbol_scene(editor_scene):
                 self.newPin.setSelected(False)
 
             elif self.drawRect:
-                drawnRect = QRect(self.mousePressLoc,self.mouseReleaseLoc)
-                self.newRect.rect= drawnRect
                 self.newRect.setSelected(False)
             elif self.drawArc:
                 self.newArc.setSelected(False)
@@ -1758,6 +1755,13 @@ class schematic_scene(editor_scene):
             self.logger.error(e)  # no items found
             return eventLoc
 
+    def clearAddedNetNames(self, netsSet: set):
+        '''
+        Clear all assigned net names
+        '''
+        for netItem in netsSet:
+            netItem.nameAdded = False
+
     def groupAllNets(self) -> None:
         """
         This method starting from nets connected to pins, then named nets and unnamed
@@ -1766,6 +1770,7 @@ class schematic_scene(editor_scene):
         try:
             # all the nets in the schematic in a set to remove duplicates
             sceneNetsSet = self.findSceneNetsSet()
+
             # first find nets connected to pins designating global nets.
             globalNetsSet = self.findGlobalNets()
             sceneNetsSet -= globalNetsSet  # remove these nets from all nets set.
@@ -1795,7 +1800,7 @@ class schematic_scene(editor_scene):
                          self.items(sceneSchemPin.sceneBoundingRect()) if
                          isinstance(netItem, net.schematicNet)}
             for netItem in pinNetSet:
-                if netItem.nameSet:  # check if net is named
+                if netItem.nameSet or netItem.nameAdded:  # check if net is named
                     if netItem.name == sceneSchemPin.pinName:
                         schemPinConNetsSet.add(netItem)
                     else:
@@ -1806,6 +1811,7 @@ class schematic_scene(editor_scene):
                 else:
                     schemPinConNetsSet.add(netItem)
                     netItem.name = sceneSchemPin.pinName
+                    netItem.nameAdded = True
                 netItem.update()
             schemPinConNetsSet.update(pinNetSet)
         return schemPinConNetsSet
@@ -1826,7 +1832,8 @@ class schematic_scene(editor_scene):
                 pinNetSet = {netItem for netItem in self.items(pinItem.sceneBoundingRect())
                              if isinstance(netItem, net.schematicNet)}
                 for netItem in pinNetSet:
-                    if netItem.nameSet:  # check if net is explicitly named
+                    if netItem.nameSet or netItem.nameAdded:
+                        # check if net is already named explicitly
                         if netItem.name != pinItem.pinName:
                             netItem.nameConflict = True
                             self.logger.error(f"Net name conflict at {pinItem.pinName} of "
@@ -1836,74 +1843,11 @@ class schematic_scene(editor_scene):
                     else:
                         globalNetsSet.add(netItem)
                         netItem.name = pinItem.pinName
+                        netItem.nameAdded = True
             return globalNetsSet
         except Exception as e:
             self.logger.error(e)
 
-    def generatePinNetMap(self, sceneSymbolSet):
-        """
-        For symbols in sceneSymbolSet, find which pin is connected to which net. If a
-        pin is not connected, assign to it a default net starting with d prefix.
-        """
-        # TODO: if the pin name ends with '!'(a global net), the nets connected
-        #  to it should have the same name
-        netCounter = 0
-        for symbolItem in sceneSymbolSet:
-            for pinName, pinItem in symbolItem.pins.items():
-                pinItem.connected = False  # clear connections
-
-                pinConnectedNets = [netItem for netItem in self.items(
-                    pinItem.sceneBoundingRect().adjusted(-2, -2, 2, 2)) if
-                                    isinstance(netItem, net.schematicNet)]
-                # this will name the pin by first net it finds in the bounding rectangle of
-                # the pin. If there are multiple nets in the bounding rectangle, the first
-                # net in the list will be the one used.
-                if pinConnectedNets:
-                    symbolItem.pinNetMap[pinName] = pinConnectedNets[0].name
-                    pinItem.connected = True
-
-                if not pinItem.connected:
-                    # assign a default net name prefixed with d(efault).
-                    symbolItem.pinNetMap[pinName] = f"dnet{netCounter}"
-                    self.logger.warning(f"left unconnected:{symbolItem.pinNetMap[pinName]}")
-                    netCounter += 1
-
-    def findSceneCells(self, symbolSet):
-        """
-        This function just goes through set of symbol items in the scene and
-        checks if that symbol's cell is encountered first time. If so, it adds
-        it to a dictionary   cell_name:symbol
-        """
-        symbolGroupDict = dict()
-        for symbolItem in symbolSet:
-            if symbolItem.cellName not in symbolGroupDict.keys():
-                symbolGroupDict[symbolItem.cellName] = symbolItem
-        return symbolGroupDict
-
-    def findSceneSymbolSet(self) -> set[shp.symbolShape]:
-        """
-        Find all the symbols on the scene as a set.
-        """
-        symbolSceneSet = {item for item in self.items() if
-                          isinstance(item, shp.symbolShape)}
-        return symbolSceneSet
-
-    def findSceneNetsSet(self) -> set[net.schematicNet]:
-        return set(item for item in self.items() if isinstance(item, net.schematicNet))
-
-    def findSceneSchemPinsSet(self) -> set[shp.schematicPin]:
-        pinsSceneSet = {item for item in self.items() if isinstance(item, shp.schematicPin)}
-        if pinsSceneSet:  # check pinsSceneSet is empty
-            return pinsSceneSet
-        else:
-            return set()
-
-    def findSceneTextSet(self) -> set[shp.text]:
-        textSceneSet = {item for item in self.items() if isinstance(item, shp.text)}
-        if textSceneSet:  # check textSceneSet is empty
-            return textSceneSet
-        else:
-            return set()
 
     def groupNamedNets(self, namedNetsSet, unnamedNetsSet):
         """
@@ -1996,6 +1940,71 @@ class schematic_scene(editor_scene):
                     return True
         else:
             return False
+
+    def generatePinNetMap(self, sceneSymbolSet):
+        """
+        For symbols in sceneSymbolSet, find which pin is connected to which net. If a
+        pin is not connected, assign to it a default net starting with d prefix.
+        """
+        # TODO: if the pin name ends with '!'(a global net), the nets connected
+        #  to it should have the same name
+        netCounter = 0
+        for symbolItem in sceneSymbolSet:
+            for pinName, pinItem in symbolItem.pins.items():
+                pinItem.connected = False  # clear connections
+
+                pinConnectedNets = [netItem for netItem in self.items(
+                    pinItem.sceneBoundingRect().adjusted(-2, -2, 2, 2)) if
+                                    isinstance(netItem, net.schematicNet)]
+                # this will name the pin by first net it finds in the bounding rectangle of
+                # the pin. If there are multiple nets in the bounding rectangle, the first
+                # net in the list will be the one used.
+                if pinConnectedNets:
+                    symbolItem.pinNetMap[pinName] = pinConnectedNets[0].name
+                    pinItem.connected = True
+
+                if not pinItem.connected:
+                    # assign a default net name prefixed with d(efault).
+                    symbolItem.pinNetMap[pinName] = f"dnet{netCounter}"
+                    self.logger.warning(f"left unconnected:{symbolItem.pinNetMap[pinName]}")
+                    netCounter += 1
+
+    def findSceneCells(self, symbolSet):
+        """
+        This function just goes through set of symbol items in the scene and
+        checks if that symbol's cell is encountered first time. If so, it adds
+        it to a dictionary   cell_name:symbol
+        """
+        symbolGroupDict = dict()
+        for symbolItem in symbolSet:
+            if symbolItem.cellName not in symbolGroupDict.keys():
+                symbolGroupDict[symbolItem.cellName] = symbolItem
+        return symbolGroupDict
+
+    def findSceneSymbolSet(self) -> set[shp.symbolShape]:
+        """
+        Find all the symbols on the scene as a set.
+        """
+        symbolSceneSet = {item for item in self.items() if
+                          isinstance(item, shp.symbolShape)}
+        return symbolSceneSet
+
+    def findSceneNetsSet(self) -> set[net.schematicNet]:
+        return set(item for item in self.items() if isinstance(item, net.schematicNet))
+
+    def findSceneSchemPinsSet(self) -> set[shp.schematicPin]:
+        pinsSceneSet = {item for item in self.items() if isinstance(item, shp.schematicPin)}
+        if pinsSceneSet:  # check pinsSceneSet is empty
+            return pinsSceneSet
+        else:
+            return set()
+
+    def findSceneTextSet(self) -> set[shp.text]:
+        textSceneSet = {item for item in self.items() if isinstance(item, shp.text)}
+        if textSceneSet:  # check textSceneSet is empty
+            return textSceneSet
+        else:
+            return set()
 
     def keyPressEvent(self, key_event):
         if key_event.key() == Qt.Key_Escape:
@@ -3304,9 +3313,34 @@ class xyceNetlist:
                     # think about changing to a namedtuple of dataclass
                     self.netlistedViews[item.cellName] = [libItem.libraryName, "veriloga", ]
                 elif viewDict[view].viewType == "symbol":
-                    cirFile.write(f"{item.createXyceNetlistLine()}\n")
+                    cirFile.write(f"{self.createXyceNetlistLine(item)}\n")
                     self.netlistedViews[item.cellName] = [libItem.libraryName, "symbol", ]
                 break
+
+
+    def createXyceNetlistLine(self, item):
+        """
+        Create a netlist line from a nlp device format line.
+        """
+        try:
+            nlpDeviceFormatLine = item.attr["NLPDeviceFormat"].strip()
+            nlpDeviceFormatLine.replace("[@instName]", f"{item.instanceName}")
+            for labelItem in item.labels.values():
+                if labelItem.labelDefinition in nlpDeviceFormatLine:
+                    nlpDeviceFormatLine = nlpDeviceFormatLine.replace(
+                        labelItem.labelDefinition, labelItem.labelText)
+            for pinName, netName in item.pinNetMap.items():
+                if pinName in nlpDeviceFormatLine:
+                    nlpDeviceFormatLine = nlpDeviceFormatLine.replace(f"[|{pinName}:%]",
+                                                                      netName)
+            return nlpDeviceFormatLine
+        except Exception as e:
+            self._scene.logger.error(e)
+            self._scene.logger.error(f"Netlist line is not defined for"
+                                      f" {item.instanceName}")
+            # if there is no NLPDeviceFormat line, create a warning line
+            return f"*Netlist line is not defined for symbol of {item.instanceName}"
+
 
 
 class configViewEdit(QMainWindow):
