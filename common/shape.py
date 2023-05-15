@@ -30,7 +30,8 @@ from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent, )
 from quantiphy import Quantity
 import revedaEditor.common.net as net
 import revedaEditor.backend.dataDefinitions as ddef
-import revedaEditor.pdk.callbacks as cb
+import pdk.callbacks as cb
+
 
 
 class shape(QGraphicsItem):
@@ -1052,7 +1053,7 @@ class label(shape):
     labelUses = ["Normal", "Instance", "Pin", "Device", "Annotation"]
     labelTypes = ["Normal", "NLPLabel", "PyLabel"]
     predefinedLabels = ["[@libName]", "[@cellName]", "[@viewName]", "[@instName]",
-                        "[@modelName]", ]
+                        "[@modelName]", "[@elementNum]" ]
 
     def __init__(self, start: QPoint, pen: QPen, labelDefinition: str = "",
                  grid: tuple = (10, 10), labelType: str = "Normal", labelHeight: str = "12",
@@ -1061,9 +1062,10 @@ class label(shape):
         super().__init__(pen, grid)
         self._start = start  # top left corner
         self._pen = pen
-        self._labelDefinition = labelDefinition  # label definition
+        self._labelDefinition = labelDefinition  # label definition is what is
+        # entered in the symbol editor
         self._labelName = None  # label Name
-        self._labelValue = "?"  # label value
+        self._labelValue = None  # label value
         self._labelText = None  # Displayed label
         self._labelHeight = labelHeight
         self._labelAlign = labelAlign
@@ -1139,7 +1141,7 @@ class label(shape):
         return self._labelName
 
     @labelName.setter
-    def labelName(self, labelName):
+    def labelName(self, labelName:str):
         self._labelName = labelName
 
     @property
@@ -1147,8 +1149,9 @@ class label(shape):
         return self._labelDefinition
 
     @labelDefinition.setter
-    def labelDefinition(self, labelDefinition):
-        self._labelDefinition = labelDefinition
+    def labelDefinition(self, labelDefinition:str):
+        if isinstance(labelDefinition, str):
+            self._labelDefinition = labelDefinition.strip()
 
     @property
     def labelValue(self):
@@ -1157,6 +1160,8 @@ class label(shape):
     @labelValue.setter
     def labelValue(self, labelValue):
         self._labelValue = labelValue
+        self._labelValueSet = True
+        self.labelDefs()
 
     @property
     def labelValueSet(self) -> bool:
@@ -1195,7 +1200,7 @@ class label(shape):
     def labelType(self, labelType):
         if labelType in self.labelTypes:
             self._labelType = labelType
-        else:
+        elif self.scene():
             self.scene().logger.error("Invalid label type")
 
     @property
@@ -1206,8 +1211,8 @@ class label(shape):
     def labelAlign(self, labelAlignment):
         if labelAlignment in self.labelAlignments:
             self._labelAlign = labelAlignment
-        else:
-            print("Invalid label alignment")
+        elif self.scene():
+            self.scene().logger.error("Invalid label alignment")
 
     @property
     def labelOrient(self):
@@ -1228,8 +1233,8 @@ class label(shape):
     def labelUse(self, labelUse):
         if labelUse in self.labelUses:
             self._labelUse = labelUse
-        else:
-            print("Invalid label use")
+        elif self.scene():
+            self.scene().logger.error("Invalid label use")
 
     @property
     def labelFont(self):
@@ -1262,10 +1267,12 @@ class label(shape):
         w. Label names are used in instance.labelDict to identify each label.
         """
         # if label type is normal, label name is the label definition and also label text
-        if self._labelType == "Normal":
+        if self._labelType == self.labelTypes[0]:
             self._labelName = self._labelDefinition
+            self._labelText = self._labelDefinition
+            self._labelValue = None
 
-        elif self._labelType == "NLPLabel":
+        elif self._labelType == self.labelTypes[1]:
             # if label type is NLPLabel, it is a bit more complicated.
             # here we only define label names to display when symbol is instantiated.
             try:
@@ -1290,76 +1297,96 @@ class label(shape):
                     else:
                         self.scene().logger.error("Error in label definition.")
             except Exception as e:
-                print(e)
-        elif self._labelType == "PyLabel":
+                if self.scene():
+                    self.scene().logger.error(e)
+        elif self._labelType == self.labelTypes[2]:
+            # label name is left of equal sign in label definition
             self._labelName = \
                 [string.strip() for string in self.labelDefinition.split("=")][0]
 
     def labelDefs(self):
         """
-        This method will create label name and text from label definition. It
-        should be run label is defined or redefined.
+        This method will create label name, value andtext from label
+        definition. It should be run label is defined or redefined.
         """
+        self.prepareGeometryChange()
         if self._labelType == label.labelTypes[0]:
+            self._labelName = self._labelDefinition
             self._labelText = self._labelDefinition
-        elif self._labelType == label.labelTypes[1]:
+            self._labelValue = None
+            self._labelValueSet = True
+        elif self.labelType == label.labelTypes[1]:
             try:
-                match self._labelDefinition.strip():
-                    case "[@cellName]":
-                        self._labelValue = self.parentItem().cellName
-                        self._labelText = self._labelValue
-                    case "[@instName]":
-                        self._labelValue = f"I{self.parentItem().counter}"
-                        self._labelText = self._labelValue
-                    case "[@libName]":
-                        self._labelValue = self.parentItem().libraryName
-                        self._labelText = self._labelValue
-                    case "[@viewName]":
-                        self._labelValue = self.parentItem().viewName
-                        self._labelText = self._labelValue
-                    case "[@modelName]":
-                        if self.parentItem().attr.get("ModelName"):
-                            self._labelValue = self.parentItem().attr["modelName"]
-                        else:
-                            self._labelValue = ""
-                        self._labelText = self._labelValue
-                    case "[@elementNum]":
-                        self._labelValue = f"{self.parentItem().counter}"
-                        self._labelText = self._labelValue
-                    case other:
-                        labelFields = (
-                            self._labelDefinition.lstrip("[@").rstrip("]").rstrip(
+                if self._labelDefinition in label.predefinedLabels:
+                    self._labelValueSet = True
+                    match self.labelDefinition:
+                        case "[@cellName]":
+                            self._labelName = "cellName"
+                            self._labelValue = self.parentItem().cellName
+                            self._labelText = self._labelValue
+                        case "[@instName]":
+                            self._labelName = "instName"
+                            self._labelValue = f"I{self.parentItem().counter}"
+                            self._labelText = self._labelValue
+                        case "[@libName]":
+                            self._labelName = "libName"
+                            self._labelValue = self.parentItem().libraryName
+                            self._labelText = self._labelValue
+                        case "[@viewName]":
+                            self._viewName = "viewName"
+                            self._labelValue = self.parentItem().viewName
+                            self._labelText = self._labelValue
+                        case "[@modelName]":
+                            self._labelName = "modelName"
+                            self._labelValue = self.parentItem().attr.get(
+                                    "modelName", "")
+                            self._labelText = self._labelValue
+                        case "[@elementNum]":
+                            self._labelName = "elementNum"
+                            self._labelValue = f"{self.parentItem().counter}"
+                            self._labelText = self._labelValue
+                else:
+                    labelFields = (self._labelDefinition.lstrip("[@").rstrip("]").rstrip(
                                 ":").split(":"))
-                        match len(labelFields):
-                            case 1:
-                                self._labelText = self._labelValue
-                            case 2:
+                    self._labelName = labelFields[0].strip()
+                    match len(labelFields):
+                        case 1:
+                            if not self._labelValueSet:
+                                self._labelValue = "?"
+                            self._labelText = self._labelValue
+                        case 2:
+                            if self._labelValueSet:
                                 self._labelText = (
                                     labelFields[1].strip().replace("%", self._labelValue))
-                            case 3:
-                                tempLabelValue = (
+                            else:
+                                self._labelValue = "?"
+                        case 3:
+                            tempLabelValue = (
                                     labelFields[2].strip().split("=")[-1].split()[-1])
-                                if self._labelValueSet:
-                                    self._labelText = labelFields[2].replace(tempLabelValue,
-                                                                             self._labelValue)
-                                else:
-                                    self._labelText = labelFields[2]
-                                    self._labelValue = tempLabelValue
+                            if self.labelValueSet:
+                                self._labelText = labelFields[2
+                                    ].replace(tempLabelValue, self.labelValue)
+                            else:
+                                self._labelText = labelFields[2]
+                                self._labelValue = tempLabelValue
+
             except Exception as e:
-                print(e)
+                if self.scene():
+                    self.scene().logger.error(e)
         elif self._labelType == label.labelTypes[2]:  # pyLabel
             try:
                 labelFields = self._labelDefinition.strip().split("=")
                 self._labelName = labelFields[0].strip()
                 labelFunction = labelFields[1].strip()
                 # pass the PDK callback class named with "cellName" the labels
-                # dictionary of instance.
-                expression = (f"cb.{self.parentItem().cellName}(self.parentItem("
-                              f").labels).{labelFunction}")
+                # dictionary of instance.w
+                expression = (f"cb.{self.parentItem().cellName}(self.parentItem().labels).{labelFunction}")
+                print(expression)
                 self._labelValue = Quantity(eval(expression)).render(prec=3)
                 self._labelText = f"{self._labelName}={self._labelValue}"
             except Exception as e:
-                print(e)
+                if self.scene():
+                    self.scene().logger.error(e)
 
 
 class symbolShape(shape):
@@ -1506,7 +1533,14 @@ class symbolShape(shape):
 
     @instanceName.setter
     def instanceName(self, value: str):
+        '''
+        If instance name is changed and [@instName] label exists, change it too.
+        '''
         self._instanceName = value
+        if self.labels.get('instanceName', None):
+            self.labels['instanceName'].labelValue = value
+            self.labels['instanceName'].labelValueSet = True
+            self.labels['instanceName'].update()
 
     @property
     def counter(self) -> int:
@@ -1528,17 +1562,15 @@ class symbolShape(shape):
 
     @property
     def labels(self):
-        return self._labels
-
-    # labels setter works a bit differently
-    @labels.setter
-    def labels(self, item: label):
-        assert isinstance(item, label)
-        self._labels[item.labelName] = item
+        return self._labels # dictionary
 
     @property
     def pins(self):
         return self._pins
+
+    @property
+    def drawings(self):
+        return self._drawings
 
 class schematicPin(shape):
     """
