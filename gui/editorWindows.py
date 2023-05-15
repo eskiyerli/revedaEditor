@@ -2349,6 +2349,7 @@ class schematic_scene(editor_scene):
                                 else:
                                     item.labels[
                                         tempLabelName].labelVisible = False
+                        [labelItem.labelDefs() for labelItem in item.labels.values()]
                     #     item.update()
                 elif isinstance(item, net.schematicNet):
                     dlg = pdlg.netProperties(self.parent.parent, item)
