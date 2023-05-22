@@ -1082,6 +1082,9 @@ class label(shape):
         self._fm = QFontMetrics(self._labelFont)
         self._rect = self._fm.boundingRect(self._labelDefinition)
 
+    def __repr__(self):
+        return f"label: {self._labelText} for {self._labelDefinition} at {self._start}, " \
+               f"value =  {self._labelValue}"
     def boundingRect(self):
         return QRect(self._start.x(), self._start.y(), self._rect.width(),
                      self._rect.height())  #
@@ -1261,49 +1264,6 @@ class label(shape):
     def moveBy(self, delta: QPoint):
         self._start += delta
 
-    def setLabelName(self):
-        """
-        Creates a label name from label definition, such as [@w:w=%:] becomes
-        w. Label names are used in instance.labelDict to identify each label.
-        """
-        # if label type is normal, label name is the label definition and also label text
-        if self._labelType == self.labelTypes[0]:
-            self._labelName = self._labelDefinition
-            self._labelText = self._labelDefinition
-            self._labelValue = None
-
-        elif self._labelType == self.labelTypes[1]:
-            # if label type is NLPLabel, it is a bit more complicated.
-            # here we only define label names to display when symbol is instantiated.
-            try:
-                if self._labelDefinition.strip() == "[@cellName]":
-                    self._labelName = "cellName"
-                elif self.labelDefinition.strip() == "[@instName]":
-                    self._labelName = "instName"
-                elif self._labelDefinition.strip() == "[@libName]":
-                    self._labelName = "libName"
-                elif self._labelDefinition.strip() == "[@viewName]":
-                    self._labelName = "viewName"
-                elif self._labelDefinition.strip() == "[@modelName]":
-                    self._labelName = "modelName"
-                elif self._labelDefinition.strip() == "[@elementNum]":
-                    self._labelName = "elementNum"
-                else:
-                    if (self._labelDefinition[:2] == "[@" and self._labelDefinition[
-                        -1] == "]"):  # check if it is a correct start and end
-                        self._labelName = (
-                            self._labelDefinition.lstrip("[@").rstrip("]").rstrip(
-                                ":").split(":")[0].strip())
-                    else:
-                        self.scene().logger.error("Error in label definition.")
-            except Exception as e:
-                if self.scene():
-                    self.scene().logger.error(e)
-        elif self._labelType == self.labelTypes[2]:
-            # label name is left of equal sign in label definition
-            self._labelName = \
-                [string.strip() for string in self.labelDefinition.split("=")][0]
-
     def labelDefs(self):
         """
         This method will create label name, value andtext from label
@@ -1381,7 +1341,6 @@ class label(shape):
                 # pass the PDK callback class named with "cellName" the labels
                 # dictionary of instance.w
                 expression = (f"cb.{self.parentItem().cellName}(self.parentItem().labels).{labelFunction}")
-                print(expression)
                 self._labelValue = Quantity(eval(expression)).render(prec=3)
                 self._labelText = f"{self._labelName}={self._labelValue}"
             except Exception as e:

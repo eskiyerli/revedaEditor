@@ -443,7 +443,6 @@ class instanceProperties(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.instance = instance
-        print(self.instance.labels)
         self.initUI()
 
     def initUI(self):
