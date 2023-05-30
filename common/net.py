@@ -57,7 +57,7 @@ class schematicNet(QGraphicsLineItem):
         self._endPoints = [self._start, self._end]
         self._dots = set()
         self._dotPoints = set()
-        self._touchingNets = set()
+        # self._touchingNets = set()
         self._dashedLines = dict()
         self._newWires = list()
 
@@ -128,6 +128,7 @@ class schematicNet(QGraphicsLineItem):
     def pen(self, pen: QPen):
         self._pen = pen
         self.setPen(pen)
+        self.update()
 
     @property
     def name(self):
@@ -187,7 +188,7 @@ class schematicNet(QGraphicsLineItem):
             [self.scene().removeItem(dot) for dot in self._dots]
             self._dots.clear()
             self._dotPoints.clear()
-            self._touchingNets.clear()
+            # self._touchingNets.clear()
 
             if self.horizontal:
                 nets = {netItem for netItem in self.scene().items(
@@ -206,14 +207,13 @@ class schematicNet(QGraphicsLineItem):
                             selfEnd) and selfEnd not in
                             netItem.endPoints):
                         self._dotPoints.add(self.mapFromScene(selfEnd).toPoint())
-                        self._touchingNets.add(netItem)
+                        # self._touchingNets.add(netItem)
 
             [self._dots.add(crossingDot(dotPoint,3,self.scene().wirePen)) for dotPoint in
              self._dotPoints]
             [dot.setParentItem(self) for dot in self._dots]
             [self.scene().addItem(dot) for dot in self._dots]
-            for netItem in self._touchingNets:
-                netItem.findDotPoints()
+            # [netItem.findDotPoints() for netItem in self._touchingNets]
 
         except Exception as e:
             self.scene().logger.error(f'Error in net.findDotPoints: {e}')
@@ -289,10 +289,8 @@ class schematicNet(QGraphicsLineItem):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
-            gridTuple = self.scene().gridTuple
             viewRect = self.scene().views()[0].viewport().rect()
-            # newPos.setX(round(newPos.x() / gridTuple[0]) * gridTuple[0])
-            # newPos.setY(round(newPos.y() / gridTuple[1]) * gridTuple[1])
+
             # Keep the item inside the view rect.
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -315,13 +313,13 @@ class schematicNet(QGraphicsLineItem):
             self.findDotPoints()
         elif change == QGraphicsItem.ItemSelectedHasChanged and self.scene():
             if value:
-                self.scene().schematicWindow.messageLine.setText("Selected Net")
+                self.scene().editorWindow.messageLine.setText("Selected Net")
                 self.mergeNets()
                 self.findDotPoints()
             else:
                 # self.removeDashedLines()
                 # self.mergeNets()
-                self.scene().schematicWindow.messageLine.setText("Unselected Net")
+                self.scene().editorWindow.messageLine.setText("Unselected Net")
         return super().itemChange(change, value)
 
     def removeDashedLines(self):

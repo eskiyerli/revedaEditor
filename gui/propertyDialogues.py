@@ -741,8 +741,44 @@ class displayConfigDialog(QDialog):
         self.snapDistanceEntry = QLineEdit()
         fLayout.addRow("Snap Distance", self.snapDistanceEntry)
 
+        gridTypeGroup = QGroupBox("Grid Type")
+        gridTypeLayout = QHBoxLayout()
+        self.dotType = QRadioButton('Dot Grid')
+        self.dotType.setChecked(True)
+        self.lineType = QRadioButton('Line Grid')
+        self.noType = QRadioButton('No Grid')
+        gridTypeLayout.addWidget(self.dotType)
+        gridTypeLayout.addWidget(self.lineType)
+        gridTypeLayout.addWidget(self.noType)
+        gridTypeGroup.setLayout(gridTypeLayout)
+
         self.vLayout.addLayout(fLayout)
+        self.vLayout.addWidget(gridTypeGroup)
         self.vLayout.addStretch(1)
+
         self.vLayout.addWidget(self.buttonBox)
         self.setLayout(self.vLayout)
+        self.show()
+
+class selectConfigDialogue(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("Selection Options")
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        vLayout = QVBoxLayout()
+        selectionTypeGroup = QGroupBox("Selection Type")
+        selectionTypeLayout = QHBoxLayout()
+        self.fullSelection = QRadioButton('Full')
+        self.partialSelection = QRadioButton('Partial')
+        selectionTypeLayout.addWidget(self.fullSelection)
+        selectionTypeLayout.addWidget(self.partialSelection)
+        selectionTypeGroup.setLayout(selectionTypeLayout)
+        vLayout.addWidget(selectionTypeGroup)
+        vLayout.addStretch(1)
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
         self.show()
