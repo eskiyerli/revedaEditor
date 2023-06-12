@@ -30,7 +30,15 @@ import revedaEditor.common.net as net
 import revedaEditor.common.pens as pens
 import revedaEditor.common.shape as shp
 import revedaEditor.fileio.symbolEncoder as se
+import revedaEditor.common.layers as lyr
 
+def createLayerItems(item):
+    """
+    Create layer items from json file.
+    """
+    layer = lyr.layer(item["name"], item["pcolour"], item["pwidth"], item["pstyle"],
+                      item["bpattern"], item["bcolour"])
+    return layer
 
 def createSymbolItems(item, gridTuple):
     """
@@ -178,15 +186,14 @@ def createSchematicItems(item, libraryDict, viewName: str, gridTuple: (int, int)
         symbolInstance.cellName = item["cell"]
         symbolInstance.counter = instCounter
         symbolInstance.instanceName = item["nam"]
-        symbolInstance.angle = item["ang"]
-        symbolInstance.viewName = "symbol"
+        symbolInstance.angle = item.get("ang", 0)
+        symbolInstance.netlistIgnore = bool(item.get("ign",0))
+        symbolInstance.viewName = viewName
         symbolInstance.attributes = symbolAttributes
-        for label in symbolInstance.labels.values():
-            if label.labelName in labelDict.keys():
-                label.labelValueSet = True
-                label.labelValue = labelDict[label.labelName][0]
-                label.labelVisible = labelDict[label.labelName][1]
-                label.labelDefs()
+        for labelItem in symbolInstance.labels.values():
+            if labelItem.labelName in labelDict.keys():
+                labelItem.labelValue = labelDict[labelItem.labelName][0]
+                labelItem.labelVisible = labelDict[labelItem.labelName][1]
         symbolInstance.setPos(item["loc"][0], item["loc"][1])
         return symbolInstance
 

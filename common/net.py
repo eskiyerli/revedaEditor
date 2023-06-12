@@ -22,10 +22,10 @@
 
 # net class definition.
 from PySide6.QtCore import (QPoint, Qt, QLineF, QRectF, QPointF, QRect)
-from PySide6.QtGui import (QPen, QStaticText, QPainterPath, QColor, QFont,)
-from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem,
+from PySide6.QtGui import (QPen, QStaticText, QPainterPath, QColor, QFont,QColorConstants)
+from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem, QGraphicsPathItem,
                                QGraphicsEllipseItem, QGraphicsRectItem,
-                               QGraphicsSceneMouseEvent)
+                               QGraphicsSceneMouseEvent, QGraphicsSceneHoverEvent,)
 # import revedaEditor.common.pens as pens
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.undoStack as us
@@ -37,7 +37,6 @@ class schematicNet(QGraphicsLineItem):
     '''
     uses = ["SIGNAL", "ANALOG", "CLOCK", "GROUND", "POWER", ]
 
-
     def __init__(self, start: QPoint, end: QPoint, pen: QPen):
         assert isinstance(pen, QPen)
         self._pen = pen
@@ -46,21 +45,25 @@ class schematicNet(QGraphicsLineItem):
         self._start = start
         self._end = end
         self._nameSet = False  # if a name has been set
+        self._nameAdded = False # net name is propagated to the net
         self._nameConflict = False  # if a name conflict has been detected
-        self._connections = dict()  # dictionary of connections
         super().__init__(QLineF(self._start, self._end))
         self.setPen(self._pen)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
+        self.setAcceptHoverEvents(True)
         # self._createdNets = dict()
         self._endPoints = [self._start, self._end]
         self._dots = set()
         self._dotPoints = set()
-        self._touchingNets = set()
+        # self._touchingNets = set()
         self._dashedLines = dict()
         self._newWires = list()
+        self._connectedNetsSet = set()
+        self._flightLinesSet = set()
+        self._highlighted = False
 
     def __repr__(self):
         return f"schematicNet(start={self.mapToScene(self._start)}, " \
@@ -81,6 +84,8 @@ class schematicNet(QGraphicsLineItem):
         painter.setPen(self._pen)
         if self.isSelected():
             painter.setPen(QPen(Qt.blue, 2, Qt.SolidLine))
+        elif self._highlighted:
+            painter.setPen(self.scene().hilightPen)
         if self.name is not None:
             if self._nameConflict:
                 painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
@@ -99,6 +104,46 @@ class schematicNet(QGraphicsLineItem):
             return True
         except AttributeError:
             return False
+
+    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+        super().hoverEnterEvent(event)
+        if self.scene().highlightNets:
+            self._connectedNetsSet = {netItem for netItem in self.scene().items() if ((
+                    isinstance(netItem, schematicNet) and (self.nameSet or self.nameAdded) and
+                                                           netItem.name == self.name))}
+            [netItem.highlight() for netItem in self._connectedNetsSet]
+            for netItem in self._connectedNetsSet:
+                flightLine = netFlightLine(self.mapToScene(self.line().center()),
+                                           netItem.mapToScene(netItem.line().center()),
+                                           self.scene().hilightPen)
+                self._flightLinesSet.add(flightLine)
+                self.scene().addItem(flightLine)
+
+    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+        super().hoverLeaveEvent(event)
+        if self._highlighted:
+            for flightLine in self._flightLinesSet:
+                self.scene().removeItem(flightLine)
+            self._flightLinesSet = set()
+        [netItem.unhighlight() for netItem in self._connectedNetsSet]
+
+    def highlight(self):
+        self._highlighted = True
+        self.update()
+
+    def unhighlight(self):
+        self._highlighted = False
+        self.update()
+
+    @property
+    def highlighted(self):
+        return self._highlighted
+
+    @highlighted.setter
+    def highlighted(self, value: bool):
+        self._highlighted = value
+
+
 
     @property
     def start(self):
@@ -129,6 +174,7 @@ class schematicNet(QGraphicsLineItem):
     def pen(self, pen: QPen):
         self._pen = pen
         self.setPen(pen)
+        self.update()
 
     @property
     def name(self):
@@ -145,6 +191,15 @@ class schematicNet(QGraphicsLineItem):
     @property
     def nameSet(self) -> bool:
         return self._nameSet
+
+    @property
+    def nameAdded(self) -> bool:
+        return self._nameAdded
+
+    @nameAdded.setter
+    def nameAdded(self, value: bool):
+        assert isinstance(value,bool)
+        self._nameAdded = value
 
     @nameSet.setter
     def nameSet(self, value: bool):
@@ -188,7 +243,7 @@ class schematicNet(QGraphicsLineItem):
             [self.scene().removeItem(dot) for dot in self._dots]
             self._dots.clear()
             self._dotPoints.clear()
-            self._touchingNets.clear()
+            # self._touchingNets.clear()
 
             if self.horizontal:
                 nets = {netItem for netItem in self.scene().items(
@@ -207,14 +262,13 @@ class schematicNet(QGraphicsLineItem):
                             selfEnd) and selfEnd not in
                             netItem.endPoints):
                         self._dotPoints.add(self.mapFromScene(selfEnd).toPoint())
-                        self._touchingNets.add(netItem)
+                        # self._touchingNets.add(netItem)
 
             [self._dots.add(crossingDot(dotPoint,3,self.scene().wirePen)) for dotPoint in
              self._dotPoints]
             [dot.setParentItem(self) for dot in self._dots]
             [self.scene().addItem(dot) for dot in self._dots]
-            for netItem in self._touchingNets:
-                netItem.findDotPoints()
+            # [netItem.findDotPoints() for netItem in self._touchingNets]
 
         except Exception as e:
             self.scene().logger.error(f'Error in net.findDotPoints: {e}')
@@ -290,10 +344,8 @@ class schematicNet(QGraphicsLineItem):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
-            gridTuple = self.scene().gridTuple
             viewRect = self.scene().views()[0].viewport().rect()
-            # newPos.setX(round(newPos.x() / gridTuple[0]) * gridTuple[0])
-            # newPos.setY(round(newPos.y() / gridTuple[1]) * gridTuple[1])
+
             # Keep the item inside the view rect.
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -316,13 +368,13 @@ class schematicNet(QGraphicsLineItem):
             self.findDotPoints()
         elif change == QGraphicsItem.ItemSelectedHasChanged and self.scene():
             if value:
-                self.scene().schematicWindow.messageLine.setText("Selected Net")
+                self.scene().editorWindow.messageLine.setText("Selected Net")
                 self.mergeNets()
                 self.findDotPoints()
             else:
                 # self.removeDashedLines()
                 # self.mergeNets()
-                self.scene().schematicWindow.messageLine.setText("Unselected Net")
+                self.scene().editorWindow.messageLine.setText("Unselected Net")
         return super().itemChange(change, value)
 
     def removeDashedLines(self):
@@ -387,6 +439,26 @@ class schematicNet(QGraphicsLineItem):
             for netItem in nets.difference({self}):
                 self.scene().removeItem(netItem)
                 del netItem
+
+class netFlightLine(QGraphicsPathItem):
+    def __init__(self, start: QPoint, end: QPoint, pen: QPen):
+        self._start = start
+        self._end = end
+        self._pen = pen
+        super().__init__()
+
+    def paint(self, painter, option, widget) -> None:
+
+        painter.setPen(self._pen)
+        line = QLineF(self._start, self._end)
+        perpendicularLine =  QLineF(line.center(), line.center()+QPointF(-line.dy(), line.dx()))
+        perpendicularLine.setLength(100)
+
+        path = QPainterPath()
+        path.moveTo(self._start)
+        path.quadTo(perpendicularLine.p2(), self._end)
+        painter.drawPath(path)
+
 
 
 class crossingDot(QGraphicsEllipseItem):

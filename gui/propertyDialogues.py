@@ -452,19 +452,25 @@ class instanceProperties(QDialog):
         self.buttonBox = QDialogButtonBox(QBtn)
         formLayout = QFormLayout()
         self.libNameEdit = edf.longLineEdit()
+        self.libNameEdit.setReadOnly(True)
         self.libNameEdit.setText(self.instance.libraryName)
+        self.libNameEdit.setToolTip("Library Name (Read Only)")
         formLayout.addRow(edf.boldLabel("Library Name", self), self.libNameEdit)
         self.cellNameEdit = edf.longLineEdit()
         self.cellNameEdit.setText(self.instance.cellName)
+        self.cellNameEdit.setReadOnly(True)
+        self.cellNameEdit.setToolTip("Cell Name (Read Only)")
         formLayout.addRow(edf.boldLabel("Cell Name", self), self.cellNameEdit)
         self.viewNameEdit = edf.longLineEdit()
         self.viewNameEdit.setText(self.instance.viewName)
+        self.viewNameEdit.setReadOnly(True)
+        self.viewNameEdit.setToolTip("View Name (Read Only)")
         formLayout.addRow(edf.boldLabel("View Name", self), self.viewNameEdit)
         self.instNameEdit = edf.longLineEdit()
         self.instNameEdit.setText(self.instance.instanceName)
+        self.instNameEdit.setToolTip("Instance Name")
         formLayout.addRow(edf.boldLabel("Instance Name", self), self.instNameEdit)
-        location = (
-                self.instance.scenePos() - self.instance.scene().origin).toTuple()
+        location = (self.instance.scenePos() - self.instance.scene().origin).toTuple()
         self.xLocationEdit = edf.shortLineEdit()
         self.xLocationEdit.setText(str(location[0]))
         formLayout.addRow(edf.boldLabel("x location", self), self.xLocationEdit)
@@ -476,6 +482,12 @@ class instanceProperties(QDialog):
         formLayout.addRow(edf.boldLabel("Angle", self), self.angleEdit)
         formLayout.setVerticalSpacing(10)
         self.instanceLabelsLayout = QGridLayout()
+        self.instanceLabelsLayout.setColumnMinimumWidth(0, 100)
+        self.instanceLabelsLayout.setColumnMinimumWidth(1, 200)
+        self.instanceLabelsLayout.setColumnMinimumWidth(2, 100)
+        self.instanceLabelsLayout.setColumnStretch(0, 0)
+        self.instanceLabelsLayout.setColumnStretch(1, 1)
+        self.instanceLabelsLayout.setColumnStretch(2, 0)
         row_index = 0
         for label in self.instance.labels.values():
             if label.labelDefinition not in shp.label.predefinedLabels:
@@ -497,14 +509,19 @@ class instanceProperties(QDialog):
 
         instanceAttributesLayout = QGridLayout()
         instanceAttributesLayout.setColumnMinimumWidth(0, 100)
+        instanceAttributesLayout.setColumnMinimumWidth(1, 200)
+        instanceAttributesLayout.setColumnStretch(0, 0)
+        instanceAttributesLayout.setColumnStretch(1, 1)
+        # now list instance attributes
         for counter, name in enumerate(self.instance.attr.keys()):
             instanceAttributesLayout.addWidget(edf.boldLabel(name, self), counter,
                 0)
             labelType = edf.longLineEdit()
             labelType.setReadOnly(True)
-            labelName = edf.longLineEdit()
-            labelName.setText(self.instance.attr[name])
-            instanceAttributesLayout.addWidget(labelName, counter, 1)
+            labelNameEdit = edf.longLineEdit()
+            labelNameEdit.setText(self.instance.attr.get(name))
+            labelNameEdit.setToolTip(f"{name} attribute (Read Only)")
+            instanceAttributesLayout.addWidget(labelNameEdit, counter, 1)
 
         self.mainLayout.addLayout(formLayout)
         self.mainLayout.addWidget(edf.boldLabel("Instance Labels", self))
@@ -555,9 +572,16 @@ class schematicPinPropertiesDialog(createPinDialog):
     def __init__(self, parent, item):
         super().__init__(parent)
         self.setWindowTitle(f"{item.pinName} - Pin Properties")
-        self.pinName.setText(item.pinName)
-        self.pinDir.setCurrentText(item.pinDir)
-        self.pinType.setCurrentText(item.pinType)
+        self.xlocationEdit = edf.shortLineEdit()
+        self.xlocationEdit.setToolTip("x location of pin")
+        self.fLayout.addRow("x location:", self.xlocationEdit)
+        self.ylocationEdit = edf.shortLineEdit()
+        self.ylocationEdit.setToolTip("y location of pin")
+        self.fLayout.addRow("y location:", self.ylocationEdit)
+        self.angleEdit = edf.shortLineEdit()
+        self.angleEdit.setToolTip("angle of pin")
+        self.fLayout.addRow("angle:", self.angleEdit)
+
 
 class symbolNameDialog(QDialog):
     def __init__(self, cellPath:pathlib.Path, cellName: str, parent):
@@ -724,8 +748,44 @@ class displayConfigDialog(QDialog):
         self.snapDistanceEntry = QLineEdit()
         fLayout.addRow("Snap Distance", self.snapDistanceEntry)
 
+        gridTypeGroup = QGroupBox("Grid Type")
+        gridTypeLayout = QHBoxLayout()
+        self.dotType = QRadioButton('Dot Grid')
+        self.dotType.setChecked(True)
+        self.lineType = QRadioButton('Line Grid')
+        self.noType = QRadioButton('No Grid')
+        gridTypeLayout.addWidget(self.dotType)
+        gridTypeLayout.addWidget(self.lineType)
+        gridTypeLayout.addWidget(self.noType)
+        gridTypeGroup.setLayout(gridTypeLayout)
+
         self.vLayout.addLayout(fLayout)
+        self.vLayout.addWidget(gridTypeGroup)
         self.vLayout.addStretch(1)
+
         self.vLayout.addWidget(self.buttonBox)
         self.setLayout(self.vLayout)
+        self.show()
+
+class selectConfigDialogue(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("Selection Options")
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        vLayout = QVBoxLayout()
+        selectionTypeGroup = QGroupBox("Selection Type")
+        selectionTypeLayout = QHBoxLayout()
+        self.fullSelection = QRadioButton('Full')
+        self.partialSelection = QRadioButton('Partial')
+        selectionTypeLayout.addWidget(self.fullSelection)
+        selectionTypeLayout.addWidget(self.partialSelection)
+        selectionTypeGroup.setLayout(selectionTypeLayout)
+        vLayout.addWidget(selectionTypeGroup)
+        vLayout.addStretch(1)
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
         self.show()

@@ -22,38 +22,43 @@
 
 # Schematic and symbol editor classes
 # (C) Revolution Semiconductor, 2021
-from PySide6.QtGui import (QColor)
+from PySide6.QtGui import (QColor, QColorConstants)
+from PySide6.QtCore import (Qt)
+from dataclasses import dataclass
 
-
+@dataclass
 class layer:
-    def __init__(self, name, color, z, visible):
-        self.name = name
-        self.color = color  # QColor type
-        self.z = z
-        self.visible = visible
-
-    def __str__(self):
-        return f'{self.name}  {str(self.color.toTuple())} {str(self.z)} {str(self.visible)}'
-
-    def __repr__(self):
-        return f'{self.name}  {str(self.color.toTuple())} {str(self.z)} {str(self.visible)}'
-
-    def __eq__(self, other):
-        return (self.name == other.cellName and self.color == other.color and self.z ==
-                other.z and self.visible == other.visible)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def layerDelete(self):
-        del self
+    name:str = "" # layer name
+    pcolor: QColor = Qt.black # pen colour
+    pwidth: int = 1 # pen width
+    pstyle: Qt.PenStyle = Qt.SolidLine # pen style
+    bcolor: Qt.QColor = Qt.transparent # brush colour
+    bpattern: Qt.BrushStyle = Qt.NoBrush # brush style
+    zindex: int = 1 # z-index
+    selectable: bool = True # selectable
+    visible: bool = True # visible
 
 
-wireLayer = layer(name="wireLayer", color=QColor("cyan"), z=1, visible=True)
-symbolLayer = layer(name="symbolLayer", color=QColor("green"), z=1, visible=True)
-guideLineLayer = layer(name="guideLineLayer", color=QColor("white"), z=1, visible=True)
-selectedWireLayer = layer(name="selectedWireLayer", color=QColor("red"), z=1,
-                          visible=True)
+wireLayer = layer(name="wireLayer", pcolor=QColor("cyan"), pwidth = 1,
+                  pstyle = Qt.SolidLine, z=1, visible=True,
+                  selectable= True)
+symbolLayer = layer(name="symbolLayer", pcolor=QColor("green"), pwidth = 2,
+                    z=2, pstyle= Qt.SolidLine, visible=True, selectable= True)
+guideLineLayer = layer(name="guideLineLayer", pcolor=QColor("white"), pwidth =
+1, z=3)
+
+selectedWireLayer = layer(name="selectedWireLayer", pcolor=QColor("red"), pwidth = 1,
+                          pstyle = Qt.SolidLine, z=3, visible=True, selectable=
+                          True)
+pinLayer = layer(name="pinLayer", pcolor=QColor("red"), pwidth = 1, z=2,
+                 bcolor = QColor("red"), bpattern= Qt.SolidPattern,
+                 visible=True, selectable= True)
+
+#wireLayer = layer(name="wireLayer", color=QColor("cyan"), z=1, visible=True)
+#symbolLayer = layer(name="symbolLayer", color=QColor("green"), z=1, visible=True)
+
+# selectedWireLayer = layer(name="selectedWireLayer", color=QColor("red"), z=1,
+#                           visible=True)
 pinLayer = layer(name="pinLayer", color=QColor("red"), z=2, visible=True)
 labelLayer = layer(name="labelLayer", color=QColor("yellow"), z=3, visible=True)
 textLayer = layer(name="textLayer", color=QColor("white"), z=4, visible=True)
