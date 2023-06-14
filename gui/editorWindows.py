@@ -26,7 +26,7 @@ import math
 import pathlib
 import shutil
 from copy import deepcopy
-import os
+# import os
 # if os.environ.get('REVEDASIM_PATH'):
 #     import revedasim.simMainWindow as smw
 
@@ -39,20 +39,19 @@ from PySide6.QtGui import (QAction, QCloseEvent, QColor, QCursor,
                            QStandardItemModel, QTextDocument, QUndoStack)
 from PySide6.QtPrintSupport import (QPrintDialog, QPrinter, QPrintPreviewDialog)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QDialog,
-                                QGraphicsItem, QFileDialog, QFormLayout,
-                               QGraphicsRectItem, QGraphicsScene,
-                               QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout,
-                               QGroupBox, QLabel, QMainWindow, QMenu, QMessageBox,
-                               QTableView, QToolBar, QTreeView, QVBoxLayout, QWidget,
-                               )
+                            QFileDialog, QFormLayout,
+                           QGraphicsRectItem, QGraphicsScene,
+                           QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout,
+                           QGroupBox, QLabel, QMainWindow, QMenu, QMessageBox,
+                           QTableView, QToolBar, QTreeView, QVBoxLayout, QWidget,
+                           )
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.backend.undoStack as us
-import revedaEditor.common.layers as cel
 import revedaEditor.common.net as net
-import revedaEditor.common.pens as pens  # import pens
+import pdk.pens as pens  # import pens
 import revedaEditor.common.shape as shp  # import the shapes
 import revedaEditor.fileio.loadJSON as lj
 import revedaEditor.fileio.symbolEncoder as se
@@ -1106,8 +1105,6 @@ class editor_scene(QGraphicsScene):
         self.mouseReleaseLoc = None
         self.selectedItems = None  # selected item
         self.readOnly = False  # if the scene is not editable
-        self.defineSceneLayers()
-        self.setPens()
         self.undoStack = QUndoStack()
         self.changeOrigin = False
         self.origin = QPoint(0, 0)
@@ -1125,24 +1122,6 @@ class editor_scene(QGraphicsScene):
         self.statusLine = self.editorWindow.statusLine
         self.installEventFilter(self)
 
-    def setPens(self):
-        self.wirePen = pens.sPen.returnPen("wirePen")
-        self.symbolPen = pens.sPen.returnPen("symbolPen")
-        self.selectedWirePen = pens.sPen.returnPen("selectedWirePen")
-        self.pinPen = pens.sPen.returnPen("pinPen")
-        self.labelPen = pens.sPen.returnPen("labelPen")
-        self.textPen = pens.sPen.returnPen("textPen")
-        self.hilightPen = pens.sPen.returnPen("hilightPen")
-        self.otherPen = pens.sPen.returnPen("otherPen")
-
-    def defineSceneLayers(self):
-        self.wireLayer = cel.wireLayer
-        self.symbolLayer = cel.symbolLayer
-        self.guideLineLayer = cel.guideLineLayer
-        self.selectedWireLayer = cel.selectedWireLayer
-        self.pinLayer = cel.pinLayer
-        self.labelLayer = cel.labelLayer
-        self.textLayer = cel.textLayer
 
     def snapToBase(self, number, base):
         '''
@@ -1196,7 +1175,7 @@ class editor_scene(QGraphicsScene):
             self.editorWindow.messageLine.setText("Draw Selection Rectangle")
             self.selectionRectItem = QGraphicsRectItem(
                 QRectF(self.mousePressLoc, self.mousePressLoc))
-            self.selectionRectItem.setPen(self.draftPen)
+            self.selectionRectItem.setPen(pens.draftPen)
             self.addItem(self.selectionRectItem)
         else:
             self.editorWindow.messageLine.setText("Select an item")
@@ -1247,9 +1226,6 @@ class symbol_scene(editor_scene):
         self.parent = parent
         # drawing switches
         self.selectMode()  # reset to select mode
-        # pen definitions
-        self.setPens()
-        self.draftPen = QPen(self.guideLineLayer.color, 1)
         self.drawPin = False
         self.itemSelect = True
         self.drawArc = False  # draw arc
@@ -1294,32 +1270,27 @@ class symbol_scene(editor_scene):
                     self.selectSceneItems(modifiers)
                 if self.drawPin:
                     self.editorWindow.messageLine.setText("Add Symbol Pin")
-                    self.newPin = self.pinDraw(self.mousePressLoc, self.gridTuple)
+                    self.newPin = self.pinDraw(self.mousePressLoc)
                     self.newPin.setSelected(True)
                 elif self.drawLine:
                     self.editorWindow.messageLine.setText('Drawing a Line')
-                    self.newLine = self.lineDraw(self.mousePressLoc, self.mousePressLoc,
-                                                 self.symbolPen, self.gridTuple)
+                    self.newLine = self.lineDraw(self.mousePressLoc, self.mousePressLoc)
                     self.newLine.setSelected(True)
                 elif self.addLabel:
-                    self.newLabel = self.labelDraw(self.mousePressLoc, self.labelPen,
+                    self.newLabel = self.labelDraw(self.mousePressLoc,
                                                    self.labelDefinition, self.labelType,
                                                    self.labelHeight, self.labelAlignment,
-                                                   self.labelOrient, self.labelUse,
-                                                   self.gridTuple)
+                                                   self.labelOrient, self.labelUse)
                     self.newLabel.setSelected(True)
                 elif self.drawRect:
-                    self.newRect = self.rectDraw(self.mousePressLoc, self.mousePressLoc,
-                                                 self.symbolPen, self.gridTuple)
+                    self.newRect = self.rectDraw(self.mousePressLoc, self.mousePressLoc)
                 elif self.drawCircle:
                     self.editorWindow.messageLine.setText(
                         'Click on the center of the circle')
-                    self.newCircle = self.circleDraw(self.mousePressLoc, self.mousePressLoc,
-                                                     self.symbolPen, self.gridTuple)
+                    self.newCircle = self.circleDraw(self.mousePressLoc, self.mousePressLoc)
                 elif self.drawArc:
                     self.editorWindow.messageLine.setText('Start drawing an arc')
-                    self.newArc = self.arcDraw(self.mousePressLoc, self.mousePressLoc,
-                                               self.symbolPen, self.gridTuple)
+                    self.newArc = self.arcDraw(self.mousePressLoc, self.mousePressLoc)
                 if self.rotateItem and self.selectedItems:
                     self.rotateSelectedItems(self.mousePressLoc)
         except Exception as e:
@@ -1384,59 +1355,57 @@ class symbol_scene(editor_scene):
 
             self.selectMode()
 
-    def lineDraw(self, start: QPoint, current: QPoint, pen: pens.sPen,
-                 gridTuple: [int, int]):
-        line = shp.line(start, current, pen, gridTuple)
+    def lineDraw(self, start: QPoint, current: QPoint):
+        line = shp.line(start, current, self.gridTuple)
         self.addItem(line)
         undoCommand = us.addShapeUndo(self, line)
         self.undoStack.push(undoCommand)
         return line
 
-    def rectDraw(self, start: QPoint, end: QPoint, pen: pens.sPen, gridTuple: [int, int]):
+    def rectDraw(self, start: QPoint, end: QPoint):
         """
         Draws a rectangle on the scene
         """
         # rect = shp.rectangle(start, end - QPoint(pen.width() / 2, pen.width() / 2), pen,
         #                      gridTuple)
-        rect = shp.rectangle(start, end, pen, gridTuple)
+        rect = shp.rectangle(start, end, self.gridTuple)
         self.addItem(rect)
         undoCommand = us.addShapeUndo(self, rect)
         self.undoStack.push(undoCommand)
         return rect
 
-    def circleDraw(self, start: QPoint, end: QPoint, pen: pens.sPen, gridTuple: [int, int]):
+    def circleDraw(self, start: QPoint, end: QPoint):
         """
         Draws a circle on the scene
         """
-        snappedEnd = self.snapToGrid(end, gridTuple)
-        circle = shp.circle(start, snappedEnd, pen, gridTuple)
+        # snappedEnd = self.snapToGrid(end, gridTuple)
+        circle = shp.circle(start, end, self.gridTuple)
         self.addItem(circle)
         undoCommand = us.addShapeUndo(self, circle)
         self.undoStack.push(undoCommand)
         return circle
 
-    def arcDraw(self, start: QPoint, end: QPoint, pen: pens.sPen, gridTuple: [int, int]):
+    def arcDraw(self, start: QPoint, end: QPoint):
         '''
         Draws an arc inside the rectangle defined by start and end points.
         '''
-        arc = shp.arc(start, end, pen, self.gridTuple)
+        arc = shp.arc(start, end,self.gridTuple)
         self.addItem(arc)
         undoCommand = us.addShapeUndo(self, arc)
         self.undoStack.push(undoCommand)
         return arc
 
-    def pinDraw(self, current, gridTuple: [int, int]):
-        pin = shp.pin(current, self.pinPen, self.pinName, self.pinDir, self.pinType,
-                      gridTuple)
+    def pinDraw(self, current):
+        pin = shp.pin(current, self.pinName, self.pinDir, self.pinType, self.gridTuple)
         self.addItem(pin)
         undoCommand = us.addShapeUndo(self, pin)
         self.undoStack.push(undoCommand)
         return pin
 
-    def labelDraw(self, current, pen: pens.sPen, labelDefinition, labelType, labelHeight,
-                  labelAlignment, labelOrient, labelUse, gridTuple: [int, int]):
-        label = shp.label(current, pen, labelDefinition, gridTuple, labelType, labelHeight,
-                          labelAlignment, labelOrient, labelUse, )
+    def labelDraw(self, current, labelDefinition, labelType, labelHeight,
+                  labelAlignment, labelOrient, labelUse):
+        label = shp.label(current,  labelDefinition,  labelType, labelHeight,
+                          labelAlignment, labelOrient, labelUse, self.gridTuple)
         label.labelVisible = self.labelOpaque
         label.labelDefs()
         label.setOpacity(1)
@@ -1686,7 +1655,7 @@ class schematic_scene(editor_scene):
         self.drawText = False  # flat to add text
         self.itemSelect = True  # flag to select item
         self.drawMode = self.drawWire or self.drawPin
-        self.draftPen = QPen(self.guideLineLayer.color, 1)
+        self.draftPen = pens.draftPen
         self.draftPen.setStyle(Qt.DashLine)
         self.draftPin = None
         self.draftText = None
@@ -1728,10 +1697,11 @@ class schematic_scene(editor_scene):
 
                 elif self.drawWire:
                     self.editorWindow.messageLine.setText("Wire Mode")
-                    self.wires = self.addWires(self.mousePressLoc, self.wirePen)
+                    self.wires = self.addWires(self.mousePressLoc)
 
                 elif self.changeOrigin:  # change origin of the symbol
                     self.origin = self.mousePressLoc
+                    self.changeOrigin = False
 
                 elif self.drawPin:
                     self.editorWindow.messageLine.setText("Add a pin")
@@ -1787,7 +1757,7 @@ class schematic_scene(editor_scene):
                         QRectF(self.mousePressLoc, self.mouseMoveLoc))
 
             self.editorWindow.statusLine.showMessage(
-                f"Cursor Position: {str(self.mouseMoveLoc.toTuple())}"
+                f"Cursor Position: {str((self.mouseMoveLoc-self.origin).toTuple())}"
             )
         except Exception as e:
             self.logger.error(e)
@@ -1807,7 +1777,7 @@ class schematic_scene(editor_scene):
                         self.removeItem(self.snapPointRect)
                         self.snapPointRect = None
 
-                    lines = self.pruneWires(self.wires, self.wirePen)
+                    lines = self.pruneWires(self.wires, pens.wirePen)
                     if lines:
                         for line in lines:
                             line.mergeNets()
@@ -1858,7 +1828,7 @@ class schematic_scene(editor_scene):
                     elif isinstance(item, net.schematicNet):
                         if snapRect.contains(item.line().p1().toPoint()):
                             items.append(item)
-                            # print(f'net start:{item.start}')
+
                             points.append(item.line().p1().toPoint())
                             lengths.append((item.mapToScene(
                                 item.line().p1()) - eventLoc).manhattanLength())
@@ -2145,12 +2115,12 @@ class schematic_scene(editor_scene):
         self.selectedItems = []
         self.parent.parent.messageLine.setText("Select Mode")
 
-    def addWires(self, start: QPoint, pen: pens.sPen) -> net.schematicNet:
+    def addWires(self, start: QPoint) -> net.schematicNet:
         """
         Add a net or nets to the scene.
         """
-        lines = [net.schematicNet(start, start, pen), net.schematicNet(start, start, pen),
-                 net.schematicNet(start, start, pen)]
+        lines = [net.schematicNet(start, start), net.schematicNet(start, start),
+                 net.schematicNet(start, start)]
         return lines
 
     def extendWires(self, lines: list, start: QPoint, end: QPoint):
@@ -2183,7 +2153,7 @@ class schematic_scene(editor_scene):
         # if the line is vertical or horizontal
         elif lines[0].start.x() == lines[2].end.x() or lines[0].start.y() == lines[
             2].end.y():
-            newLine = net.schematicNet(lines[0].start, lines[2].end, pen)
+            newLine = net.schematicNet(lines[0].start, lines[2].end)
             self.addItem(newLine)
             undoCommand = us.addShapeUndo(self, newLine)
             self.undoStack.push(undoCommand)
@@ -2204,7 +2174,7 @@ class schematic_scene(editor_scene):
 
     def addPin(self, pos: QPoint):
         try:
-            pin = shp.schematicPin(pos, self.pinPen, self.pinName, self.pinDir,
+            pin = shp.schematicPin(pos, self.pinName, self.pinDir,
                                    self.pinType, self.gridTuple)
             self.addItem(pin)
             undoCommand = us.addShapeUndo(self, pin)
@@ -2217,7 +2187,7 @@ class schematic_scene(editor_scene):
         """
         Changed the method name not to clash with qgraphicsscene addText method.
         """
-        text = shp.text(pos, self.textPen, self.noteText, self.gridTuple,
+        text = shp.text(pos, self.noteText, self.gridTuple,
                         self.noteFontFamily, self.noteFontStyle, self.noteFontSize,
                         self.noteAlign, self.noteOrient, )
         self.addItem(text)
@@ -2243,7 +2213,6 @@ class schematic_scene(editor_scene):
         assert isinstance(file, pathlib.Path)
         itemShapes = []
         itemAttributes = {}
-        draftPen = QPen(self.guideLineLayer.color, 1)
         with open(file, "r") as temp:
             try:
                 items = json.load(temp)
@@ -2258,8 +2227,8 @@ class schematic_scene(editor_scene):
 
                 # create a symbol instance passing item shapes and attributes as
                 # arguments
-                symbolInstance = shp.symbolShape(draftPen, self.gridTuple, itemShapes,
-                                                 itemAttributes)
+                symbolInstance = shp.symbolShape(itemShapes,
+                                                 itemAttributes, self.gridTuple)
                 symbolInstance.setPos(pos)
                 # For each instance assign a counter number from the scene
                 symbolInstance.counter = self.itemCounter
@@ -2313,22 +2282,25 @@ class schematic_scene(editor_scene):
                 self.undoStack.push(undoCommand)
 
     def saveSchematicCell(self, file: pathlib.Path):
-        self.sceneR = self.sceneRect()  # get scene rect
-        # items = self.items(self.sceneR)  # get items in scene rect
-        # only save symbol shapes
-        symbolItems = self.findSceneSymbolSet()
-        netItems = self.findSceneNetsSet()
-        pinItems = self.findSceneSchemPinsSet()
-        textItems = self.findSceneTextSet()
-        items = list(symbolItems | netItems | pinItems | textItems)
-        items.insert(0, {"cellView": "schematic"})
-        with open(file, "w") as f:
-            json.dump(items, f, cls=se.schematicEncoder, indent=4)
-        if self.parent.parent.parentView is not None:
-            if type(self.parentView) == schematicEditor:
-                self.parent.parent.parentView.loadSchematic()
-            elif type(self.parentView) == symbolEditor:
-                self.parent.parent.parentView.loadSymbol()
+        try:
+            self.sceneR = self.sceneRect()  # get scene rect
+            # items = self.items(self.sceneR)  # get items in scene rect
+            # only save symbol shapes
+            symbolItems = self.findSceneSymbolSet()
+            netItems = self.findSceneNetsSet()
+            pinItems = self.findSceneSchemPinsSet()
+            textItems = self.findSceneTextSet()
+            items = list(symbolItems | netItems | pinItems | textItems)
+            items.insert(0, {"cellView": "schematic"})
+            with open(file, "w") as f:
+                json.dump(items, f, cls=se.schematicEncoder, indent=4)
+            if self.parent.parent.parentView is not None:
+                if type(self.parentView) == schematicEditor:
+                    self.parent.parent.parentView.loadSchematic()
+                elif type(self.parentView) == symbolEditor:
+                    self.parent.parent.parentView.loadSymbol()
+        except Exception as e:
+            self.logger.error(e)
 
     def loadSchematicCell(self, itemsList):
         """
@@ -2372,8 +2344,10 @@ class schematic_scene(editor_scene):
                             item.angle = float(dlg.angleEdit.text().strip())
 
                             location = QPoint(float(dlg.xLocationEdit.text().strip()),
-                                    float(dlg.yLocationEdit.text().strip())) - self.origin
-                            item.setPos(self.snapToGrid(location, self.gridTuple))
+                                              float(dlg.yLocationEdit.text().strip(
+                                              )))
+                            item.setPos(self.snapToGrid(location-self.origin,
+                                                        self.gridTuple))
                             tempDoc = QTextDocument()
                             for i in range(dlg.instanceLabelsLayout.rowCount()):
                                 # first create label name document with HTML annotations
@@ -2393,14 +2367,15 @@ class schematic_scene(editor_scene):
                                     else:
                                         item.labels[tempLabelName].labelVisible = False
                             [labelItem.labelDefs() for labelItem in
-                             item.labels.values()]  # item.update()
+                             item.labels.values()]
+
                     elif isinstance(item, net.schematicNet):
                         dlg = pdlg.netProperties(self.editorWindow, item)
                         if dlg.exec() == QDialog.Accepted:
                             item.name = dlg.netNameEdit.text().strip()
                             if item.name != "":
                                 item.nameSet = True
-                            item.update()
+
                     elif isinstance(item, shp.text):
                         dlg = pdlg.noteTextEditProperties(self.editorWindow, item)
                         if dlg.exec() == QDialog.Accepted:
@@ -2428,11 +2403,12 @@ class schematic_scene(editor_scene):
                             item.pinName = dlg.pinName.text().strip()
                             item.pinDir = dlg.pinDir.currentText()
                             item.pinType = dlg.pinType.currentText()
-                            itemStartPos = QPoint(float(dlg.xlocationEdit.text().strip(
-                            )), float(dlg.ylocationEdit.text().strip()))
+                            itemStartPos = QPoint(int(float(dlg.xlocationEdit.text().strip(
+                            ))), int(float(dlg.ylocationEdit.text().strip())))
                             item.start=self.snapToGrid(itemStartPos-self.origin,
                                                        self.gridTuple)
                             item.angle = float(dlg.angleEdit.text().strip())
+                item.update()
         except Exception as e:
             self.logger.error(e)
 
@@ -2538,14 +2514,12 @@ class schematic_scene(editor_scene):
         # add window to open windows list
         libraryView.openViews[f"{libName}_{cellName}_{symbolViewName}"] = symbolWindow
         symbolScene = symbolWindow.centralW.scene
-        symbolScene.rectDraw(QPoint(0, 0), QPoint(rectXDim, rectYDim), self.symbolPen,
-                             symbolScene.gridTuple)
+        symbolScene.rectDraw(QPoint(0, 0), QPoint(rectXDim, rectYDim))
         symbolScene.labelDraw(QPoint(int(0.25 * rectXDim), int(0.4 * rectYDim)),
-                              self.labelPen, "[@cellName]", "NLPLabel", "12", "Center",
-                              "R0", "Instance", symbolScene.gridTuple)
-        symbolScene.labelDraw(QPoint(int(rectXDim), int(-0.2 * rectYDim)), self.labelPen,
-                              "[@instName]", "NLPLabel", "12", "Center", "R0", "Instance",
-                              symbolScene.gridTuple)
+                            "[@cellName]", "NLPLabel", "12", "Center",
+                              "R0", "Instance")
+        symbolScene.labelDraw(QPoint(int(rectXDim), int(-0.2 * rectYDim)),
+                              "[@instName]", "NLPLabel", "12", "Center", "R0", "Instance")
         leftPinLocs = [QPoint(-stubLength, (i + 1) * pinDistance) for i in
                        range(len(leftPinNames))]
         rightPinLocs = [QPoint(rectXDim + stubLength, (i + 1) * pinDistance) for i in
@@ -2555,30 +2529,26 @@ class schematic_scene(editor_scene):
         topPinLocs = [QPoint((i + 1) * pinDistance, -stubLength) for i in
                       range(len(topPinNames))]
         for i in range(len(leftPinNames)):
-            symbolScene.lineDraw(leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0),
-                                 symbolScene.symbolPen, symbolScene.gridTuple)
+            symbolScene.lineDraw(leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0))
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(leftPinNames[i])].toSymbolPin(
-                    leftPinLocs[i], symbolScene.pinPen, symbolScene.gridTuple))
+                    leftPinLocs[i],symbolScene.gridTuple))
         for i in range(len(rightPinNames)):
-            symbolScene.lineDraw(rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0),
-                                 symbolScene.symbolPen, symbolScene.gridTuple)
+            symbolScene.lineDraw(rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0))
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(rightPinNames[i])].toSymbolPin(
-                    rightPinLocs[i], symbolScene.pinPen, symbolScene.gridTuple))
+                    rightPinLocs[i], symbolScene.gridTuple))
         for i in range(len(topPinNames)):
-            symbolScene.lineDraw(topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength),
-                                 symbolScene.symbolPen, symbolScene.gridTuple)
+            symbolScene.lineDraw(topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength))
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(topPinNames[i])].toSymbolPin(
-                    topPinLocs[i], symbolScene.pinPen, symbolScene.gridTuple))
+                    topPinLocs[i], symbolScene.gridTuple))
         for i in range(len(bottomPinNames)):
             symbolScene.lineDraw(bottomPinLocs[i],
-                                 bottomPinLocs[i] + QPoint(0, -stubLength),
-                                 symbolScene.symbolPen, symbolScene.gridTuple)
+                                 bottomPinLocs[i] + QPoint(0, -stubLength))
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(bottomPinNames[i])].toSymbolPin(
-                    bottomPinLocs[i], symbolScene.pinPen,
+                    bottomPinLocs[i],
                     symbolScene.gridTuple))  # symbol attribute generation for netlisting.
         symbolScene.attributeList = list()  # empty attribute list
 

@@ -24,18 +24,17 @@ import json
 import pathlib
 import shutil
 
-from PySide6.QtCore import (Qt, QPoint)
-from PySide6.QtWidgets import (QMainWindow, QDialog)
-
+import pdk.pens as pens
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.hdlBackEnd as hdl
 import revedaEditor.backend.libraryMethods as libm  # library view functions
 import revedaEditor.backend.schBackEnd as scb  # import the backend
-import revedaEditor.common.pens as pens
 import revedaEditor.common.shape as shp
 import revedaEditor.fileio.symbolEncoder as se
 import revedaEditor.gui.editorWindows as edw
 import revedaEditor.gui.propertyDialogues as pdlg
+from PySide6.QtCore import (Qt, QPoint)
+from PySide6.QtWidgets import (QMainWindow, QDialog)
 
 
 def createVaView(parent: QMainWindow, importDlg: QDialog, libraryModel:
@@ -300,7 +299,7 @@ def createVaSymbol(parent: QMainWindow,
         symbolScene.attributeList.append(
             se.symbolAttribute(
                 "pinOrder", importedVaObj.pinOrder
-        ))
+            ))
         symbolWindow.show()
         symbolViewTuple = ddef.viewTuple(vaItemTuple.libraryItem.libraryName,
                                          vaItemTuple.cellItem.cellName, 'symbol')

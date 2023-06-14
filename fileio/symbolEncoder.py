@@ -59,38 +59,37 @@ class symbolEncoder(json.JSONEncoder):
     def default(self, item):
         if isinstance(item, shp.rectangle):
             itemDict = {"type": "rect", "rect": item.rect.getCoords(),
-                        "pen": item.pen.pname,
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.line):
             itemDict = {"type": "line", "st": item.start.toTuple(),
-                        "end": item.end.toTuple(), "pen": item.pen.pname,
+                        "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.circle):
             itemDict = {"type": "circle", "cen": item.centre.toTuple(),
-                        "end": item.end.toTuple(), "pen": item.pen.pname,
+                        "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.arc):
             itemDict = {"type": "arc", "st": item.start.toTuple(),
-                        "end": item.end.toTuple(), "pen": item.pen.pname,
+                        "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.pin):
             itemDict = {"type": "pin", "st": item.start.toTuple(),
-                        "pen": item.pen.pname, "nam": item.pinName,
+                        "nam": item.pinName,
                         "pd": item.pinDir, "pt": item.pinType,
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.text):
             itemDict = {"type": "text", "st": item.start.toTuple(),
-                        "pen": item.pen.pname, 'tc': item.textContent,
+                        "nam": item.textName, 'tc': item.textContent,
                         'ff': item.fontFamily, 'fs': item.fontStyle,
                         'th': item.textHeight, 'ta': item.textAlignment,
                         'to': item.textOrient,
@@ -99,7 +98,7 @@ class symbolEncoder(json.JSONEncoder):
             return itemDict
         elif isinstance(item, shp.label):
             itemDict = {"type": "label", "st": item.start.toTuple(),
-                        "pen": item.pen.pname, "nam": item.labelName,
+                        "nam": item.labelName,
                         "def": item.labelDefinition,  # label as entered
                         "txt": item.labelText,  # shown label
                         "val": item.labelValue,  # label value
@@ -132,7 +131,7 @@ class schematicEncoder(json.JSONEncoder):
             return itemDict
         elif isinstance(item, net.schematicNet):
             itemDict = {"type": "schematicNet", "st": item.start.toTuple(),
-                        "end": item.end.toTuple(), "pen": item.pen.pname,
+                        "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "nam": item.name, "ns": item.nameSet, }
             return itemDict
