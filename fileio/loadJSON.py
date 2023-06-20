@@ -29,6 +29,7 @@ from PySide6.QtCore import (QPoint, )  # QtCore
 import revedaEditor.common.net as net
 import revedaEditor.common.shape as shp
 import revedaEditor.fileio.symbolEncoder as se
+import pdk.layoutLayers as laylyr
 
 
 
@@ -56,7 +57,8 @@ def createRectItem(item, gridTuple):
     """
     start = QPoint(item["rect"][0], item["rect"][1])
     end = QPoint(item["rect"][2], item["rect"][3])
-    rect = shp.rectangle(start, end, gridTuple)  # note that we are using grid values for
+    rect = shp.rectangle(start, end, gridTuple)  # note that we are using grid
+    # values for
     # scene
     rect.setPos(QPoint(item["loc"][0], item["loc"][1]), )
     rect.angle = item["ang"]
@@ -66,7 +68,8 @@ def createRectItem(item, gridTuple):
 def createCircleItem(item, gridTuple):
     centre = QPoint(item["cen"][0], item["cen"][1])
     end = QPoint(item["end"][0], item["end"][1])
-    circle = shp.circle(centre, end, gridTuple)  # note that we are using grid values for
+    circle = shp.circle(centre, end, gridTuple)  # note that we are using grid
+    # values for
     # scene
     circle.setPos(QPoint(item["loc"][0], item["loc"][1]), )
     circle.angle = item["ang"]
@@ -76,7 +79,9 @@ def createCircleItem(item, gridTuple):
 def createArcItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
     end = QPoint(item["end"][0], item["end"][1])
-    arc = shp.arc(start, end, gridTuple)  # note that we are using grid values for scene
+
+    arc = shp.arc(start, end, gridTuple)  # note that we are using grid values
+    # for scene
     arc.setPos(QPoint(item["loc"][0], item["loc"][1]))
     arc.angle = item["ang"]
     return arc
@@ -85,6 +90,7 @@ def createArcItem(item, gridTuple):
 def createLineItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
     end = QPoint(item["end"][0], item["end"][1])
+
     line = shp.line(start, end, gridTuple)
     line.setPos(QPoint(item["loc"][0], item["loc"][1]))
     line.angle = item["ang"]
@@ -189,7 +195,7 @@ def createSchematicNets(item):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
         position = QPoint(item["loc"][0], item["loc"][1])
-        netItem = net.schematicNet(start, end,)
+        netItem = net.schematicNet(start, end)
         netItem.name = item["nam"]
         netItem.nameSet = item["ns"]
         netItem.setPos(position)
@@ -205,7 +211,22 @@ def createSchematicPins(item, gridTuple):
         pinName = item["pn"]
         pinDir = item["pd"]
         pinType = item["pt"]
-        pinItem = shp.schematicPin(start, pinName, pinDir, pinType,gridTuple)
+        pinItem = shp.schematicPin(start, pinName, pinDir, pinType, gridTuple)
         pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
         pinItem.angle = item["ang"]
         return pinItem
+
+
+def createLayoutItems(item,gridTuple):
+    """
+    Create layout items from json file.
+    """
+    if item["type"] == "layRect":
+        start = QPoint(item["rect"][0], item["rect"][1])
+        end = QPoint(item["rect"][2], item["rect"][3])
+        layoutLayer = [layer for layer in laylyr.pdkLayoutLayers if layer.name == item[
+            'lname']][0]
+        rect = shp.layRect(start, end, layoutLayer, gridTuple)
+        rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
+        rect.angle = item["ang"]
+        return rect

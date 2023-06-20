@@ -19,15 +19,25 @@
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
+import gdstk
+import pdk.layoutLayers as laylyr
+import revedaEditor.common.shape as shp
+import pathlib
 
-import json
-import revedaEditor.common.layers as lyr
-class layerEncoder(json.JSONEncoder):
-    def default(self, item):
-        if isinstance(item,lyr.layer):
-            itemDict = {'name': item.name, 'pcolour': item.penColour,
-                        'pwidth': item.penWidth, 'pstyle': item.penStyle,
-                        'bpattern': item.brushPattern, 'bcolour':
-                            item.brushColour, 'zindex': item.zIndex, 'visible':
-                            item.visible}
-            return itemDict
+class gdsExporter:
+    def __init__(self, cellname:str, items:list, outputFileObj:str):
+        self.cellname = cellname
+        self.items = items
+        self.outputFileObj = outputFileObj
+
+
+    def gds_export(self):
+        self.outputFileObj.parent.mkdir(parents=True, exist_ok=True)
+        lib = gdstk.Library()
+        cell = lib.new_cell(self.cellname)
+        for item in self.items:
+            if isinstance(item, shp.layRect):
+                rect = gdstk.rectangle(item.start.toTuple(), item.end.toTuple(),
+                                       item.layer.gdsLayer, item.layer.datatype)
+                cell.add(rect)
+        lib.write_gds(self.outputFileObj)

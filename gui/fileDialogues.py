@@ -310,7 +310,7 @@ class netlistExportDialogue(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.setWindowTitle(f'Export Netlist?')
+        self.setWindowTitle(f'Export Netlist for {parent.cellName}-{parent.viewName}')
         self.setMinimumSize(500, 100)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -331,7 +331,7 @@ class netlistExportDialogue(QDialog):
         viewBoxLayout.addRow(edf.boldLabel('View:'),self.viewNameCombo)
         viewBox.setLayout(viewBoxLayout)
         self.mainLayout.addWidget(viewBox)
-        switchBox = QGroupBox('Switch and Stop View Lists')
+        self.switchBox = QGroupBox('Switch and Stop View Lists')
         self.formLayout = QFormLayout()
         self.switchViewEdit = edf.longLineEdit()
         self.switchViewEdit.setText((', ').join(self.parent.switchViewList))
@@ -339,8 +339,8 @@ class netlistExportDialogue(QDialog):
         self.stopViewEdit = edf.longLineEdit()
         self.stopViewEdit.setText((', ').join(self.parent.stopViewList))
         self.formLayout.addRow((edf.boldLabel('Stop View: ')), self.stopViewEdit)
-        switchBox.setLayout(self.formLayout)
-        self.mainLayout.addWidget(switchBox)
+        self.switchBox.setLayout(self.formLayout)
+        self.mainLayout.addWidget(self.switchBox)
         fileBox = QGroupBox('Select Simulation Directory')
         fileDialogLayout = QHBoxLayout()
         fileDialogLayout.addWidget(edf.boldLabel('Export Directory:'))
@@ -360,6 +360,37 @@ class netlistExportDialogue(QDialog):
         if self.dirName:
             self.netlistDirEdit.setText(self.dirName)
 
+class gdsExportDialogue(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle(f'Export Netlist for {parent.cellName}-{parent.viewName}')
+        self.setMinimumSize(500, 100)
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        self.mainLayout = QVBoxLayout()
+        self.mainLayout.addStretch(2)
+        fileBox = QGroupBox('GDS Export Directory')
+        fileDialogLayout = QHBoxLayout()
+        fileDialogLayout.addWidget(edf.boldLabel('Export Directory/File:'))
+        self.exportPathEdit = edf.longLineEdit()
+        fileDialogLayout.addWidget(self.exportPathEdit)
+        self.gdsExportButton = QPushButton('...')
+        self.gdsExportButton.clicked.connect(self.onDirButtonClicked)
+        fileDialogLayout.addWidget(self.gdsExportButton)
+        fileBox.setLayout(fileDialogLayout)
+        self.mainLayout.addWidget(fileBox)
+        self.mainLayout.addStretch(2)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+
+    def onDirButtonClicked(self):
+        self.dirName = QFileDialog.getExistingDirectory()
+        if self.dirName:
+            self.exportPathEdit.setText(f'{self.dirName}/{self.parent.cellName}-{self.parent.viewName}.gds')
 
 class goDownHierDialogue(QDialog):
     def __init__(self, parent,):

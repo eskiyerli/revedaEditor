@@ -20,30 +20,26 @@
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
 import math
-import sys
 
-import pdk.layers as lyr
-import pdk.pens as pens
+import pdk.symLayers as symlyr
+import pdk.schLayers as schlyr
+import pdk.layoutLayers as laylyr
+
 import pdk.callbacks as cb
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.common.net as net
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QLine, QLineF
-from PySide6.QtGui import (QPen, QFont, QFontMetrics, QPainterPath, QTextOption,
-                           QFontDatabase)
+from PySide6.QtGui import (QPen, QBrush,  QFont, QFontMetrics, QPainterPath,
+                           QTextOption, QFontDatabase)
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent,
                                QGraphicsSceneHoverEvent)
 from quantiphy import Quantity
 
 
-
-
-
-# import pdk.callbacks as cb
-
-
 class shape(QGraphicsItem):
+
     def __init__(self, gridTuple: tuple[int, int]) -> None:
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
@@ -54,6 +50,7 @@ class shape(QGraphicsItem):
         self._gridTuple = gridTuple
         self._angle = 0  # rotation angle
         self._stretch: bool = False
+        self._pen = symlyr.defaultPen
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
@@ -81,6 +78,19 @@ class shape(QGraphicsItem):
         return super().itemChange(change, value)
 
     @property
+    def pen(self):
+        return self._pen
+
+
+    @property
+    def brush(self):
+        return self._brush
+
+    @brush.setter
+    def brush(self, value:QBrush):
+        if isinstance(value, QBrush):
+            self._brush = value
+    @property
     def angle(self):
         return self._angle
 
@@ -105,6 +115,7 @@ class shape(QGraphicsItem):
     @stretch.setter
     def stretch(self, value: bool):
         self._stretch = value
+
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -169,25 +180,24 @@ class rectangle(shape):
 
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]) -> None:
-        super().__init__(gridTuple)
+    def __init__(self, start: QPoint, end: QPoint,gridTuple: tuple[int, int]) -> None:
+        super().__init__( gridTuple)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
         self._end = self._rect.bottomRight()
         self._stretchSide = None
-        self._pen = pens.symbolPen
-        self._brush = pens.symbolBrush
-        self.setZValue(lyr.symbolLayer.z)
+        self._pen = symlyr.symbolPen
 
     def boundingRect(self):
         return self._rect.normalized().adjusted(-2, -2, 2, 2)
 
     def paint(self, painter, option, widget):
         if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
-            self.setZValue(lyr.selectedSymbolLayer.z)
+            painter.setPen(symlyr.selectedSymbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
             if self.stretch:
-                painter.setPen(pens.stretchSymbolPen)
+                painter.setPen(symlyr.stretchSymbolPen)
+                self.setZValue(symlyr.stretchSymbolLayer.z)
                 if self._stretchSide == rectangle.sides[0]:
                     painter.drawLine(self.rect.topLeft(), self.rect.bottomLeft())
                 elif self._stretchSide == rectangle.sides[1]:
@@ -197,8 +207,8 @@ class rectangle(shape):
                 elif self._stretchSide == rectangle.sides[3]:
                     painter.drawLine(self.rect.bottomLeft(), self.rect.bottomRight())
         else:
-            painter.setPen(pens.symbolPen)
-            self.setZValue(lyr.symbolLayer.z)
+            painter.setPen(symlyr.symbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
         painter.drawRect(self._rect)
 
     @property
@@ -355,7 +365,8 @@ class rectangle(shape):
 
 
 class circle(shape):
-    def __init__(self, centre: QPoint, end: QPoint, gridTuple: tuple[int, int]):
+    def __init__(self, centre: QPoint, end: QPoint, gridTuple:
+    tuple[int, int]):
         super().__init__(gridTuple)
         xlen = abs(end.x() - centre.x())
         ylen = abs(end.y() - centre.y())
@@ -365,21 +376,20 @@ class circle(shape):
         self._topLeft = self._centre - QPoint(self._radius, self._radius)
         self._rightBottom = self._centre + QPoint(self._radius, self._radius)
         self._end = self._centre + QPoint(self._radius, 0)  # along x-axis
-        self._pen = pens.symbolPen
         self._stretch = False
         self._startStretch = False
-        self.setZValue(lyr.symbolLayer.z)
 
     def paint(self, painter, option, widget) -> None:
         if self.isSelected():
-            self.setZValue(lyr.selectedSymbolLayer.z)
-            painter.setPen(pens.selectedSymbolPen)
+            painter.setPen(symlyr.selectedSymbolPen)
+            self.setZValue(symlyr.selectedSymbolLayer.z)
             painter.drawEllipse(self._centre, 1, 1)
             if self._stretch:
-                painter.setPen(pens.stretchSymbolPen)
+                painter.setPen(symlyr.stretchSymbolPen)
+                self.setZValue(symlyr.stretchSymbolLayer.z)
         else:
-            painter.setPen(pens.symbolPen)
-            self.setZValue(lyr.symbolLayer.z)
+            painter.setPen(symlyr.symbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
         painter.drawEllipse(self._centre, self._radius, self._radius)
 
     # @property
@@ -489,7 +499,9 @@ class arc(shape):
     arcTypes = ["Up", "Right", "Down", "Left"]
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]):
+    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[
+        int,
+    int]):
         super().__init__(gridTuple)
         self._start = start
         self._end = end
@@ -498,10 +510,9 @@ class arc(shape):
         self._arcAngle = 0
         self._width = self._rect.width()
         self._height = self._rect.height()
-        self._pen = pens.symbolPen
+        self._pen = symlyr.symbolPen
         self._adjustment = int(self._pen.width() / 2)
         self._stretchSide = None
-        self.setZValue(lyr.symbolLayer.z)
         self._findAngle()
 
     def _findAngle(self):
@@ -517,12 +528,12 @@ class arc(shape):
 
     def paint(self, painter, option, widget) -> None:
         if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
+            painter.setPen(symlyr.selectedSymbolPen)
             painter.drawRect(self.rect)
-            self.setZValue(lyr.selectedSymbolLayer.z)
+            self.setZValue(symlyr.selectedSymbolLayer.z)
             if self._stretch:
-                painter.setPen(pens.stretchSymbolPen)
-                self.arcDraw(painter)
+                painter.setPen(symlyr.stretchSymbolPen)
+                self.setZValue(symlyr.stretchSymbolLayer.z)
                 if self._stretchSide == arc.sides[0]:
                     painter.drawLine(self._rect.topLeft(), self._rect.bottomLeft())
                 elif self._stretchSide == arc.sides[1]:
@@ -532,7 +543,9 @@ class arc(shape):
                 elif self._stretchSide == arc.sides[3]:
                     painter.drawLine(self._rect.bottomLeft(), self._rect.bottomRight())
         else:
-            painter.setPen(self._pen)
+            painter.setPen(symlyr.symbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
+
         self.arcDraw(painter)
 
     def arcDraw(self, painter):
@@ -547,10 +560,6 @@ class arc(shape):
 
     def boundingRect(self):
         return self._rect.adjusted(-2, -2, 2, 2)
-
-    @property
-    def objName(self):
-        return "ARC"
 
     @property
     def rect(self):
@@ -683,9 +692,9 @@ class line(shape):
         self._start = start
         self._stretch = False
         self._stretchSide = None
+        self._pen = symlyr.symbolPen
         self._line = QLine(self._start, self._end)
         self._rect = QRect(self._start, self._end).normalized()
-        self.setZValue(lyr.symbolLayer.z)
         self._horizontal = True  # True if line is horizontal, False if vertical
 
     def boundingRect(self):
@@ -703,17 +712,18 @@ class line(shape):
 
     def paint(self, painter, option, widget):
         if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
-            self.setZValue(lyr.selectedSymbolLayer.z)
+            painter.setPen(symlyr.selectedSymbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
             if self._stretch:
-                painter.setPen(pens.stretchSymbolPen)
+                painter.setPen(symlyr.stretchSymbolPen)
+                self.setZValue(symlyr.stretchSymbolLayer.z)
                 if self._stretchSide == line.stretchSides[0]:
                     painter.drawEllipse(self._start, self.gridTuple[0], self.gridTuple[1])
                 elif self._stretchSide == line.stretchSides[1]:
                     painter.drawEllipse(self._end, self.gridTuple[0], self.gridTuple[1])
         else:
-            painter.setPen(pens.symbolPen)
-            self.setZValue(lyr.symbolLayer.z)
+            painter.setPen(symlyr.symbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
         painter.drawLine(self._line)
 
     @property
@@ -746,13 +756,6 @@ class line(shape):
         self._line = QLine(self._start, self._end)
         self._rect = QRect(self._start, self._end).normalized()
 
-    @property
-    def pen(self):
-        return self._pen
-
-    @pen.setter
-    def pen(self, pen: QPen):
-        self._pen = pen
 
     @property
     def width(self):
@@ -816,7 +819,7 @@ class pin(shape):
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
 
     def __init__(self, start: QPoint, pinName: str, pinDir: str, pinType: str,
-                 gridTuple: tuple[int, int]):
+                gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
 
         self._start = start  # centre of pin
@@ -825,10 +828,8 @@ class pin(shape):
         self._pinType = pinType
         self._connected = False  # True if the pin is connected to a net.
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
-        self.setZValue(lyr.symbolLayer.z)
-        self.setVisible(lyr.symbolLayer.visible)
 
-    def __repr__(self):
+    def __str__(self):
         return f"pin: {self._pinName} {self.mapToScene(self._start)}"
 
     def boundingRect(self):
@@ -836,10 +837,11 @@ class pin(shape):
 
     def paint(self, painter, option, widget):
         if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
-            painter.setBrush(pens.symbolPinBrush)
-        painter.setPen(pens.symbolPinPen)
-        painter.setBrush(pens.symbolPinBrush)
+            painter.setPen(symlyr.selectedSymbolPinPen)
+            painter.setBrush(symlyr.selectedSymbolPinBrush)
+        else:
+            painter.setPen(symlyr.symbolPinPen)
+            painter.setBrush(symlyr.symbolPinBrush)
         painter.setFont(QFont("Arial", 12))
         painter.drawRect(self._rect)
         painter.drawText(QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName)
@@ -918,8 +920,6 @@ class text(shape):
         self._textFont.setPointSize(int(float(self._textHeight)))
         self._textFont.setKerning(True)
         self.setOpacity(1)
-        self.setZValue(lyr.textLayer.z)
-        self.setVisible(lyr.textLayer.visible)
         self._fm = QFontMetrics(self._textFont)
         self._textOptions = QTextOption()
         if self._textAlign == text.textAlignments[0]:
@@ -950,12 +950,12 @@ class text(shape):
     def paint(self, painter, option, widget):
         painter.setFont(self._textFont)
         if self.isSelected():
-            painter.setPen(pens.selectedTextPen)
+            painter.setPen(schlyr.selectedTextPen)
             painter.drawRect(self.boundingRect())
-            self.setZValue(lyr.selectedTextLayer.z)
+            self.setZValue(schlyr.selectedTextLayer.z)
         else:
-            painter.setPen(pens.textPen)
-            self.setZValue(lyr.textLayer.z)
+            painter.setPen(schlyr.textPen)
+            self.setZValue(schlyr.textLayer.z)
         painter.drawText(self.boundingRect(), self._textContent, o=self._textOptions)
 
     @property
@@ -1063,7 +1063,7 @@ class label(shape):
 
     def __init__(self, start: QPoint, labelDefinition: str, labelType: str,
                  labelHeight: str, labelAlign: str, labelOrient: str, labelUse: str,
-                 gridTuple: tuple[int, int]):
+                gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
         self._start = start  # top left corner
         self._labelDefinition = labelDefinition  # label definition is what is
@@ -1081,10 +1081,7 @@ class label(shape):
         self._labelFont.setKerning(False)
         self._labelVisible: bool = False
         self._labelValueSet: bool = False
-        self._pen = pens.labelPen
         # labels are visible by default
-        self.setOpacity(1)
-        self.setVisible(lyr.labelLayer.visible)
         self._fm = QFontMetrics(self._labelFont)
         self._rect = self._fm.boundingRect(self._labelDefinition)
 
@@ -1106,10 +1103,12 @@ class label(shape):
         self._labelFont.setPointSize(int(self._labelHeight))
         painter.setFont(self._labelFont)
         if self.isSelected():
-            painter.setPen(pens.selectedTextPen)
+            painter.setPen(symlyr.selectedLabelPen)
             painter.drawRect(self.boundingRect())
+            self.setZValue(symlyr.selectedLabelLayer.z)
         else:
-            painter.setPen(pens.labelPen)
+            painter.setPen(symlyr.labelPen)
+            self.setZValue(symlyr.labelLayer.z)
         if self._labelText:
             painter.drawText(QPoint(self._start.x(), self._start.y() + self._rect.height()),
                              self._labelText, )
@@ -1362,7 +1361,8 @@ class label(shape):
 
 
 class symbolShape(shape):
-    def __init__(self, shapes: list, attr: dict, gridTuple: tuple[int, int]):
+    def __init__(self, shapes: list, attr: dict, gridTuple: tuple[
+        int, int]):
         super().__init__(gridTuple)
         assert shapes is not None  # must not be an empty list
         self.shapes = shapes  # list of shapes in the symbol
@@ -1401,23 +1401,22 @@ class symbolShape(shape):
             for draw in self._drawings[1:]:
                 self.borderRect = self.borderRect.united(draw.sceneBoundingRect())
         self.dashLines = dict()
-        self.setZValue(lyr.symbolLayer.z)
-        self.setVisible(lyr.symbolLayer.visible)
 
-    def __repr__(self):
+    def __str__(self):
         return (f"symbolShape(name={self.cellName}, scene position= {self.scenePos()}, "
                 f"pins = {self.pins}, labels = {self.labels}, ")
 
     def paint(self, painter, option, widget):
-        self.setZValue(lyr.symbolLayer.z)
+        self.setZValue(symlyr.symbolLayer.z)
         if self._draft:
-            painter.setPen(pens.draftPen)
+            painter.setPen(symlyr.draftPen)
+            self.setZValue(symlyr.draftLayer.z)
         if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
+            painter.setPen(symlyr.selectedSymbolPen)
             painter.drawRect(self.borderRect)
-            self.setZValue(lyr.selectedSymbolLayer.z)
+            self.setZValue(symlyr.selectedSymbolLayer.z)
         if self.netlistIgnore:
-            painter.setPen(pens.ignoreSymbolPen)
+            painter.setPen(schlyr.ignoreSymbolPen)
             painter.drawLine(self.borderRect.bottomLeft(), self.borderRect.topRight())
             painter.drawLine(self.borderRect.topLeft(), self.borderRect.bottomRight())
 
@@ -1586,14 +1585,25 @@ class schematicPin(shape):
         self._pinType = pinType
         self._netTupleSet = set()
 
-    def __repr__(self):
+    def __str__(self):
         return f"schematicPin({self._start}, {self._pinName}, {self._pinDir}, " \
                f"{self._pinType})"
 
     def paint(self, painter, option, widget):
-        self.setZValue(lyr.schematicPinLayer.z)
-        painter.setPen(pens.schematicPinPen)
-        painter.setBrush(pens.schematicPinBrush)
+        if self.isSelected():
+            painter.setPen(schlyr.selectedSchematicPinPen)
+            painter.setBrush(schlyr.selectedSchematicPinBrush)
+            painter.drawRect(QRect.span(QPoint(self._start.x() - 10, self._start.y() - 10),
+                                        QPoint(self._start.x() + 10,
+                                               self._start.y() + 10), ))
+        else:
+            painter.setPen(schlyr.schematicPinPen)
+            painter.setBrush(schlyr.schematicPinBrush)
+            self.setZValue(schlyr.schematicPinLayer.z)
+        self.drawPin(painter)
+
+    def drawPin(self, painter):
+
         painter.setFont(QFont("Arial", 12))
         match self.pinDir:
             case "Input":
@@ -1616,12 +1626,6 @@ class schematicPin(shape):
                                      QPoint(self._start.x() + 10, self._start.y() + 10),
                                      QPoint(self._start.x() - 10, self._start.y() + 10), ])
         painter.drawText(self._start.x(), self._start.y() - 20, self.pinName)
-        if self.isSelected():
-            painter.setPen(pens.selectedSymbolPen)
-            painter.setBrush(pens.selectedSymbolBrush)
-            painter.drawRect(QRect.span(QPoint(self._start.x() - 10, self._start.y() - 10),
-                                        QPoint(self._start.x() + 10,
-                                               self._start.y() + 10), ))
 
     def boundingRect(self):
         return QRect(self._start.x() - 10, self._start.y() - 10, 30, 20).adjusted(-5, -10,
@@ -1655,7 +1659,7 @@ class schematicPin(shape):
                 item.net.start = pinSceneLoc
             else:
                 item.net.end = pinSceneLoc
-            item.net.pen = pens.guideLinePen
+            item.net.pen = self._guideLinePen
         super().mousePressEvent(event)
 
     #
@@ -1663,9 +1667,9 @@ class schematicPin(shape):
         super().mouseReleaseEvent(event)
 
         for item in self._netTupleSet:
-            lines = self.scene().addWires(item.net.start, pens.wirePen)
+            lines = self.scene().addWires(item.net.start, schlyr.wirePen)
             self.scene().extendWires(lines, item.net.start, item.net.end)
-            self.scene().pruneWires(lines, pens.wirePen)
+            self.scene().pruneWires(lines, schlyr.wirePen)
             self.scene().removeItem(item.net)
         self._netTupleSet = set()
 
@@ -1722,3 +1726,25 @@ class schematicPin(shape):
     def pinType(self, pintype: str):
         if pintype in self.pinTypes:
             self._pinType = pintype
+
+class layRect(rectangle):
+    def __init__(self, start: QPoint, end: QPoint, inpEdLayer: ddef.edLayer, gridTuple:
+    tuple[
+        int, int]):
+        super().__init__(start, end, gridTuple)
+        self._inpEdLayer = inpEdLayer
+        self._pen = QPen(self._inpEdLayer.pcolor, self._inpEdLayer.pwidth,
+                         self._inpEdLayer.pstyle)
+        self._brush = QBrush(self._inpEdLayer.bcolor, self._inpEdLayer.bstyle)
+
+    def paint(self, painter, option, widget):
+        painter.setPen(self._pen)
+        painter.setBrush(self._brush)
+        painter.drawRect(self._rect)
+
+    def sceneEvent(self, event):
+        return True
+
+    @property
+    def layer(self):
+        return self._inpEdLayer

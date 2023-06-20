@@ -19,14 +19,17 @@
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-
 from collections import namedtuple
+from dataclasses import dataclass
+
+from PySide6.QtCore import (Qt)
+from PySide6.QtGui import (QColor, QPen, QBrush)
 
 viewTuple = namedtuple('viewTuple', ['libraryName', 'cellName', 'viewName'])
 cellTuple = namedtuple('cellTuple', ['libraryName', 'cellName'])
 viewItemTuple = namedtuple('viewItemTuple', ['libraryItem', 'cellItem',
                                              'viewItem'])
-pinNetTuple = namedtuple('pinNetTuple',  ['pin', 'net', 'start'])
+pinNetTuple = namedtuple('pinNetTuple', ['pin', 'net', 'start'])
 netTuple = namedtuple('netTuple', ['net', 'start'])
 # this namedtuple is used to collect information on dashed lines.
 # net is the dashed line
@@ -35,4 +38,21 @@ netTuple = namedtuple('netTuple', ['net', 'start'])
 # 1: end
 # orient is True if self is horizontal, otherwise False
 netEndTuple = namedtuple('netEndTuple', ['net', 'index', 'orient'])
+
+
+@dataclass
+class edLayer:
+    name: str = ""  # edLayer name
+    purpose: str= "drawing"  # edLayer purpose
+    pcolor: QColor = Qt.black  # pen colour
+    pwidth: int = 1  # pen width
+    pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
+    bcolor: QColor = Qt.transparent  # brush colour
+    bstyle: Qt.BrushStyle = Qt.NoBrush  # brush style
+    z: int = 1  # z-index
+    selectable: bool = True  # selectable
+    visible: bool = True  # visible
+    gdsLayer: int = 0 # gds edLayer
+    datatype: int = 0# gds datatype
+
 

@@ -24,7 +24,6 @@ import json
 import pathlib
 import shutil
 
-import pdk.pens as pens
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.hdlBackEnd as hdl
 import revedaEditor.backend.libraryMethods as libm  # library view functions
