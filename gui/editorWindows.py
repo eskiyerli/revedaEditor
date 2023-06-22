@@ -51,7 +51,7 @@ import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.backend.undoStack as us
 import revedaEditor.common.net as net
-import pdk.symLayers as symlyr
+# import pdk.symLayers as symlyr
 import pdk.schLayers as schlyr
 import pdk.layoutLayers as laylyr
 import revedaEditor.common.shape as shp  # import the shapes
@@ -61,6 +61,7 @@ import revedaEditor.fileio.layoutEncoder as le
 import revedaEditor.gui.editFunctions as edf
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
+import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.lsw as lsw
 import revedaEditor.resources.resources
 import revedaEditor.fileio.gdsExport as gdse
@@ -646,7 +647,6 @@ class schematicEditor(editorWindow):
         # help menu
 
         self.menuSimulation.addAction(self.netlistAction)
-        print(f'revedasim_path: {self._app.revedasim_path}')
         if self._app.revedasim_path:
             self.menuSimulation.addAction(self.simulateAction)
 
@@ -3147,11 +3147,21 @@ class libraryBrowser(QMainWindow):
                 symbolWindow.loadSymbol()
                 symbolWindow.show()
             case "veriloga":
-                scb.createCellView(self.appMainW, viewItem.viewName, cellItem)
+                # scb.createCellView(self.appMainW, viewItem.viewName, cellItem)
                 if self.editProcess is None:
                     self.editProcess = QProcess()
                     self.editProcess.finished.connect(self.editProcessFinished)
                     self.editProcess.start(str(self.appMainW.textEditorPath), [])
+            case "layout":
+                layoutWindow = layoutEditor(viewItem, self.libraryDict,
+                                            self.libBrowserCont.designView)
+                self.appMainW.openViews[viewTuple] = layoutWindow
+                layoutWindow.loadLayout()
+                layoutWindow.showLayout()
+            case 'pcell':
+                dlg = ldlg.pcellSettingDialogue(self.appMainW,viewItem, 'pdk.pcells')
+                if dlg.exec() == QDialog.Accepted:
+                    pass
 
     def openConfigEditWindow(self, configDict, schViewItem, viewItem):
         schematicName = schViewItem.viewName
@@ -3233,6 +3243,10 @@ class libraryBrowser(QMainWindow):
                                                    [str(VerilogafilePathObj)])
                     else:
                         self.logger.warning("File path not defined.")
+                case 'pcell':
+                    with open(viewItem.viewPath) as tempFile:
+                        items = json.load(tempFile)
+
                 case "config":
                     with open(viewItem.viewPath) as tempFile:
                         items = json.load(tempFile)
@@ -3255,7 +3269,6 @@ class libraryBrowser(QMainWindow):
             viewItem.data(Qt.UserRole + 2).unlink()  # delete the file.
             viewItem.parent().removeRow(viewItem.row())
         except OSError as e:
-            # print(f"Error:{e.strerror}")
             self.logger.warning(f"Error:{e.strerror}")
 
     def closeEvent(self, event: QCloseEvent) -> None:

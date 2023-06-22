@@ -24,6 +24,8 @@ import pathlib
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.common.shape as shp
 import revedaEditor.gui.editFunctions as edf
+import pdk.pcells as pcl
+import inspect
 from PySide6.QtCore import (Qt, QDir)
 from PySide6.QtGui import (QStandardItemModel, QStandardItem)
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog,
@@ -662,3 +664,4 @@ class libraryPathEditorDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
+

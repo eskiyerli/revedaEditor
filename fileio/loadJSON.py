@@ -224,8 +224,7 @@ def createLayoutItems(item,gridTuple):
     if item["type"] == "layRect":
         start = QPoint(item["rect"][0], item["rect"][1])
         end = QPoint(item["rect"][2], item["rect"][3])
-        layoutLayer = [layer for layer in laylyr.pdkLayoutLayers if layer.name == item[
-            'lname']][0]
+        layoutLayer = laylyr.pdkLayoutLayers[item["lnum"]]
         rect = shp.layRect(start, end, layoutLayer, gridTuple)
         rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item["ang"]

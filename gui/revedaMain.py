@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self._createMenuBar()
         self._createTriggers()
         self.cellViews = ["schematic", "symbol", "layout", "veriloga", "config",
-            "spice", ]
+            "spice", 'pcell' ]
         self.switchViewList = ["schematic", "veriloga", "spice", "symbol"]
         self.stopViewList = ["symbol"]
         self.simulationPath = pathlib.Path.cwd().parent

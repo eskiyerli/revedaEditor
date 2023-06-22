@@ -22,11 +22,12 @@
 import json
 
 import revedaEditor.common.shape as shp
+import pdk.layoutLayers as laylyr
 
 class layoutEncoder(json.JSONEncoder):
     def default(self, item):
         if isinstance(item, shp.layRect):
             itemDict = {"type": "layRect", "rect": item.rect.getCoords(), "loc": (
                 item.scenePos() - item.scene().origin).toTuple(), "ang": item.angle,
-                         "lname": item.layer.name}
+                         "lnum": laylyr.pdkLayoutLayers.index(item.layer)}
             return itemDict

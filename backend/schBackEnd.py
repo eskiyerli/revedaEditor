@@ -122,6 +122,8 @@ class viewItem(QStandardItem):
             return 'myhdl'
         elif 'layout'in self.viewPath.stem:
             return 'layout'
+        elif 'pcell' in self.viewPath.stem:
+            return 'pcell'
         else:
             return None
 
@@ -189,6 +191,10 @@ def createCellView(parent, viewName, cellItem: cellItem) -> viewItem:
         items.insert(0, {'viewName': 'veriloga'})
     elif 'config' in viewName:
         items.insert(0, {'viewName': 'config'})
+    elif 'layout' in viewName:
+        items.insert(0, {'viewName': 'layout'})
+    elif 'pcell' in viewName:
+        items.insert(0, {'viewName': 'pcell'})
     with viewPath.open(mode='w') as f:
         json.dump(items, f, indent=4)
     parent.logger.warning(f'Created {viewName} at {str(viewPath)}')
