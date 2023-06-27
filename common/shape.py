@@ -130,7 +130,6 @@ class shape(QGraphicsItem):
         """
         Do not propagate event if shape needs to keep still.
         """
-
         if self.scene() and (self.scene().changeOrigin or self.scene().drawMode):
             return False
         else:
@@ -1475,7 +1474,7 @@ class symbolShape(shape):
         super().mouseReleaseEvent(event)
 
         for item in self.pinNetTupleList:
-            lines = self.scene().addWires(item.net.start, self.scene().wirePen)
+            lines = self.scene().addWires(item.net.start)
             self.scene().extendWires(lines, item.net.start, item.net.end)
             self.scene().pruneWires(lines, self.scene().wirePen)
             self.scene().removeItem(item.net)
@@ -1667,7 +1666,7 @@ class schematicPin(shape):
         super().mouseReleaseEvent(event)
 
         for item in self._netTupleSet:
-            lines = self.scene().addWires(item.net.start, schlyr.wirePen)
+            lines = self.scene().addWires(item.net.start)
             self.scene().extendWires(lines, item.net.start, item.net.end)
             self.scene().pruneWires(lines, schlyr.wirePen)
             self.scene().removeItem(item.net)
@@ -1728,9 +1727,8 @@ class schematicPin(shape):
             self._pinType = pintype
 
 class layRect(rectangle):
-    def __init__(self, start: QPoint, end: QPoint, inpEdLayer: ddef.edLayer, gridTuple:
-    tuple[
-        int, int]):
+    def __init__(self, start: QPoint, end: QPoint, inpEdLayer: ddef.edLayer, gridTuple: tuple
+        [int, int]):
         super().__init__(start, end, gridTuple)
         self._inpEdLayer = inpEdLayer
         self._pen = QPen(self._inpEdLayer.pcolor, self._inpEdLayer.pwidth,
@@ -1742,9 +1740,98 @@ class layRect(rectangle):
         painter.setBrush(self._brush)
         painter.drawRect(self._rect)
 
-    def sceneEvent(self, event):
-        return True
-
     @property
     def layer(self):
         return self._inpEdLayer
+
+class layoutCell(shape):
+    def __init__(self, shapes: list, gridTuple: tuple[int, int]):
+        super().__init__(gridTuple)
+        assert shapes is not None  # must not be an empty list
+        self._shapes = shapes  # list of shapes in the symbol
+        self._angle = 0.0
+        self._draft = False
+        self._libraryName = ""
+        self._cellName = ""
+        self._viewName = ""
+        self._instanceName = ""
+        self._drawings = list()
+        self._counter = 0
+        for item in self._shapes:
+            item.setFlag(QGraphicsItem.ItemIsSelectable, False)
+            item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
+            item.setParentItem(self)
+            self._drawings.append(item)
+        self.setFiltersChildEvents(True)
+        self.setHandlesChildEvents(True)
+        self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        self._borderRect = self._drawings[0].sceneBoundingRect()
+        if self._drawings[1:]:
+            for drawing in self._drawings[1:]:
+                self._borderRect = self._borderRect.united(
+                    drawing.sceneBoundingRect())
+
+    def __str__(self):
+        return (f"type(self)({self.cellName}, scene position= {self.scenePos()} )")
+
+    def boundingRect(self):
+        return self.childrenBoundingRect()
+
+    def paint(self, painter, option, widget):
+        pass
+
+    @property
+    def libraryName(self):
+        return self._libraryName
+
+    @libraryName.setter
+    def libraryName(self, value):
+        self._libraryName = value
+
+    @property
+    def cellName(self):
+        return self._cellName
+
+    @cellName.setter
+    def cellName(self, value: str):
+        self._cellName = value
+
+    @property
+    def viewName(self):
+        return self._viewName
+
+    @viewName.setter
+    def viewName(self, value: str):
+        self._viewName = value
+
+    @property
+    def counter(self):
+        return self._counter
+
+    @counter.setter
+    def counter(self, value:int):
+        assert isinstance(value, int)
+        self._counter = value
+
+    @property
+    def instanceName(self):
+        return self._instanceName
+
+    @instanceName.setter
+    def instanceName(self, value:str):
+        assert isinstance(value, str)
+        self._instanceName = value
+
+    @property
+    def shapes(self):
+        return self._shapes
+
+    @shapes.setter
+    def shapes(self, value:list):
+        self._shapes = value
+        for shape in self._shapes:
+            shape.setParentItem(self)
+
+    def addShape(self, shape: QGraphicsItem):
+        self._drawings.append(shape)
+        shape.setParentItem(self)

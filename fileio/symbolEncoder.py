@@ -117,8 +117,7 @@ class schematicEncoder(json.JSONEncoder):
                         "view": item.viewName, "nam": item.instanceName, "ic": item.counter,
                         "ld": itemLabelDict,
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, "ign": int(item.netlistIgnore),
-                        "lay": item.layerName, }
+                        "ang": item.angle, "ign": int(item.netlistIgnore), }
             return itemDict
         elif isinstance(item, net.schematicNet):
             itemDict = {"type": "schematicNet", "st": item.start.toTuple(),
@@ -128,13 +127,13 @@ class schematicEncoder(json.JSONEncoder):
             return itemDict
         elif isinstance(item, shp.schematicPin):
             itemDict = {"type": "schematicPin", "st": item.start.toTuple(),
-                        "pen": item.pen.pname, "pn": item.pinName, "pd": item.pinDir,
+                        "pn": item.pinName, "pd": item.pinDir,
                         "pt": item.pinType,
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
         elif isinstance(item, shp.text):
-            itemDict = {"type": "text", "st": item.start.toTuple(), "pen": item.pen.pname,
+            itemDict = {"type": "text", "st": item.start.toTuple(), 
                         'tc': item.textContent, 'ff': item.fontFamily, 'fs': item.fontStyle,
                         'th': item.textHeight, 'ta': item.textAlignment, 'to': item.textOrient,
                         'loc': (item.scenePos() - item.scene().origin).toTuple(),

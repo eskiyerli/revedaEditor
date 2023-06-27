@@ -36,8 +36,17 @@ class gdsExporter:
         lib = gdstk.Library()
         cell = lib.new_cell(self.cellname)
         for item in self.items:
-            if isinstance(item, shp.layRect):
-                rect = gdstk.rectangle(item.start.toTuple(), item.end.toTuple(),
-                                       item.layer.gdsLayer, item.layer.datatype)
-                cell.add(rect)
+            self.createCells(cell, item)
         lib.write_gds(self.outputFileObj)
+
+    def createCells(self, cell,item):
+        match type(item):
+            case shp.layoutCell:
+                self.createCells(cell, item)
+            case shp.layRect:
+                sceneRect = item.mapRectToScene(item.rect).toRect()
+                rect = gdstk.rectangle(sceneRect.topLeft().toTuple(),
+                                       sceneRect.bottomRight(
+                                       ).toTuple(), item.layer.gdsLayer,
+                                       item.layer.datatype)
+                cell.add(rect)

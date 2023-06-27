@@ -26,9 +26,7 @@ from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem, QGraphicsPathIt
                                QGraphicsEllipseItem, QGraphicsRectItem,
                                QGraphicsSceneMouseEvent, QGraphicsSceneHoverEvent, )
 import pdk.schLayers as schlyr
-import pdk.symLayers as symlyr
 import revedaEditor.backend.dataDefinitions as ddef
-from dataclasses import replace
 
 
 # import revedaEditor.backend.undoStack as us
@@ -39,7 +37,6 @@ class schematicNet(QGraphicsLineItem):
     Base schematic net class.
     """
     uses = ["SIGNAL", "ANALOG", "CLOCK", "GROUND", "POWER", ]
-    wirePen = QPen(schlyr.wireLayer.pcolor, schlyr.wireLayer.pwidth, schlyr.wireLayer.pstyle)
 
     def __init__(self, start: QPoint, end: QPoint):
         self._name = None
@@ -50,7 +47,7 @@ class schematicNet(QGraphicsLineItem):
         self._nameAdded = False  # net name is propagated to the net
         self._nameConflict = False  # if a name conflict has been detected
         super().__init__(QLineF(self._start, self._end))
-        self.setPen(self._pen)
+        self.setPen(schlyr.wirePen)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
@@ -83,27 +80,26 @@ class schematicNet(QGraphicsLineItem):
 
     def paint(self, painter, option, widget) -> None:
         line = self.line()
-        painter.setPen(schematicNet.wirePen)
+        pen = schlyr.wirePen
         if self.isSelected():
-            painter.setPen(schematicNet.selectWirePen)
+            pen = schlyr.selectedWirePen
         elif self._highlighted:
-            painter.setPen(schematicNet.hilightWirePen)
+            pen = schlyr.hilightPen
         if self.name is not None:
             if self._nameConflict:
-                painter.setPen(schematicNet.errorWirePen)
-            # if there is name conflict, draw the line and name in red.
-            textLoc = line.center()
-            painter.drawStaticText(textLoc, QStaticText(self.name))
+                pen = schlyr.errorWirePen
+                # if there is name conflict, draw the line and name in red.
+                textLoc = line.center()
+                painter.drawStaticText(textLoc, QStaticText(self.name))
+        painter.setPen(pen)
         painter.drawLine(line)
 
     def sceneEvent(self, event):
-        try:
-            if self.scene().drawWire:
-                return False
+        if self.scene().drawWire:
+            return False
+        else:
             super().sceneEvent(event)
             return True
-        except AttributeError:
-            return False
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         super().hoverEnterEvent(event)
@@ -144,7 +140,7 @@ class schematicNet(QGraphicsLineItem):
 
     @property
     def start(self):
-        return self._start  # return self._start
+        return self._start
 
     @start.setter
     def start(self, start: QPoint):
@@ -169,7 +165,7 @@ class schematicNet(QGraphicsLineItem):
     @name.setter
     def name(self, name):
         if name != "":  # net name should not be an empty string
-            self._name = name  # self.nameSet = True
+            self._name = name
 
     @property
     def nameSet(self) -> bool:
@@ -206,7 +202,7 @@ class schematicNet(QGraphicsLineItem):
     def endPoints(self):
         return [self.mapToScene(self._start).toPoint(), self.mapToScene(
             self._end).toPoint()]
-        # return [self.mapToScene(self.line().p1()),self.mapToScene(self.line().p2())]
+
 
     @property
     def horizontal(self):
@@ -242,7 +238,7 @@ class schematicNet(QGraphicsLineItem):
                         self._dotPoints.add(self.mapFromScene(
                             selfEnd).toPoint())  # self._touchingNets.add(netItem)
 
-            [self._dots.add(crossingDot(dotPoint, 3, schlyr.wirePen)) for dotPoint in
+            [self._dots.add(crossingDot(dotPoint, 3)) for dotPoint in
              self._dotPoints]
             [dot.setParentItem(self) for dot in self._dots]
             [self.scene().addItem(dot) for dot in
@@ -439,23 +435,20 @@ class guideLine(QGraphicsLineItem):
 
 
 class crossingDot(QGraphicsEllipseItem):
-    crossingDotPen = QPen(schlyr.wireLayer.pcolor, schlyr.wireLayer.pwidth,
-                          schlyr.wireLayer.pstyle)
-    crossingDotBrush = QBrush(schlyr.wireLayer.bcolor, schlyr.wireLayer.bstyle)
 
-    def __init__(self, point: QPoint, radius: int, inputLayer: ddef.edLayer):
+
+    def __init__(self, point: QPoint, radius: int):
         self.radius = radius
-        self._pen = QPen(inputLayer.pcolor, inputLayer.pwidth, inputLayer.pstyle)
         self.point = point
         super().__init__(point.x() - radius, point.y() - radius, 2 * radius, 2 * radius)
-        self.setPen(crossingDot.crossingDotPen)
-        self.setBrush(crossingDot.crossingDotBrush)
+        self.setPen(schlyr.wirePen)
+        self.setBrush(schlyr.wireBrush)
 
     def paint(self, painter, option, widget) -> None:
         if self.isSelected():
-            painter.setPen(QPen(Qt.white, 2, Qt.SolidLine))
-            painter.setBrush(Qt.white)
+            painter.setPen(schlyr.selectedWirePen)
+            painter.setBrush(schlyr.selectedWireBrush)
         else:
-            painter.setPen(self._pen)
-            painter.setBrush(self._pen.color())
+            painter.setPen(schlyr.wirePen)
+            painter.setBrush(schlyr.wireBrush)
         painter.drawEllipse(self.point, self.radius, self.radius)

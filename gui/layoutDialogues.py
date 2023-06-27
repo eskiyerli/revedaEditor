@@ -44,9 +44,9 @@ class pcellSettingDialogue(QDialog):
         formLayout = QFormLayout()
         groupBox.setLayout(formLayout)
         pcells = self.getClasses(self.module)
-        pcellCB = QComboBox()
-        pcellCB.addItems(pcells)
-        formLayout.addRow(edf.boldLabel("PCell:"), pcellCB)
+        self.pcellCB = QComboBox()
+        self.pcellCB.addItems(pcells)
+        formLayout.addRow(edf.boldLabel("PCell:"), self.pcellCB)
         self.mainLayout.addWidget(groupBox)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -61,7 +61,6 @@ class pcellSettingDialogue(QDialog):
         module = importlib.import_module(module_name)
         classes = []
         for name, obj in inspect.getmembers(module):
-            print(name)
             if inspect.isclass(obj):
                 classes.append(name)
         return classes

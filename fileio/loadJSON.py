@@ -30,7 +30,7 @@ import revedaEditor.common.net as net
 import revedaEditor.common.shape as shp
 import revedaEditor.fileio.symbolEncoder as se
 import pdk.layoutLayers as laylyr
-
+import pathlib
 
 
 def createSymbolItems(item, gridTuple):
@@ -217,11 +217,47 @@ def createSchematicPins(item, gridTuple):
         return pinItem
 
 
-def createLayoutItems(item,gridTuple):
+def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     """
     Create layout items from json file.
     """
-    if item["type"] == "layRect":
+    match item["type"]:
+        case "layoutCell":
+            libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
+            if libraryPath is None:
+                print(f'{item["lib"]} cannot be found.')
+                return None
+            cell = item["cell"]
+            viewName = item["view"]
+            instCounter = item["ic"]
+            file = libraryPath.joinpath(cell, f'{viewName}.json')
+            itemShapes = list()
+            with open(file, "r") as temp:
+                try:
+                    shapes = json.load(temp)
+                    for shape in shapes[1:]:
+                        if shape["type"] == "layoutCell":
+                            itemShapes.append(createLayoutItems(shape,
+                                                                libraryDict,
+                                                                gridTuple))
+                        elif shape['type'] == 'layRect':
+                            itemShapes.append(createRectShape(shape, gridTuple))
+
+                except json.decoder.JSONDecodeError:
+                    print("Error: Invalid Layout file")
+            layoutInstance = shp.layoutCell(itemShapes, gridTuple)
+            layoutInstance.libraryName = item["lib"]
+            layoutInstance.cellName = item["cell"]
+            layoutInstance.counter = instCounter
+            layoutInstance.instanceName = item["nam"]
+            layoutInstance.setPos(item["loc"][0], item["loc"][1])
+            layoutInstance.viewName = viewName
+            return layoutInstance
+        case "layRect":
+            return createRectShape(item, gridTuple)
+
+
+def createRectShape(item, gridTuple:tuple[int,int]):
         start = QPoint(item["rect"][0], item["rect"][1])
         end = QPoint(item["rect"][2], item["rect"][3])
         layoutLayer = laylyr.pdkLayoutLayers[item["lnum"]]
@@ -229,3 +265,4 @@ def createLayoutItems(item,gridTuple):
         rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item["ang"]
         return rect
+
