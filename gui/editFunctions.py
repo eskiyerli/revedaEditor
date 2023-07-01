@@ -25,9 +25,13 @@ from PySide6.QtCore import (Qt, )
 from PySide6.QtWidgets import (QLineEdit, QLabel, QWidget)
 
 class shortLineEdit(QLineEdit):
-    def __init__(self):
+    def __init__(self, value:str = ''):
         super().__init__(None)
         self.setMaximumWidth(80)
+        if type(value) == str:
+            self.setText(value)
+        else:
+            self.setText(str(value))
 
 
 class boldLabel(QLabel):

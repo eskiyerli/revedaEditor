@@ -223,6 +223,8 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     """
     match item["type"]:
         case "layoutCell":
+            return createLayoutCell(gridTuple, item, libraryDict)
+        case 'pcell':
             libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
             if libraryPath is None:
                 print(f'{item["lib"]} cannot be found.')
@@ -230,31 +232,63 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
             cell = item["cell"]
             viewName = item["view"]
             instCounter = item["ic"]
+            # open pcell json file with reference to pcell class name
             file = libraryPath.joinpath(cell, f'{viewName}.json')
-            itemShapes = list()
             with open(file, "r") as temp:
                 try:
-                    shapes = json.load(temp)
-                    for shape in shapes[1:]:
-                        if shape["type"] == "layoutCell":
-                            itemShapes.append(createLayoutItems(shape,
-                                                                libraryDict,
-                                                                gridTuple))
-                        elif shape['type'] == 'layRect':
-                            itemShapes.append(createRectShape(shape, gridTuple))
-
+                    items = json.load(temp)
+                    if items[0]["cellView"] != "pcell":
+                        print("Not a pcell cell")
+                    else:
+                        pcellInstanceStr = f'pcells.' \
+                                           f'{items[1]["reference"]}(**item.__dict__' \
+                                           f'{gridTuple})'
+                        pcellInstance = eval(pcellInstanceStr)
+                        pcellInstance.libraryName = item["lib"]
+                        pcellInstance.cellName = item["cell"]
+                        pcellInstance.counter = instCounter
+                        pcellInstance.instanceName = item["nam"]
+                        pcellInstance.setPos(item["loc"][0], item["loc"][1])
+                        pcellInstance.viewName = viewName
+                        return pcellInstance
                 except json.decoder.JSONDecodeError:
-                    print("Error: Invalid Layout file")
-            layoutInstance = shp.layoutCell(itemShapes, gridTuple)
-            layoutInstance.libraryName = item["lib"]
-            layoutInstance.cellName = item["cell"]
-            layoutInstance.counter = instCounter
-            layoutInstance.instanceName = item["nam"]
-            layoutInstance.setPos(item["loc"][0], item["loc"][1])
-            layoutInstance.viewName = viewName
-            return layoutInstance
+                    print("Error: Invalid PCell file")
+
         case "layRect":
             return createRectShape(item, gridTuple)
+
+
+def createLayoutCell(gridTuple, item, libraryDict):
+    libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
+    if libraryPath is None:
+        print(f'{item["lib"]} cannot be found.')
+        return None
+    cell = item["cell"]
+    viewName = item["view"]
+    instCounter = item["ic"]
+    file = libraryPath.joinpath(cell, f'{viewName}.json')
+    itemShapes = list()
+    with open(file, "r") as temp:
+        try:
+            shapes = json.load(temp)
+            for shape in shapes[1:]:
+                if shape["type"] == "layoutCell":
+                    itemShapes.append(createLayoutItems(shape,
+                                                        libraryDict,
+                                                        gridTuple))
+                elif shape['type'] == 'layRect':
+                    itemShapes.append(createRectShape(shape, gridTuple))
+
+        except json.decoder.JSONDecodeError:
+            print("Error: Invalid Layout file")
+    layoutInstance = shp.layoutCell(itemShapes, gridTuple)
+    layoutInstance.libraryName = item["lib"]
+    layoutInstance.cellName = item["cell"]
+    layoutInstance.counter = instCounter
+    layoutInstance.instanceName = item["nam"]
+    layoutInstance.setPos(item["loc"][0], item["loc"][1])
+    layoutInstance.viewName = viewName
+    return layoutInstance
 
 
 def createRectShape(item, gridTuple:tuple[int,int]):

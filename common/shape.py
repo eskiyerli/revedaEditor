@@ -1744,12 +1744,11 @@ class layRect(rectangle):
     def layer(self):
         return self._inpEdLayer
 
-class layoutCell(shape):
+class layoutShape(shape):
     def __init__(self, shapes: list, gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
         assert shapes is not None  # must not be an empty list
         self._shapes = shapes  # list of shapes in the symbol
-        self._angle = 0.0
         self._draft = False
         self._libraryName = ""
         self._cellName = ""
@@ -1835,3 +1834,10 @@ class layoutCell(shape):
     def addShape(self, shape: QGraphicsItem):
         self._drawings.append(shape)
         shape.setParentItem(self)
+
+class layoutCell(layoutShape):
+    def __init__(self,shapes:list,gridTuple):
+        super().__init__(shapes,gridTuple)
+class pcell(layoutShape):
+    def __init__(self, shapes: list, gridTuple: tuple[int, int]):
+        super().__init__(shapes,gridTuple)

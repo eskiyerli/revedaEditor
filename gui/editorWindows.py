@@ -1182,7 +1182,6 @@ class editor_scene(QGraphicsScene):
         self.mousePressLoc = None
         self.mouseMoveLoc = None
         self.mouseReleaseLoc = None
-        self.selectedItems = None  # selected item
         self.readOnly = False  # if the scene is not editable
         self.undoStack = QUndoStack()
         self.changeOrigin = False
@@ -1217,7 +1216,7 @@ class editor_scene(QGraphicsScene):
         """
         Rotate selected items by 90 degree.
         """
-        for item in self.selectedItems:
+        for item in self.selectedItems():
             self.rotateAnItem(point, item, 90)
         self.rotateItem = False
         self.itemSelect = True
@@ -1261,10 +1260,10 @@ class editor_scene(QGraphicsScene):
         else:
             self.editorWindow.messageLine.setText("Select an item")
             itemsAtMousePress = self.items(self.mousePressLoc)
-            self.selectedItems = [item for item in itemsAtMousePress if
+            [item for item in itemsAtMousePress if
                                   item.isSelected()] if itemsAtMousePress else None
             self.editorWindow.messageLine.setText(
-                "Item selected" if self.selectedItems else "Nothing selected")
+                "Item selected" if self.selectedItems() else "Nothing selected")
 
     def selectInRectItems(self, selectionRect: QRect, partialSelection=False):
         """
@@ -1272,33 +1271,27 @@ class editor_scene(QGraphicsScene):
         """
 
         mode = Qt.IntersectsItemShape if partialSelection else Qt.ContainsItemShape
-        selectedItems = self.items(selectionRect, mode=mode)
-        [item.setSelected(True) for item in selectedItems]
-        return selectedItems
+        [item.setSelected(True) for item in self.items(selectionRect, mode=mode)]
 
     def selectAll(self):
         """
         Select all items in the scene.
         """
-        self.selectedItems = self.items()
-        [item.setSelected(True) for item in self.selectedItems]
+        [item.setSelected(True) for item in self.items()]
 
     def deselectAll(self):
         """
         Deselect all items in the scene.
         """
-        [item.setSelected(False) for item in self.selectedItems]
-        self.selectedItems = None
+        [item.setSelected(False) for item in self.selectedItems()]
 
     def deleteSelectedItems(self):
-        if self.selectedItems:
-            for item in self.selectedItems:
+        if self.selectedItems() is not None:
+            for item in self.selectedItems():
                 self.removeItem(item)
                 undoCommand = us.deleteShapeUndo(self, item)
                 self.undoStack.push(undoCommand)
-            del self.selectedItems
             self.update()  # self.selectMode()
-
 
 class symbol_scene(editor_scene):
     """
@@ -1430,7 +1423,7 @@ class symbol_scene(editor_scene):
                 elif self.addLabel:
                     self.newLabel.setSelected(False)
                 elif self.itemSelect and modifiers == Qt.ShiftModifier:
-                    self.selectedItems = self.selectInRectItems(
+                    self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection)
                     self.removeItem(self.selectionRectItem)
                     self.selectionRectItem = None
@@ -1523,7 +1516,7 @@ class symbol_scene(editor_scene):
 
     def copySelectedItems(self):
         if hasattr(self, "selectedItems"):
-            for item in self.selectedItems:
+            for item in self.selectedItems():
                 selectedItemJson = json.dumps(item, cls=se.symbolEncoder)
                 itemCopyDict = json.loads(selectedItemJson)
                 shape = lj.createSymbolItems(itemCopyDict, self.gridTuple)
@@ -1538,9 +1531,9 @@ class symbol_scene(editor_scene):
         """
         When item properties is queried.
         """
-        if not self.selectedItems:
+        if not self.selectedItems():
             return
-        for item in self.selectedItems:
+        for item in self.selectedItems():
             if isinstance(item, shp.rectangle):
                 self.queryDlg = pdlg.rectPropertyDialog(self.editorWindow, item)
                 if self.queryDlg.exec() == QDialog.Accepted:
@@ -1677,9 +1670,9 @@ class symbol_scene(editor_scene):
                 self.logger.error(e)
 
     def stretchSelectedItem(self):
-        if self.selectedItems is not None:
+        if self.selectedItems() is not None:
             try:
-                for item in self.selectedItems:
+                for item in self.selectedItems():
                     if hasattr(item, 'stretch'):
                         item.stretch = True
 
@@ -1721,7 +1714,6 @@ class schematic_scene(editor_scene):
         self.instCounter = 0
         self.start = QPoint(0, 0)
         self.current = QPoint(0, 0)
-        self.selectedItems = None
         self.itemsAtMousePress = list()
         self.drawWire = False  # flag to add wire
         self.drawPin = False  # flag to add pin
@@ -1787,7 +1779,7 @@ class schematic_scene(editor_scene):
                     self.newText.setSelected(True)
                 elif self.rotateItem:
                     self.editorWindow.messageLine.setText("Rotate item")
-                    if self.selectedItems:
+                    if self.selectedItems():
                         self.rotateSelectedItems(self.mousePressLoc)
 
                 elif self.itemSelect:
@@ -1870,7 +1862,7 @@ class schematic_scene(editor_scene):
                     self.drawPin = False
                     self.newPin = None
                 elif self.itemSelect and modifiers == Qt.ShiftModifier:
-                    self.selectedItems = self.selectInRectItems(
+                    self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection)
                     self.removeItem(self.selectionRectItem)
                     self.selectionRectItem = None
@@ -2180,7 +2172,6 @@ class schematic_scene(editor_scene):
         self.itemSelect = True
         self.drawWire = False
         self.drawPin = False
-        self.selectedItems = []
         self.parent.parent.messageLine.setText("Select Mode")
 
     def addWires(self, start: QPoint) -> net.schematicNet:
@@ -2312,8 +2303,8 @@ class schematic_scene(editor_scene):
                 self.logger.warning("Invalid JSON File")
 
     def copySelectedItems(self):
-        if self.selectedItems is not None:
-            for item in self.selectedItems:
+        if self.selectedItems() is not None:
+            for item in self.selectedItems():
                 selectedItemJson = json.dumps(item, cls=se.schematicEncoder)
                 itemCopyDict = json.loads(selectedItemJson)
                 if isinstance(item, shp.symbolShape):
@@ -2392,8 +2383,8 @@ class schematic_scene(editor_scene):
         Display the properties of the selected object.
         """
         try:
-            if self.selectedItems is not None:
-                for item in self.selectedItems:
+            if self.selectedItems() is not None:
+                for item in self.selectedItems():
                     if isinstance(item, shp.symbolShape):
                         dlg = pdlg.instanceProperties(self.editorWindow, item)
                         if dlg.exec() == QDialog.Accepted:
@@ -2473,8 +2464,8 @@ class schematic_scene(editor_scene):
         Edit the name of the selected net.
         """
         try:
-            if self.selectedItems is not None:
-                for item in self.selectedItems:
+            if  self.selectedItems() is not None:
+                for item in self.selectedItems():
                     if isinstance(item, net.schematicNet):
                         dlg = pdlg.netProperties(self.editorWindow, item)
                         if dlg.exec() == QDialog.Accepted:
@@ -2618,8 +2609,8 @@ class schematic_scene(editor_scene):
         return symbolViewItem
 
     def goDownHier(self):
-        if self.selectedItems is not None:
-            for item in self.selectedItems:
+        if self.selectedItems() is not None:
+            for item in self.selectedItems():
                 if isinstance(item, shp.symbolShape):
                     dlg = fd.goDownHierDialogue(self.editorWindow)
                     libItem = libm.getLibItem(self.editorWindow.libraryView.libraryModel,
@@ -2649,8 +2640,8 @@ class schematic_scene(editor_scene):
             self.editorWindow.close()
 
     def ignoreSymbol(self):
-        if self.selectedItems:
-            for item in self.selectedItems:
+        if self.selectedItems() is not None:
+            for item in self.selectedItems():
                 if isinstance(item, shp.symbolShape):
                     item.netlistIgnore = not item.netlistIgnore
         else:
@@ -2679,7 +2670,6 @@ class layout_scene(editor_scene):
                 self.parent.view.viewport().rect()).boundingRect()
             if mouse_event.button() == Qt.LeftButton:
                 self.mousePressLoc = mouse_event.scenePos().toPoint()
-
                 if self.addInstance:
                     self.newInstance = self.drawInstance(self.mousePressLoc)
                     self.newInstance.setSelected(True)
@@ -2689,7 +2679,6 @@ class layout_scene(editor_scene):
                     self.changeOrigin = False
                 elif self.itemSelect:
                     self.selectSceneItems(modifiers)
-                    print(self.selectionRectItem)
                 elif self.drawRect:
                     self.newRect = self.layRectDraw(self.mousePressLoc, self.mousePressLoc,
                                                     self.selectEdLayer)
@@ -2702,13 +2691,19 @@ class layout_scene(editor_scene):
         self.mouseMoveLoc = mouse_event.scenePos().toPoint()
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
+
+            if self.selectedItems() is not None:
+                for item in self.selectedItems():
+                    item.setPos(item.pos() + (self.mouseMoveLoc - self.mousePressLoc))
+                    self.mousePressLoc = self.mouseMoveLoc
             if self.drawRect:
                 self.editorWindow.messageLine.setText(
                     "Release mouse on the bottom left point")
                 self.newRect.end = self.mouseMoveLoc
 
-        # elif self.itemSelect and modifiers == Qt.ShiftModifier:
-        #     self.selectionRectItem.setRect(QRectF(self.mousePressLoc, self.mouseMoveLoc))
+            elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                self.selectionRectItem.setRect(QRectF(self.mousePressLoc, self.mouseMoveLoc))
+
         self.statusLine.showMessage(
             f"Cursor Position: {(self.mouseMoveLoc - self.origin).toTuple()}")
 
@@ -2720,9 +2715,9 @@ class layout_scene(editor_scene):
             if mouse_event.button() == Qt.LeftButton:
                 if self.drawRect:
                     self.newRect.setSelected(False)
-                # elif self.itemSelect and modifiers == Qt.ShiftModifier:
-                #     self.selectedItems = self.selectInRectItems(
-                #         self.selectionRectItem.rect(), self.partialSelection)
+                elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                    self.selectInRectItems(
+                        self.selectionRectItem.rect(), self.partialSelection)
                     self.removeItem(self.selectionRectItem)
                     self.selectionRectItem = None
 
@@ -2785,8 +2780,19 @@ class layout_scene(editor_scene):
                                                 f'{items[1]["reference"]}(' \
                                                 f'{self.gridTuple})'
                                 pcellInstance = eval(pcellInstanceStr)
-                                print(pcellInstance.__dict__)
+                                pcellInstance.libraryName = viewItem.parent().parent().libraryName
+                                pcellInstance.cellName = viewItem.parent().cellName
+                                pcellInstance.viewName = viewItem.viewName
+                                pcellInstance.counter = self.itemCounter
+                                pcellInstance.instanceName = f'I{pcellInstance.counter}'
+                                dlg = pdlg.pcellInstanceDialog(self.editorWindow,pcellInstance)
+                                if dlg.exec() == QDialog.Accepted:
+                                    instanceValuesDict = {}
+                                    for key, value in dlg.lineEditDict.items():
+                                        instanceValuesDict[key] = value.text()
+                                    pcellInstance(**instanceValuesDict)
                                 self.addItem(pcellInstance)
+                                return pcellInstance
                         except Exception as e:
                             self.logger.error(f'Cannot read pcell: {e}')
         except Exception as e:
@@ -2834,7 +2840,6 @@ class layout_scene(editor_scene):
         self.itemSelect = True
         self.drawRect = False
         self.changeOrigin = False
-        self.selectedItems = []
         self.parent.parent.messageLine.setText("Select Mode")
 
 

@@ -22,7 +22,7 @@
 # properties dialogues for various symbol items
 
 import pathlib
-
+import inspect
 from PySide6.QtGui import (QFontDatabase, )
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QDialogButtonBox, QLineEdit, QLabel, QComboBox,
@@ -786,6 +786,45 @@ class selectConfigDialogue(QDialog):
         selectionTypeGroup.setLayout(selectionTypeLayout)
         vLayout.addWidget(selectionTypeGroup)
         vLayout.addStretch(1)
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
+        self.show()
+
+class pcellInstanceDialog(QDialog):
+    def __init__(self, parent, item:shp.pcell):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("PCell Instance Options")
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        vLayout = QVBoxLayout()
+        instanceParamsGroup = QGroupBox("Instance Parameters")
+        instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(instanceParamsLayout)
+        if item.__class__.__bases__[0] == shp.pcell:
+            self.pcellLibName = edf.shortLineEdit()
+            self.pcellLibName.setReadOnly(True)
+            self.pcellLibName.setText(item.libraryName)
+            instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
+            self.pcellCellName = edf.shortLineEdit()
+            self.pcellCellName.setReadOnly(True)
+            self.pcellCellName.setText(item.cellName)
+            instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
+            self.pcellName = edf.shortLineEdit()
+            self.pcellName.setReadOnly(True)
+            self.pcellName.setText(item.viewName)
+            instanceParamsLayout.addRow("PCell Name:", self.pcellName)
+            initArgs = inspect.signature(item.__class__.__init__).parameters
+            argsUsed = [param for param in initArgs if (param != 'self' and
+                                                          param != 'gridTuple')]
+            argDict = {arg: getattr(item, arg) for arg in argsUsed}
+            self.lineEditDict = {key:edf.shortLineEdit(value) for key, value in argDict.items()}
+            for key, value in self.lineEditDict.items():
+                instanceParamsLayout.addRow(key, value)
+        vLayout.addWidget(instanceParamsGroup)
+
         vLayout.addWidget(self.buttonBox)
         self.setLayout(vLayout)
         self.show()
