@@ -37,6 +37,7 @@ import revedaEditor.backend.importViews as imv
 import revedaEditor.gui.editorWindows as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.pythonConsole as pcon
+import revedaEditor.gui.stippleEditor as stip
 import revinit
 
 
@@ -116,6 +117,7 @@ class MainWindow(QMainWindow):
         self.menuHelp = self.mainW_menubar.addMenu("&Help")
         self.menuFile.addAction(self.exitAction)
         self.menuTools.addAction(self.libraryBrowserAction)
+        self.menuTools.addAction(self.createStippleAction)
         self.importTools.addAction(self.importVerilogaAction)
         self.menuOptions.addAction(self.optionsAction)
         # self.menuHelp.addAction(self.helpAction)
@@ -133,12 +135,14 @@ class MainWindow(QMainWindow):
         self.libraryBrowserAction = QAction(openLibIcon, "Library Browser", self)
         optionsIcon = QIcon(":/icons/resource-monitor.png")
         self.optionsAction = QAction(optionsIcon, "Options...", self)
+        self.createStippleAction = QAction("Create Stipple...", self)
 
     def _createTriggers(self):
         self.exitAction.triggered.connect(self.exitApp)  # type: ignore
         self.libraryBrowserAction.triggered.connect(self.libraryBrowserClick)
         self.importVerilogaAction.triggered.connect(self.importVerilogaClick)
         self.optionsAction.triggered.connect(self.optionsClick)
+        self.createStippleAction.triggered.connect(self.createStippleClick)
 
     def readLibDefFile(self, libPath: pathlib.Path):
         libraryDict = dict()
@@ -216,6 +220,10 @@ class MainWindow(QMainWindow):
             if importDlg.symbolCheckBox.isChecked():
                 imv.createVaSymbol(self, vaViewItemTuple, self.libraryDict,
                                    self.libraryBrowser, importedVaObj)
+
+    def createStippleClick(self):
+        stippleWindow = stip.stippleEditor(self)
+        stippleWindow.show()
 
     def loadState(self):
 

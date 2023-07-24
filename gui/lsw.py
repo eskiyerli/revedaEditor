@@ -22,7 +22,7 @@
 
 from PySide6.QtWidgets import ( QTableView)
 from PySide6.QtGui import (QStandardItemModel, QStandardItem, QBrush, QColor,
-                           )
+                           QPixmap, QBitmap)
 from PySide6.QtCore import (Signal, Qt)
 
 import sys
@@ -44,9 +44,12 @@ class layerDataModel(QStandardItemModel):
 
         for row, layer in enumerate(self._data):
             self.insertRow(row)
-            brush = QBrush(QColor(layer.bcolor))
-            brush.setStyle(layer.bstyle)
+
+            bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(5,5).toImage())
+            brush = QBrush(bitmap)
+            brush.setColor(QColor(layer.bcolor))
             item = QStandardItem()
+            item.setForeground(QBrush(QColor(255,255,255)))
             item.setBackground(brush)
             self.setItem(row, 0, item)
             self.setItem(row, 1, QStandardItem(layer.name))
@@ -61,7 +64,7 @@ class layerDataModel(QStandardItemModel):
             self.setItem(row, 4, item)
 
     def createData(self, layerlist:list):
-        [self._data.append((layer.name,layer.visible,layer.selectable,layer.bstyle,
+        [self._data.append((layer.name,layer.visible,layer.selectable,layer.btexture,
                             layer.bcolor))  for layer in layerlist]
 
 
@@ -74,8 +77,9 @@ class layerViewTable(QTableView):
         self.setModel(self._model)
         self.resizeColumnsToContents()
         self.setShowGrid(False)
-        self.setMaximumWidth(220)
+        self.setMaximumWidth(240)
         self.setSelectionBehavior(QTableView.SelectRows)
+        self.verticalHeader().setVisible(False)
         selection_model = self.selectionModel()
         selection_model.selectionChanged.connect(self.onSelectionChanged)
 

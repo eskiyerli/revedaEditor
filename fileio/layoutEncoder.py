@@ -22,27 +22,29 @@
 import json
 import inspect
 import pdk.layoutLayers as laylyr
-import revedaEditor.common.shape as shp
+import revedaEditor.common.layoutShapes as lshp
 
 
 class layoutEncoder(json.JSONEncoder):
     def default(self, item):
         match type(item):
-            case shp.layoutCell:
-                itemDict = {"type": "layoutCell", "lib": item.libraryName, "cell":
+            case lshp.layoutInstance:
+                itemDict = {"type": "layoutInstance", "lib": item.libraryName, "cell":
                             item.cellName,
                             "view": item.viewName, "nam": item.instanceName,
                             "ic": item.counter,
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle, }
-            case shp.layRect:
+            case lshp.layRect:
                 itemDict = {"type": "layRect", "rect": item.rect.getCoords(),
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle,
                             "lnum": laylyr.pdkLayoutLayers.index(item.layer)}
+            case lshp.layoutPath:
+                itemDict = {"type": "layoutPath"}
             case default: # now check super class types:
                 match item.__class__.__bases__[0]:
-                    case shp.pcell:
+                    case lshp.pcell:
                         init_args = inspect.signature(item.__class__.__init__).parameters
                         args_used = [param for param in init_args if (param != 'self' and
                                                                     param != 'gridTuple')]

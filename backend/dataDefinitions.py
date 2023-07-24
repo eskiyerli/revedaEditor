@@ -23,7 +23,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 from PySide6.QtCore import (Qt)
-from PySide6.QtGui import (QColor, QPen, QBrush)
+from PySide6.QtGui import (QColor, QPixmap)
 
 viewTuple = namedtuple('viewTuple', ['libraryName', 'cellName', 'viewName'])
 cellTuple = namedtuple('cellTuple', ['libraryName', 'cellName'])
@@ -39,7 +39,6 @@ netTuple = namedtuple('netTuple', ['net', 'start'])
 # orient is True if self is horizontal, otherwise False
 netEndTuple = namedtuple('netEndTuple', ['net', 'index', 'orient'])
 
-
 @dataclass
 class edLayer:
     name: str = ""  # edLayer name
@@ -48,7 +47,21 @@ class edLayer:
     pwidth: int = 1  # pen width
     pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
     bcolor: QColor = Qt.transparent  # brush colour
-    bstyle: Qt.BrushStyle = Qt.NoBrush  # brush style
+    bstyle: Qt.BrushStyle = Qt.SolidPattern  # brush texture
+    z: int = 1  # z-index
+    selectable: bool = True  # selectable
+    visible: bool = True  # visible
+    gdsLayer: int = 0 # gds edLayer
+    datatype: int = 0# gds datatype
+@dataclass
+class layLayer:
+    name: str = ""  # edLayer name
+    purpose: str= "drawing"  # edLayer purpose
+    pcolor: QColor = Qt.black  # pen colour
+    pwidth: int = 1  # pen width
+    pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
+    bcolor: QColor = Qt.transparent  # brush colour
+    btexture: str = ''  # brush texture
     z: int = 1  # z-index
     selectable: bool = True  # selectable
     visible: bool = True  # visible

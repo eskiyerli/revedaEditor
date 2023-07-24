@@ -28,6 +28,7 @@ from PySide6.QtCore import (QPoint, )  # QtCore
 
 import revedaEditor.common.net as net
 import revedaEditor.common.shape as shp
+import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.fileio.symbolEncoder as se
 import pdk.layoutLayers as laylyr
 import pathlib
@@ -222,8 +223,8 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     Create layout items from json file.
     """
     match item["type"]:
-        case "layoutCell":
-            return createLayoutCell(gridTuple, item, libraryDict)
+        case "layoutInstance":
+            return createLayoutInstance(gridTuple, item, libraryDict)
         case 'pcell':
             libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
             if libraryPath is None:
@@ -258,7 +259,7 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
             return createRectShape(item, gridTuple)
 
 
-def createLayoutCell(gridTuple, item, libraryDict):
+def createLayoutInstance(gridTuple, item, libraryDict):
     libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
     if libraryPath is None:
         print(f'{item["lib"]} cannot be found.')
@@ -272,16 +273,14 @@ def createLayoutCell(gridTuple, item, libraryDict):
         try:
             shapes = json.load(temp)
             for shape in shapes[1:]:
-                if shape["type"] == "layoutCell":
-                    itemShapes.append(createLayoutItems(shape,
-                                                        libraryDict,
-                                                        gridTuple))
+                if shape["type"] == "layoutInstance":
+                    itemShapes.append(createLayoutInstance(gridTuple, shape, libraryDict))
                 elif shape['type'] == 'layRect':
                     itemShapes.append(createRectShape(shape, gridTuple))
 
         except json.decoder.JSONDecodeError:
             print("Error: Invalid Layout file")
-    layoutInstance = shp.layoutCell(itemShapes, gridTuple)
+    layoutInstance = lshp.layoutInstance(itemShapes, gridTuple)
     layoutInstance.libraryName = item["lib"]
     layoutInstance.cellName = item["cell"]
     layoutInstance.counter = instCounter
@@ -295,7 +294,7 @@ def createRectShape(item, gridTuple:tuple[int,int]):
         start = QPoint(item["rect"][0], item["rect"][1])
         end = QPoint(item["rect"][2], item["rect"][3])
         layoutLayer = laylyr.pdkLayoutLayers[item["lnum"]]
-        rect = shp.layRect(start, end, layoutLayer, gridTuple)
+        rect = lshp.layoutInstance(start, end, layoutLayer, gridTuple)
         rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item["ang"]
         return rect

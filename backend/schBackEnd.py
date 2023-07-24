@@ -43,8 +43,11 @@ class libraryItem(QStandardItem):
     def type(self):
         return Qt.StandardItem.UserType
 
+    def __str__(self):
+        return f"library item path: {self.libraryPath}, library item name: {self.libraryName}"
+
     def __repr__(self):
-        return f"library item path: {self.libraryPath}, \nlibrary item name: {self.libraryName}"
+        return f'{type(self).__name__}({self.libraryPath})'
 
     @property
     def libraryPath(self):
@@ -62,6 +65,7 @@ class libraryItem(QStandardItem):
 
 class cellItem(QStandardItem):
     def __init__(self, cellPath: pathlib.Path) -> None:
+        self.cellPath = cellPath
         self._cellName = cellPath.stem
         # self._libName = self.parent.libraryName
         super().__init__(self.cellName)
@@ -72,8 +76,11 @@ class cellItem(QStandardItem):
     def type(self):
         return QStandardItem.UserType + 1
 
-    def __repr__(self):
+    def __str__(self):
         return f"cell item path: {self.cellPath}, \ncell item name: {self.cellName}"
+
+    def __repr__(self):
+        return f'{type(self).__name__}({self.cellPath})'
 
     @property
     def cellName(self):
@@ -92,8 +99,11 @@ class viewItem(QStandardItem):
     def type(self):
         return QStandardItem.UserType + 1
 
+    def __str__(self):
+        return f"view item path: {self.viewPath}, view item name: {self.viewName}"
+
     def __repr__(self):
-        return f"view item path: {self.viewPath}, \nview item name: {self.viewName}"
+        return f'{type(self).__name__}(pathlib.Path({self.viewPath}))'
 
     def delete(self):
         '''

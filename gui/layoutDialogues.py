@@ -23,13 +23,55 @@ import revedaEditor.gui.editFunctions as edf
 import pdk.pcells as pcl
 import inspect
 import importlib
-from PySide6.QtCore import (Qt, QDir)
+import revedaEditor.gui.lsw as lsw
+import pdk.layoutLayers as laylyr
+import revedaEditor.common.layoutShapes as lshp
 from PySide6.QtGui import (QStandardItemModel, QStandardItem)
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QVBoxLayout, QRadioButton, QButtonGroup,
                                QPushButton, QGroupBox, QTableView, QMenu,
                                QCheckBox)
+
+
+class pcellInstanceDialog(QDialog):
+    def __init__(self, parent, item:lshp.pcell):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("PCell Instance Options")
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        vLayout = QVBoxLayout()
+        instanceParamsGroup = QGroupBox("Instance Parameters")
+        instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(instanceParamsLayout)
+        if item.__class__.__bases__[0] == shp.pcell:
+            self.pcellLibName = edf.shortLineEdit()
+            self.pcellLibName.setReadOnly(True)
+            self.pcellLibName.setText(item.libraryName)
+            instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
+            self.pcellCellName = edf.shortLineEdit()
+            self.pcellCellName.setReadOnly(True)
+            self.pcellCellName.setText(item.cellName)
+            instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
+            self.pcellName = edf.shortLineEdit()
+            self.pcellName.setReadOnly(True)
+            self.pcellName.setText(item.viewName)
+            instanceParamsLayout.addRow("PCell Name:", self.pcellName)
+            initArgs = inspect.signature(item.__class__.__init__).parameters
+            argsUsed = [param for param in initArgs if (param != 'self' and
+                                                          param != 'gridTuple')]
+            argDict = {arg: getattr(item, arg) for arg in argsUsed}
+            self.lineEditDict = {key:edf.shortLineEdit(value) for key, value in argDict.items()}
+            for key, value in self.lineEditDict.items():
+                instanceParamsLayout.addRow(key, value)
+        vLayout.addWidget(instanceParamsGroup)
+
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
+        self.show()
 
 class pcellSettingDialogue(QDialog):
     def __init__(self,parent,viewItem: QStandardItem, module: str):
@@ -54,6 +96,7 @@ class pcellSettingDialogue(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
+        self.show()
 
 
     @staticmethod
@@ -64,3 +107,50 @@ class pcellSettingDialogue(QDialog):
             if inspect.isclass(obj):
                 classes.append(name)
         return classes
+
+class pathSettingsDialogue(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle('Create Path')
+        self.setMinimumSize(400,200)
+        mainLayout = QVBoxLayout()
+        pathOrientBox = QGroupBox('Path Orientation')
+        horizontalLayout = QHBoxLayout(pathOrientBox)
+        pathOrientBox.setLayout(horizontalLayout)
+        pathOrientGroup = QButtonGroup()
+
+        self.manhattanButton = QRadioButton('Manhattan')
+        pathOrientGroup.addButton(self.manhattanButton)
+        horizontalLayout.addWidget(self.manhattanButton)
+        self.diagonalButton = QRadioButton('Diagonal')
+        pathOrientGroup.addButton(self.diagonalButton)
+        horizontalLayout.addWidget(self.diagonalButton)
+        self.anyButton = QRadioButton('Any')
+        pathOrientGroup.addButton(self.anyButton)
+        horizontalLayout.addWidget(self.anyButton)
+        self.horizontalButton = QRadioButton('Horizontal')
+        pathOrientGroup.addButton(self.horizontalButton)
+        horizontalLayout.addWidget(self.horizontalButton)
+        self.verticalButton = QRadioButton('Vertical')
+        pathOrientGroup.addButton(self.verticalButton)
+        horizontalLayout.addWidget(self.verticalButton)
+        self.manhattanButton.setChecked(True)
+        pathOrientGroup.setExclusive(True)
+        mainLayout.addWidget(pathOrientBox)
+        groupBox = QGroupBox()
+        formLayout = QFormLayout()
+        groupBox.setLayout(formLayout)
+        self.pathWidth = edf.shortLineEdit()
+        formLayout.addRow(edf.boldLabel("Path Width:"), self.pathWidth)
+        self.pathName = edf.shortLineEdit()
+        formLayout.addRow(edf.boldLabel("Path Name:"), self.pathName)
+        mainLayout.addWidget(groupBox)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        mainLayout.addWidget(self.buttonBox)
+        self.setLayout(mainLayout)
+        self.show()
+
