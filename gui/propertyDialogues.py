@@ -38,31 +38,22 @@ class rectPropertyDialog(QDialog):
     '''
     Property dialog for symbol rectangles.
     '''
-    def __init__(self, parent, rectItem: shp.rectangle):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.rectItem = rectItem
-        self.location = self.rectItem.scenePos().toTuple()
-        self.coords = self.rectItem.rect.getRect()
-
+        self.setMinimumWidth(300)
         self.setWindowTitle("Rectangle Properties")
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.mainLayout = QVBoxLayout()
         self.fLayout = QFormLayout()
-        self.fLayout.setContentsMargins(10, 10, 10, 10)
-        self.rectWidthLine = QLineEdit()
-        self.rectWidthLine.setText(str(self.coords[2]))
+        self.fLayout.setContentsMargins(10, 20, 10, 20)
+        self.rectWidthLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("Width:"), self.rectWidthLine)
-        self.rectHeightLine = QLineEdit()
-        self.rectHeightLine.setText(str(self.coords[3]))
+        self.rectHeightLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("Height:"), self.rectHeightLine)
-        self.rectLeftLine = QLineEdit()
-        self.rectLeftLine.setText(
-            str(self.rectItem.start.toTuple()[0] + self.location[0]))
+        self.rectLeftLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("X Origin:"), self.rectLeftLine)
-        self.rectTopLine = QLineEdit()
-        self.rectTopLine.setText(
-            str(self.rectItem.start.toTuple()[1] + self.location[1]))
+        self.rectTopLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("Y Origin:"), self.rectTopLine)
         self.mainLayout.addLayout(self.fLayout)
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -74,28 +65,23 @@ class rectPropertyDialog(QDialog):
 
 
 class circlePropertyDialog(QDialog):
-    def __init__(self, parent, circleItem: shp.circle):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.circleItem = circleItem
-        self.location = self.circleItem.scenePos().toTuple()
-        self.centre = self.circleItem.mapToScene(
-            self.circleItem.centre).toTuple()
-        self.radius = self.circleItem.radius
-
+        self.setMinimumWidth(300)
         self.setWindowTitle("Circle Properties")
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.mainLayout = QVBoxLayout()
         self.fLayout = QFormLayout()
         self.fLayout.setContentsMargins(10, 10, 10, 10)
         self.centerXEdit = edf.shortLineEdit()
-        self.centerXEdit.setText(str(self.centre[0]))
+
         self.fLayout.addRow(QLabel("center x-coord:"), self.centerXEdit)
         self.centerYEdit = edf.shortLineEdit()
-        self.centerYEdit.setText(str(self.centre[1]))
+
         self.fLayout.addRow(QLabel("center y-coord:"), self.centerYEdit)
         self.radiusEdit = edf.shortLineEdit()
-        self.radiusEdit.setText(str(self.radius))
+
         self.fLayout.addRow(QLabel("radius:"), self.radiusEdit)
         self.mainLayout.addLayout(self.fLayout)
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -106,12 +92,10 @@ class circlePropertyDialog(QDialog):
         self.show()
 
 class arcPropertyDialog(QDialog):
-    def __init__(self, parent, arcItem: shp.arc):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Arc Properties")
-        self.arcItem = arcItem
-        self.location = self.arcItem.scenePos().toTuple()
         # self.arcType = self.arcItem.arcType
         # self.arcTypeCombo = QComboBox()
         # self.arcTypeCombo.addItems(shp.arc.arcTypes)
@@ -123,18 +107,13 @@ class arcPropertyDialog(QDialog):
         self.fLayout.setContentsMargins(10, 10, 10, 10)
         # self.mainLayout.addWidget(self.arcTypeCombo)
         self.startXEdit = edf.shortLineEdit()
-        self.startXEdit.setText(
-            str(self.arcItem.start.toTuple()[0] + self.location[0]))
         self.fLayout.addRow(QLabel("X Origin:"), self.startXEdit)
         self.startYEdit = edf.shortLineEdit()
-        self.startYEdit.setText(
-            str(self.arcItem.start.toTuple()[1] + self.location[1]))
         self.fLayout.addRow(QLabel("Y Origin:"), self.startYEdit)
         self.widthEdit = edf.shortLineEdit()
-        self.widthEdit.setText(str(self.arcItem.width))
+
         self.fLayout.addRow(QLabel("Width:"), self.widthEdit)
         self.heightEdit = edf.shortLineEdit()
-        self.heightEdit.setText(str(self.arcItem.height))
         self.fLayout.addRow(QLabel("Height:"), self.heightEdit)
         self.mainLayout.addLayout(self.fLayout)
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -145,11 +124,9 @@ class arcPropertyDialog(QDialog):
         self.show()
 
 class linePropertyDialog(QDialog):
-    def __init__(self, parent, lineItem: shp.line):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.lineItem = lineItem
-        self.location = self.lineItem.scenePos().toTuple()
 
         self.setWindowTitle("Line Properties")
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
@@ -157,20 +134,13 @@ class linePropertyDialog(QDialog):
         self.fLayout = QFormLayout()
         self.fLayout.setContentsMargins(10, 10, 10, 10)
         self.startXLine = QLineEdit()
-        self.startXLine.setText(
-            str(self.lineItem.start.toTuple()[0] + self.location[0]))
+
         self.fLayout.addRow(QLabel("Start (X):"), self.startXLine)
-        self.startYLine = QLineEdit()
-        self.startYLine.setText(
-            str(self.lineItem.start.toTuple()[1] + self.location[1]))
+        self.startYLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("Start (Y):"), self.startYLine)
-        self.endXLine = QLineEdit()
-        self.endXLine.setText(
-            str(self.lineItem.end.toTuple()[0] + self.location[0]))
+        self.endXLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("End (X):"), self.endXLine)
-        self.endYLine = QLineEdit()
-        self.endYLine.setText(
-            str(self.lineItem.end.toTuple()[1] + self.location[1]))
+        self.endYLine = edf.shortLineEdit()
         self.fLayout.addRow(QLabel("End (Y):"), self.endYLine)
         self.mainLayout.addLayout(self.fLayout)
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -185,10 +155,11 @@ class createPinDialog(QDialog):
     def __init__(self, parent) -> None:
         super().__init__(parent)
         self.setWindowTitle("Create Pin")
+        self.setMinimumWidth(300)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.mainLayout = QVBoxLayout()
         self.fLayout = QFormLayout()
-        self.pinName = QLineEdit()
+        self.pinName = edf.shortLineEdit()
         self.pinName.setPlaceholderText("Pin Name")
         self.pinName.setToolTip("Enter pin name")
         self.fLayout.addRow(QLabel("Pin Name"), self.pinName)
@@ -210,22 +181,14 @@ class createPinDialog(QDialog):
 
 
 class pinPropertyDialog(createPinDialog):
-    def __init__(self, parent, pinItem: shp.pin):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.pinItem = pinItem
-        self.location = self.pinItem.scenePos().toTuple()
-
         self.setWindowTitle("Pin Properties")
-        self.pinName.setText(str(pinItem.pinName))
-        self.pinType.setCurrentText(pinItem.pinType)
-        self.pinDir.setCurrentText(pinItem.pinDir)
-        self.pinXLine = QLineEdit()
-        self.pinXLine.setText(str(self.pinItem.start.x() + self.location[0]))
+        self.pinXLine = edf.shortLineEdit()
         self.pinXLine.setToolTip("X Coordinate")
         self.fLayout.addRow(QLabel("X:"), self.pinXLine)
-        self.pinYLine = QLineEdit()
-        self.pinYLine.setText(str(self.pinItem.start.y() + self.location[1]))
+        self.pinYLine = edf.shortLineEdit()
         self.pinYLine.setToolTip("Y Coordinate")
         self.fLayout.addRow(QLabel("Y:"), self.pinYLine)
 
@@ -278,37 +241,14 @@ class createSymbolLabelDialog(QDialog):
 
 
 class labelPropertyDialog(createSymbolLabelDialog):
-    def __init__(self, parent, labelItem: shp.label):
-        assert isinstance(labelItem, shp.label)
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.labelItem = labelItem
-        self.location = self.labelItem.scenePos().toTuple()
-
         self.setWindowTitle("Label Properties")
-        self.labelDefinition.setText(str(labelItem.labelDefinition))
-        self.labelHeightEdit.setText(str(labelItem.labelHeight))
-        self.labelAlignCombo.setCurrentText(labelItem.labelAlign)
-        self.labelOrientCombo.setCurrentText(labelItem.labelOrient)
-        self.labelUseCombo.setCurrentText(labelItem.labelUse)
-        if labelItem.labelVisible:
-            self.labelVisiCombo.setCurrentText("Yes")
-        else:
-            self.labelVisiCombo.setCurrentText("No")
-        if self.labelItem.labelType == "Normal":
-            self.normalType.setChecked(True)
-        elif self.labelItem.labelType == "NLPLabel":
-            self.NLPType.setChecked(True)
-        elif self.labelItem.labelType == "PyLabel":
-            self.pyLType.setChecked(True)
-        self.labelXLine = QLineEdit()
-        self.labelXLine.setText(
-            str(self.labelItem.start.x() + self.location[0]))
+        self.labelXLine = edf.shortLineEdit()
         self.labelXLine.setToolTip("X Coordinate")
         self.fLayout.addRow(QLabel("X:"), self.labelXLine)
-        self.labelYLine = QLineEdit()
-        self.labelYLine.setText(
-            str(self.labelItem.start.y() + self.location[1]))
+        self.labelYLine = edf.shortLineEdit()
         self.labelYLine.setToolTip("Y Coordinate")
         self.fLayout.addRow(QLabel("Y:"), self.labelYLine)
 
@@ -707,18 +647,7 @@ class noteTextEdit(QDialog):
         self.setLayout(mainLayout)
         self.show()
 
-    def familyFontStyles(self,s):
-        self.fontStyleCB.clear()
-        self.fontStyles = QFontDatabase.styles(self.familyCB.currentText())
-        self.fontStyleCB.addItems(self.fontStyles)
 
-    def styleFontSizes(self,s):
-        self.fontsizeCB.clear()
-        selectedFamily = self.familyCB.currentText()
-        selectedStyle = self.fontStyleCB.currentText()
-        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(
-            selectedFamily, selectedStyle)]
-        self.fontsizeCB.addItems(self.fontSizes)
 
 class noteTextEditProperties(noteTextEdit):
     def __init__(self,parent, note:shp.text):

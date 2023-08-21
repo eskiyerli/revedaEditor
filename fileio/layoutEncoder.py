@@ -35,8 +35,8 @@ class layoutEncoder(json.JSONEncoder):
                             "ic": item.counter,
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle, }
-            case lshp.layRect:
-                itemDict = {"type": "layRect", "rect": item.rect.getCoords(),
+            case lshp.layoutRect:
+                itemDict = {"type": "layoutRect", "rect": item.rect.getCoords(),
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle,
                             "lnum": laylyr.pdkLayoutLayers.index(item.layer)}

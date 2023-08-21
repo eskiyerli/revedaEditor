@@ -255,7 +255,7 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
                 except json.decoder.JSONDecodeError:
                     print("Error: Invalid PCell file")
 
-        case "layRect":
+        case "layoutRect":
             return createRectShape(item, gridTuple)
 
 
@@ -275,7 +275,7 @@ def createLayoutInstance(gridTuple, item, libraryDict):
             for shape in shapes[1:]:
                 if shape["type"] == "layoutInstance":
                     itemShapes.append(createLayoutInstance(gridTuple, shape, libraryDict))
-                elif shape['type'] == 'layRect':
+                elif shape['type'] == 'layoutRect':
                     itemShapes.append(createRectShape(shape, gridTuple))
 
         except json.decoder.JSONDecodeError:

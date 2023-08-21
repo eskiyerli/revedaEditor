@@ -23,18 +23,36 @@
 
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
-from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QLine, QPointF, QLineF, )
-from PySide6.QtGui import (QPen, QBrush, QColor, QTransform, QPixmap, QBitmap, QFontMetrics,
-                           QFont, QTextOption)
-from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent,
-                               QGraphicsSceneHoverEvent, QGraphicsLineItem)
+from PySide6.QtCore import (
+    QPoint,
+    QRect,
+    QRectF,
+    Qt,
+    QPointF,
+    QLineF,
+)
+from PySide6.QtGui import (
+    QPen,
+    QBrush,
+    QColor,
+    QTransform,
+    QPixmap,
+    QBitmap,
+    QFontMetrics,
+    QFont,
+    QTextOption,
+    QFontDatabase,
+)
+from PySide6.QtWidgets import (
+    QGraphicsItem, QGraphicsSimpleTextItem,
+    QGraphicsSceneMouseEvent,
+    QGraphicsSceneHoverEvent,
+)
 
-import pdk.symLayers as symlyr
 import revedaEditor.backend.dataDefinitions as ddef
 
 
 class layoutShape(QGraphicsItem):
-
     def __init__(self, gridTuple: tuple[int, int]) -> None:
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
@@ -42,10 +60,13 @@ class layoutShape(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
+        self._pen = None
         self._gridTuple = gridTuple
         self._angle = 0  # rotation angle
         self._stretch: bool = False
-        self._pen = symlyr.defaultPen
+
+    def __repr__(self):
+        return f"layoutShape({self._gridTuple})"
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
@@ -75,6 +96,11 @@ class layoutShape(QGraphicsItem):
     @property
     def pen(self):
         return self._pen
+
+    @pen.setter
+    def pen(self, value: QPen):
+        if isinstance(value, QPen):
+            self._pen = value
 
     @property
     def brush(self):
@@ -162,31 +188,42 @@ class layoutShape(QGraphicsItem):
         """
         snap point to grid. Divides and multiplies by grid size.
         """
-        return QPoint(gridTuple[0] * int(round(point.x() / gridTuple[0])),
-                      gridTuple[1] * int(round(point.y() / gridTuple[1])), )
+        return QPoint(
+            gridTuple[0] * int(round(point.x() / gridTuple[0])),
+            gridTuple[1] * int(round(point.y() / gridTuple[1])),
+        )
 
 
-class layRect(layoutShape):
+class layoutRect(layoutShape):
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint, inpEdLayer: ddef.layLayer,
-                 gridTuple: tuple[int, int]):
+    def __init__(
+        self,
+        start: QPoint,
+        end: QPoint,
+        inpEdLayer: ddef.layLayer,
+        gridTuple: tuple[int, int],
+    ):
+        super().__init__(gridTuple)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
         self._end = self._rect.bottomRight()
-        self._stretchSide = None
         self._inpEdLayer = inpEdLayer
-        self._pen = QPen(self._inpEdLayer.pcolor, self._inpEdLayer.pwidth,
-                         self._inpEdLayer.pstyle)
-        bitmap = QBitmap.fromImage(QPixmap(self._inpEdLayer.btexture).scaled(10, 10).toImage())
-        self._brush = QBrush(self._inpEdLayer.bcolor, bitmap)
-        self._selectedPen = QPen(QColor('yellow'), self._inpEdLayer.pwidth, Qt.DashLine)
-
-        self._selectedBrush = QBrush(QColor('yellow'),bitmap)
-        self._stretchPen = QPen(QColor('red'), self._inpEdLayer.pwidth, Qt.SolidLine)
-
         self._gridTuple = gridTuple
-        super().__init__(self._gridTuple)
+        self._stretchSide = None
+        self._stretchPen = QPen(QColor("red"), self._inpEdLayer.pwidth, Qt.SolidLine)
+        self._pen = QPen(
+            self._inpEdLayer.pcolor, self._inpEdLayer.pwidth, self._inpEdLayer.pstyle
+        )
+        self._bitmap = QBitmap.fromImage(
+            QPixmap(self._inpEdLayer.btexture).scaled(10, 10).toImage()
+        )
+        self._brush = QBrush(self._inpEdLayer.bcolor, self._bitmap)
+        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
+        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+
+    def __repr__(self):
+        return f"layRect({self._start}, {self._end}, {self._inpEdLayer}, {self._gridTuple})"
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -194,13 +231,13 @@ class layRect(layoutShape):
             painter.setBrush(self._selectedBrush)
             if self.stretch:
                 painter.setPen(self._stretchPen)
-                if self._stretchSide == layRect.sides[0]:
+                if self._stretchSide == layoutRect.sides[0]:
                     painter.drawLine(self.rect.topLeft(), self.rect.bottomLeft())
-                elif self._stretchSide == layRect.sides[1]:
+                elif self._stretchSide == layoutRect.sides[1]:
                     painter.drawLine(self.rect.topRight(), self.rect.bottomRight())
-                elif self._stretchSide == layRect.sides[2]:
+                elif self._stretchSide == layoutRect.sides[2]:
                     painter.drawLine(self.rect.topLeft(), self.rect.topRight())
-                elif self._stretchSide == layRect.sides[3]:
+                elif self._stretchSide == layoutRect.sides[3]:
                     painter.drawLine(self.rect.bottomLeft(), self.rect.bottomRight())
         else:
             painter.setPen(self._pen)
@@ -245,8 +282,10 @@ class layRect(layoutShape):
 
     @property
     def centre(self):
-        return QPoint(int(self._rect.x() + self._rect.width() / 2),
-                      int(self._rect.y() + self._rect.height() / 2), )
+        return QPoint(
+            int(self._rect.x() + self._rect.width() / 2),
+            int(self._rect.y() + self._rect.height() / 2),
+        )
 
     @property
     def height(self):
@@ -314,6 +353,14 @@ class layRect(layoutShape):
         self.prepareGeometryChange()
         self._stretchSide = value
 
+    @property
+    def inpEdLayer(self):
+        return self._inpEdLayer
+
+    @inpEdLayer.setter
+    def inpEdLayer(self, value):
+        self._inpEdLayer = value
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         eventPos = event.pos().toPoint()
@@ -322,34 +369,36 @@ class layRect(layoutShape):
             if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
-                    self._stretchSide = layRect.sides[0]
+                    self._stretchSide = layoutRect.sides[0]
             elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
-                    self._stretchSide = layRect.sides[1]
+                    self._stretchSide = layoutRect.sides[1]
             elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
-                    self._stretchSide = layRect.sides[2]
-            elif eventPos.y() == self.snapToBase(self._rect.bottom(), self.gridTuple[1]):
+                    self._stretchSide = layoutRect.sides[2]
+            elif eventPos.y() == self.snapToBase(
+                self._rect.bottom(), self.gridTuple[1]
+            ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
-                    self._stretchSide = layRect.sides[3]
+                    self._stretchSide = layoutRect.sides[3]
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
         if self.stretch:
             self.prepareGeometryChange()
-            if self.stretchSide == layRect.sides[0]:
+            if self.stretchSide == layoutRect.sides[0]:
                 self.setCursor(Qt.SizeHorCursor)
                 self.rect.setLeft(eventPos.x())
-            elif self.stretchSide == layRect.sides[1]:
+            elif self.stretchSide == layoutRect.sides[1]:
                 self.setCursor(Qt.SizeHorCursor)
                 self.rect.setRight(eventPos.x() - int(self._pen.width() / 2))
-            elif self.stretchSide == layRect.sides[2]:
+            elif self.stretchSide == layoutRect.sides[2]:
                 self.setCursor(Qt.SizeVerCursor)
                 self.rect.setTop(eventPos.y())
-            elif self.stretchSide == layRect.sides[3]:
+            elif self.stretchSide == layoutRect.sides[3]:
                 self.setCursor(Qt.SizeVerCursor)
                 self.rect.setBottom(eventPos.y() - int(self._pen.width() / 2))
             self.update()
@@ -390,8 +439,8 @@ class layoutInstance(layoutShape):
             for drawing in self._drawings[1:]:
                 self._borderRect = self._borderRect.united(drawing.sceneBoundingRect())
 
-    def __str__(self):
-        return (f"type(self)({self.cellName}, scene position= {self.scenePos()} )")
+    def __repr__(self):
+        return f"layoutInstance({self._shapes}, {self._gridTuple})"
 
     def boundingRect(self):
         return self.childrenBoundingRect()
@@ -460,16 +509,29 @@ class layoutCell(layoutInstance):
     def __init__(self, shapes: list, gridTuple):
         super().__init__(shapes, gridTuple)
 
+    def __repr__(self):
+        return f"layoutCell({self._shapes}, {self._gridTuple})"
+
 
 class pcell(layoutInstance):
     def __init__(self, shapes: list, gridTuple: tuple[int, int]):
         super().__init__(shapes, gridTuple)
 
+    def __repr__(self):
+        return f"pcell({self._shapes}, {self._gridTuple}"
+
 
 class layoutPath(layoutShape):
-    def __init__(self, draftLine: QLineF, inpEdLayer: ddef.edLayer,
-                 gridTuple: tuple[int, int], width: float = 1.0, startExtend: int = 0,
-                 endExtend: int = 0, mode:int =0):
+    def __init__(
+        self,
+        draftLine: QLineF,
+        inpEdLayer: ddef.layLayer,
+        gridTuple: tuple[int, int],
+        width: float = 1.0,
+        startExtend: int = 0,
+        endExtend: int = 0,
+        mode: int = 0,
+    ):
         super().__init__(gridTuple)
         self._draftLine = draftLine
         self._startExtend = startExtend
@@ -480,22 +542,32 @@ class layoutPath(layoutShape):
         self._mode = mode
         self._rect = QRectF(0, 0, 0, 0)
         self._rectCorners()
-        self._pen = QPen(self._inpEdLayer.pcolor, self._inpEdLayer.pwidth,
-                         self._inpEdLayer.pstyle)
-        bitmap = QBitmap.fromImage(QPixmap(self._inpEdLayer.btexture).scaled(10, 10).toImage())
-        self._brush = QBrush(self._inpEdLayer.bcolor, bitmap)
-        self._selectedPen = QPen(QColor('yellow'), self._inpEdLayer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor('yellow'),bitmap)
-        self._stretchPen = QPen(QColor('red'), self._inpEdLayer.pwidth, Qt.SolidLine)
-        self._stretchBrush = QBrush(QColor('red'), bitmap)
+        self._inpEdLayer = inpEdLayer
+        self._pen = QPen(
+            self._inpEdLayer.pcolor, self._inpEdLayer.pwidth, self._inpEdLayer.pstyle
+        )
+        self._bitmap = QBitmap.fromImage(
+            QPixmap(self._inpEdLayer.btexture).scaled(10, 10).toImage()
+        )
+        self._brush = QBrush(self._inpEdLayer.bcolor, self._bitmap)
+        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
+        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+        self._stretchPen = QPen(QColor("red"), self._inpEdLayer.pwidth, Qt.SolidLine)
+        self._stretchBrush = QBrush(QColor("red"), self._bitmap)
         self.p45Transform = QTransform().rotate(-45, Qt.Axis.ZAxis)
+
+    def __repr__(self):
+        return (
+            f"layoutPath({self._draftLine}, {self._inpEdLayer}, {self._gridTuple}, "
+            f"{self._width}, {self._startExtend}, {self._endExtend}, {self._mode})"
+        )
 
     def _rectCorners(self):
         angle = self._draftLine.angle()
         match self._mode:
-            case 0: # manhattan
+            case 0:  # manhattan
                 self.createManhattanPath(angle)
-            case 1: # diagonal
+            case 1:  # diagonal
                 self.createDiagonalPath(angle)
             case 2:
                 self.createAnyAnglePath(angle)
@@ -561,25 +633,33 @@ class layoutPath(layoutShape):
     def createVerticalPath(self, angle):
         if 0 <= angle < 180:
             self._draftLine.setAngle(90)
-        elif 180 <=  angle < 360:
+        elif 180 <= angle < 360:
             self._draftLine.setAngle(270)
         self._rect = self.extractRect()
 
     def extractRect(self):
         direction = self._draftLine.p2() - self._draftLine.p1()
         if direction == QPoint(0, 0):  # when the mouse pressed first time
-            rect = QRectF(self._draftLine.p1(), self._draftLine.p2()).adjusted(-2, -2, 2,
-                                                                                2).normalized()
+            rect = (
+                QRectF(self._draftLine.p1(), self._draftLine.p2())
+                .adjusted(-2, -2, 2, 2)
+                .normalized()
+            )
         else:
             direction /= direction.manhattanLength()
             perpendicular = QPointF(-direction.y(), direction.x())
-            point1 = (self._draftLine.p1() + perpendicular * self._width * 0.5 - direction *
-                    self._startExtend).toPoint()
-            point2 = (self._draftLine.p2() - perpendicular * self._width * 0.5 + direction *
-                    self._endExtend).toPoint()
+            point1 = (
+                self._draftLine.p1()
+                + perpendicular * self._width * 0.5
+                - direction * self._startExtend
+            ).toPoint()
+            point2 = (
+                self._draftLine.p2()
+                - perpendicular * self._width * 0.5
+                + direction * self._endExtend
+            ).toPoint()
             rect = QRectF(point1, point2).normalized()
         return rect
-
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -604,7 +684,6 @@ class layoutPath(layoutShape):
         self._draftLine = line
         self._rectCorners()
 
-
     @property
     def width(self):
         return self._width
@@ -621,7 +700,7 @@ class layoutPath(layoutShape):
 
     @mode.setter
     def mode(self, value: int):
-        print('mode is set to', value)
+        print("mode is set to", value)
         self._mode = value
 
     @property
@@ -633,28 +712,36 @@ class layoutPath(layoutShape):
         self.prepareGeometryChange()
         self._stretchSide = value
 
+    @property
+    def inpEdLayer(self):
+        return self._inpEdLayer
+
+    @inpEdLayer.setter
+    def inpEdLayer(self, value):
+        self._inpEdLayer = value
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             if eventPos == self._line.p1():
-                self._stretchSide = 'p1'
+                self._stretchSide = "p1"
                 self.setCursor(Qt.SizeHorCursor)
             elif eventPos == self._line.p2():
-                self._stretchSide = 'p2'
+                self._stretchSide = "p2"
                 self.setCursor(Qt.SizeHorCursor)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
         if self.stretch:
             self.prepareGeometryChange()
-            if self._stretchSide == 'p1':
+            if self._stretchSide == "p1":
                 if self._angle == 0 or self._angle == 180:
                     self._line.setP1(QPoint(eventPos.x(), self._line.p1().y()))
                 elif self._angle == 90 or self._angle == 270:
                     self._line.setP1(QPoint(self._line.p1().x(), eventPos.y()))
-            elif self._stretchSide == 'p2':
+            elif self._stretchSide == "p2":
                 if self._angle == 0 or self._angle == 180:
                     self._line.setP1(QPoint(eventPos.x(), self._line.p2().y()))
                 elif self._angle == 90 or self._angle == 270:
@@ -671,22 +758,47 @@ class layoutPath(layoutShape):
             self._stretchSide = None
             self.setCursor(Qt.ArrowCursor)
 
+
 class layoutPin(layoutShape):
     pinDirs = ["Input", "Output", "Inout"]
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
-    def __init__(self, rect: QRect, pinName: str, pinDir: str, pinType: str,
-                 pinLayer: ddef.layLayer, gridTuple: tuple[
-        int, int]):
+
+    def __init__(
+        self,
+        start,
+        end,
+        pinName: str,
+        pinDir: str,
+        pinType: str,
+        inpEdLayer: ddef.layLayer,
+        gridTuple: tuple[int, int],
+    ):
         super().__init__(gridTuple)
+        self._start = start
+        self._end = end
         self._pinName = pinName
         self._pinDir = pinDir
         self._pinType = pinType
-        self._pinLayer = pinLayer
         self._connected = False  # True if the pin is connected to a net.
-        self._rect = rect
+        self._rect = QRect(start, end).normalized()
+        self._inpEdLayer = inpEdLayer
+        self._pen = QPen(
+            self._inpEdLayer.pcolor, self._inpEdLayer.pwidth, self._inpEdLayer.pstyle
+        )
+        self._bitmap = QBitmap.fromImage(
+            QPixmap(self._inpEdLayer.btexture).scaled(10, 10).toImage()
+        )
+        self._brush = QBrush(self._inpEdLayer.bcolor, self._bitmap)
+        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
+        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+
+    def __repr__(self):
+        return (
+            f"layoutPin({self._start}, {self._end}, {self._pinName}, {self._pinDir}, "
+            f"{self._pinType}, {self._inpEdLayer}, {self._gridTuple})"
+        )
 
     def paint(self, painter, option, widget):
-        super().paint(painter, option, widget)
         painter.setPen(self._pen)
         painter.setBrush(self._brush)
         painter.drawRect(self._rect)
@@ -719,30 +831,50 @@ class layoutPin(layoutShape):
         self._pinType = value
 
     @property
-    def pinLayer(self):
-        return self._pinLayer
+    def inpEdLayer(self):
+        return self._inpEdLayer
 
-    @pinLayer.setter
-    def pinLayer(self, value):
-        self._pinLayer = value
+    @inpEdLayer.setter
+    def inpEdLayer(self, value):
+        self._inpEdLayer = value
 
     @property
-    def rect(self):
-        return self._rect
+    def start(self):
+        return self._start
 
-    @rect.setter
-    def rect(self, value: QRect):
+    @start.setter
+    def start(self, start: QPoint):
         self.prepareGeometryChange()
-        self._rect = value
+        self._rect = QRectF(start, self._end).normalized()
+        self._start = start
 
-class label(layoutShape):
+    @property
+    def end(self):
+        return self._end
 
+    @end.setter
+    def end(self, end: QPoint):
+        self.prepareGeometryChange()
+        self._rect = QRectF(self._start, end).normalized()
+        self._end = end
+
+
+class layoutLabel(layoutShape):
     labelAlignments = ["Left", "Center", "Right"]
     labelOrients = ["R0", "R90", "R180", "R270", "MX", "MX90", "MY", "MY90"]
 
-    def __init__(self,start: QPoint, labelText: str, fontFamily: str, fontStyle: str,
-                 labelHeight: str, labelAlign: str, labelOrient: str, gridTuple: tuple[int,
-            int]):
+    def __init__(
+        self,
+        start: QPoint,
+        labelText: str,
+        fontFamily: str,
+        fontStyle: str,
+        labelHeight: str,
+        labelAlign: str,
+        labelOrient: str,
+        inpEdLayer: ddef.layLayer,
+        gridTuple: tuple[int, int],
+    ):
         super().__init__(gridTuple)
         self._start = start
         self._labelText = labelText
@@ -751,39 +883,160 @@ class label(layoutShape):
         self._labelHeight = labelHeight
         self._labelAlign = labelAlign
         self._labelOrient = labelOrient
+        self._inpEdLayer = inpEdLayer
+        self._pen = QPen(self._inpEdLayer.pcolor, 2, Qt.SolidLine)
+        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
+        self._brush = QBrush(self._inpEdLayer.bcolor)
         self._labelFont = QFont(fontFamily)
         self._labelFont.setStyleName(fontStyle)
+        # self._labelFont.setPointSize(int(float(self._labelHeight)))
         self._labelFont.setPointSize(int(float(self._labelHeight)))
-        self._labelFont.setKerning(True)
-        self.setOpacity(1)
+        self._labelFont.setKerning(False)
+        # self.setOpacity(1)
         self._fm = QFontMetrics(self._labelFont)
         self._textOptions = QTextOption()
-        if self._labelAlign == label.labelAlignments[0]:
+        if self._labelAlign == layoutLabel.labelAlignments[0]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        elif self._labelAlign == label.labelAlignments[1]:
+        elif self._labelAlign == layoutLabel.labelAlignments[1]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        elif self._labelAlign == label.labelAlignments[2]:
+        elif self._labelAlign == layoutLabel.labelAlignments[2]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.setOrient()
 
-        if self._labelOrient == label.labelOrients[0]:
+
+
+    def __repr__(self):
+        return (
+            f"layoutLabel({self._start}, {self._labelText}, {self._fontFamily}, "
+            f"{self._fontStyle}, {self._labelHeight}, {self._labelAlign}, "
+            f"{self._labelOrient}, {self._inpEdLayer}, {self._gridTuple})"
+        )
+
+    def setOrient(self):
+        self.setTransformOriginPoint(self.mapFromScene(self._start))
+        if self._labelOrient == layoutLabel.labelOrients[0]:
             self.setRotation(0)
-        elif self._labelOrient == label.labelOrients[1]:
+        elif self._labelOrient == layoutLabel.labelOrients[1]:
             self.setRotation(90)
-        elif self._labelOrient == label.labelOrients[2]:
+        elif self._labelOrient == layoutLabel.labelOrients[2]:
             self.setRotation(180)
-        elif self._labelOrient == label.labelOrients[3]:
+        elif self._labelOrient == layoutLabel.labelOrients[3]:
             self.setRotation(270)
-
-        self._rect = self._fm.boundingRect( self._labelText, self._textOptions)
+        elif self._labelOrient == layoutLabel.labelOrients[4]:
+            self.flip("x")
+        elif self._labelOrient == layoutLabel.labelOrients[5]:
+            self.flip("x")
+            self.setRotation(90)
+        elif self._labelOrient == layoutLabel.labelOrients[6]:
+            self.flip("y")
+            self.setRotation(90)
 
     def boundingRect(self):
-        return self._rect.adjusted(-2, 2, 2, 2)
+        return self._fm.boundingRect(self._labelText).adjusted(-5,-5,5,5)
+
+    def paint(self, painter, option, widget):
+        painter.setPen(self._pen)
+        # painter.setBrush(self._brush)
+        self._labelFont.setPointSize(int(self._labelHeight))
+        painter.setFont(self._labelFont)
+        painter.drawText(self.boundingRect(),
+            self._labelText,
+        )
+        painter.drawRect(self.boundingRect())
+        painter.drawPoint(self._start)
 
     def flip(self, direction: str):
         currentTransform = self.transform()
         newTransform = QTransform()
-        if direction == 'x':
-            currentTransform = newTransform.scale(-1,1)*currentTransform
-        elif direction == 'y':
-            currentTransform = newTransform.scale(1,-1)*currentTransform
+        if direction == "x":
+            currentTransform = newTransform.scale(-1, 1) * currentTransform
+        elif direction == "y":
+            currentTransform = newTransform.scale(1, -1) * currentTransform
         self.setTransform(currentTransform)
+
+    @property
+    def start(self):
+        return self._start
+
+    @start.setter
+    def start(self, value: QPoint):
+        self._start = value
+
+    @property
+    def labelText(self):
+        return self._labelText
+
+    @labelText.setter
+    def labelText(self, value):
+        self.prepareGeometryChange()
+        self._labelText = value
+
+    @property
+    def labelHeight(self):
+        return self._labelHeight
+
+    @labelHeight.setter
+    def labelHeight(self, value):
+        self.prepareGeometryChange()
+        self._labelHeight = value
+
+    @property
+    def fontFamily(self) -> str:
+        return self._textFont.family()
+
+    @fontFamily.setter
+    def fontFamily(self, familyName):
+        fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
+        fixedFamilies = [
+            family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
+        ]
+        if familyName in fixedFamilies:
+            self._textFont.setFamily(familyName)
+        else:
+            self.scene().logger.error(f"Not a valid font name: {familyName}")
+
+    @property
+    def inpEdLayer(self):
+        return self._inpEdLayer
+
+    @inpEdLayer.setter
+    def inpEdLayer(self, value):
+        self._inpEdLayer = value
+
+class simpleLayoutLabel(QGraphicsSimpleTextItem):
+    def __init__(
+        self,
+        start: QPoint,
+        labelText: str,
+        fontFamily: str,
+        fontStyle: str,
+        labelHeight: str,
+        labelAlign: str,
+        labelOrient: str,
+        inpEdLayer: ddef.layLayer,
+        gridTuple: tuple[int, int],
+    ):
+        super().__init__(labelText)
+
+        self._start = start
+        self._labelText = labelText
+        self._fontFamily = fontFamily
+        self._fontStyle = fontStyle
+        self._labelHeight = labelHeight
+        self._labelAlign = labelAlign
+        self._labelOrient = labelOrient
+        self._inpEdLayer = inpEdLayer
+        self._pen = QPen(self._inpEdLayer.pcolor, 2, Qt.SolidLine)
+        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
+        self._brush = QBrush(self._inpEdLayer.bcolor)
+        self._labelFont = QFont(fontFamily)
+        self._labelFont.setStyleName(fontStyle)
+        # self._labelFont.setPointSize(int(float(self._labelHeight)))
+        self._labelFont.setPointSize(int(float(self._labelHeight)))
+        self._labelFont.setKerning(False)
+        self.setPen(self._pen)
+        self.setBrush(self._brush)
+        # self.setOpacity(1)
+
+    def paint(self, painter, option, widget):
+        super().paint(painter, option, widget)

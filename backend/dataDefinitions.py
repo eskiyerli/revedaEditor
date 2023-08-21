@@ -23,7 +23,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 from PySide6.QtCore import (Qt)
-from PySide6.QtGui import (QColor, QPixmap)
+from PySide6.QtGui import (QColor)
 
 viewTuple = namedtuple('viewTuple', ['libraryName', 'cellName', 'viewName'])
 cellTuple = namedtuple('cellTuple', ['libraryName', 'cellName'])
@@ -39,10 +39,17 @@ netTuple = namedtuple('netTuple', ['net', 'start'])
 # orient is True if self is horizontal, otherwise False
 netEndTuple = namedtuple('netEndTuple', ['net', 'index', 'orient'])
 
+layoutPinTuple = namedtuple('layoutPinTuple', ['pinName', 'pinDir', 'pinType', 'pinLayer'])
+layoutLabelTuple = namedtuple('layoutLabelTuple', ['labelText', 'fontFamily', 'fontStyle',
+                                    'labelHeight', 'labelAlign', 'labelOrient', 'labelLayer'])
+
+rectCoords = namedtuple('rectCoords', ['left', 'top', 'w', 'h'])
+
+
 @dataclass
 class edLayer:
     name: str = ""  # edLayer name
-    purpose: str= "drawing"  # edLayer purpose
+    purpose: str = "drawing"  # edLayer purpose
     pcolor: QColor = Qt.black  # pen colour
     pwidth: int = 1  # pen width
     pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
@@ -51,12 +58,14 @@ class edLayer:
     z: int = 1  # z-index
     selectable: bool = True  # selectable
     visible: bool = True  # visible
-    gdsLayer: int = 0 # gds edLayer
-    datatype: int = 0# gds datatype
+    gdsLayer: int = 0  # gds edLayer
+    datatype: int = 0  # gds datatype
+
+
 @dataclass
 class layLayer:
     name: str = ""  # edLayer name
-    purpose: str= "drawing"  # edLayer purpose
+    purpose: str = "drawing"  # edLayer purpose
     pcolor: QColor = Qt.black  # pen colour
     pwidth: int = 1  # pen width
     pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
@@ -65,7 +74,5 @@ class layLayer:
     z: int = 1  # z-index
     selectable: bool = True  # selectable
     visible: bool = True  # visible
-    gdsLayer: int = 0 # gds edLayer
-    datatype: int = 0# gds datatype
-
-
+    gdsLayer: int = 0  # gds edLayer
+    datatype: int = 0  # gds datatype

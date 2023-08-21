@@ -21,28 +21,26 @@
 
 import math
 
-import pdk.symLayers as symlyr
-import pdk.schLayers as schlyr
-import pdk.layoutLayers as laylyr
-
-import pdk.callbacks as cb
-import revedaEditor.backend.dataDefinitions as ddef
-import revedaEditor.common.net as net
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
-from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QLine, QLineF, QPointF,)
-from PySide6.QtGui import (QPen, QBrush,  QFont, QFontMetrics, QPainterPath,
-                           QTextOption, QFontDatabase,)
+from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QLine, QLineF, )
+from PySide6.QtGui import (QBrush, QFont, QFontMetrics, QPainterPath,
+                           QTextOption, QFontDatabase, QTransform, )
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsSceneMouseEvent,
-                               QGraphicsSceneHoverEvent,)
+                               QGraphicsSceneHoverEvent, )
 from quantiphy import Quantity
+
+import pdk.schLayers as schlyr
+import pdk.symLayers as symlyr
+import revedaEditor.backend.dataDefinitions as ddef
+import revedaEditor.common.net as net
 
 
 class shape(QGraphicsItem):
 
     def __init__(self, gridTuple: tuple[int, int]) -> None:
         super().__init__()
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
@@ -81,15 +79,15 @@ class shape(QGraphicsItem):
     def pen(self):
         return self._pen
 
-
     @property
     def brush(self):
         return self._brush
 
     @brush.setter
-    def brush(self, value:QBrush):
+    def brush(self, value: QBrush):
         if isinstance(value, QBrush):
             self._brush = value
+
     @property
     def angle(self):
         return self._angle
@@ -116,15 +114,9 @@ class shape(QGraphicsItem):
     def stretch(self, value: bool):
         self._stretch = value
 
-
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
         super().mousePressEvent(event)
-        if self.scene().changeOrigin:
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, False)
-        else:
-            self.setFlag(QGraphicsItem.ItemIsMovable, True)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
     def sceneEvent(self, event):
         """
@@ -141,6 +133,7 @@ class shape(QGraphicsItem):
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)  # self.setSelected(False)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         self.setCursor(Qt.ArrowCursor)
@@ -179,8 +172,8 @@ f    """
 
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint,gridTuple: tuple[int, int]) -> None:
-        super().__init__( gridTuple)
+    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]) -> None:
+        super().__init__(gridTuple)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
         self._end = self._rect.bottomRight()
@@ -209,6 +202,9 @@ f    """
             painter.setPen(symlyr.symbolPen)
             self.setZValue(symlyr.symbolLayer.z)
         painter.drawRect(self._rect)
+
+    def __repr__(self):
+        return f'rect({self._start},{self._end},{self._gridTuple})'
 
     @property
     def rect(self):
@@ -246,7 +242,7 @@ f    """
 
     @property
     def height(self):
-        return self.rect.height()
+        return self._rect.height()
 
     @height.setter
     def height(self, height: int):
@@ -255,51 +251,51 @@ f    """
 
     @property
     def width(self):
-        return self.rect.width()
+        return self._rect.width()
 
     @width.setter
     def width(self, width):
         self.prepareGeometryChange()
-        self.rect.setWidth(width)
+        self._rect.setWidth(width)
 
     @property
     def left(self):
-        return self.rect.left()
+        return self._rect.left()
 
     @left.setter
     def left(self, left: int):
-        self.rect.setLeft(left)
+        self._rect.setLeft(left)
 
     @property
     def right(self):
-        return self.rect.right()
+        return self._rect.right()
 
     @right.setter
     def right(self, right: int):
         self.prepareGeometryChange()
-        self.rect.setRight(right)
+        self._rect.setRight(right)
 
     @property
     def top(self):
-        return self.rect.top()
+        return self._rect.top()
 
     @top.setter
     def top(self, top: int):
         self.prepareGeometryChange()
-        self.rect.setTop(top)
+        self._rect.setTop(top)
 
     @property
     def bottom(self):
-        return self.rect.bottom()
+        return self._rect.bottom()
 
     @bottom.setter
     def bottom(self, bottom: int):
         self.prepareGeometryChange()
-        self.rect.setBottom(bottom)
+        self._rect.setBottom(bottom)
 
     @property
     def origin(self):
-        return self.rect.bottomLeft()
+        return self._rect.bottomLeft()
 
     @property
     def stretchSide(self):
@@ -391,17 +387,9 @@ class circle(shape):
             self.setZValue(symlyr.symbolLayer.z)
         painter.drawEllipse(self._centre, self._radius, self._radius)
 
-    # @property
-    # def centre(self):
-    #     return self._centre
-    #
-    # @centre.setter
-    # def centre(self, centre: QPoint):
-    #     self.prepareGeometryChange()
-    #     self._centre = self.snapToGrid(centre, self._gridTuple)
-    #     # self.topLeft = self._centre - QPoint(self._radius, self._radius)
-    #     # self.rightBottom = self._centre + QPoint(self._radius, self._radius)
-    #     self._end = self._centre + QPoint(self._radius, 0)
+    def __repr__(self):
+        return f'circle({self._centre},{self._end},{self._gridTuple})'
+
 
     @property
     def radius(self):
@@ -500,7 +488,7 @@ class arc(shape):
 
     def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[
         int,
-    int]):
+        int]):
         super().__init__(gridTuple)
         self._start = start
         self._end = end
@@ -568,6 +556,9 @@ class arc(shape):
     def rect(self, arc_rect: QRect):
         assert isinstance(arc_rect, QRect)
         self._rect = arc_rect.normalized()
+
+    def __repr__(self):
+        return f'arc({self._start},{self._end},{self._gridTuple})'
 
     @property
     def start(self):
@@ -725,6 +716,9 @@ class line(shape):
             self.setZValue(symlyr.symbolLayer.z)
         painter.drawLine(self._line)
 
+    def __repr__(self):
+        return f'line({self._start},{self._end}, {self._gridTuple})'
+
     @property
     def rect(self):
         return self._rect
@@ -754,7 +748,6 @@ class line(shape):
         self._end = end
         self._line = QLine(self._start, self._end)
         self._rect = QRect(self._start, self._end).normalized()
-
 
     @property
     def width(self):
@@ -818,7 +811,7 @@ class pin(shape):
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
 
     def __init__(self, start: QPoint, pinName: str, pinDir: str, pinType: str,
-                gridTuple: tuple[int, int]):
+                 gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
 
         self._start = start  # centre of pin
@@ -845,8 +838,9 @@ class pin(shape):
         painter.drawRect(self._rect)
         painter.drawText(QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName)
 
-    def objName(self):
-        return "PIN"
+    def __repr__(self):
+        return f'pin({self._start},{self._pinName}, {self._pinDir}, {self._pinType},' \
+               f' {self._gridTuple})'
 
     @property
     def start(self):
@@ -854,7 +848,9 @@ class pin(shape):
 
     @start.setter
     def start(self, start):
+        self.prepareGeometryChange()
         self._start = start
+        self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
 
     @property
     def pinName(self):
@@ -863,6 +859,7 @@ class pin(shape):
     @pinName.setter
     def pinName(self, pinName):
         if pinName != "":
+            self.prepareGeometryChange()
             self._pinName = pinName
 
     @property
@@ -909,7 +906,6 @@ class text(shape):
                  gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
         self._start = start
-
         self._textContent = textContent
         self._textHeight = textHeight
         self._textAlign = textAlign
@@ -921,6 +917,7 @@ class text(shape):
         self.setOpacity(1)
         self._fm = QFontMetrics(self._textFont)
         self._textOptions = QTextOption()
+        self.setOrient()
         if self._textAlign == text.textAlignments[0]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignLeft)
         elif self._textAlign == text.textAlignments[1]:
@@ -929,6 +926,38 @@ class text(shape):
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._rect = self._fm.boundingRect(QRect(0, 0, 400, 400),
                                            Qt.AlignmentFlag.AlignCenter, self._textContent)
+
+    def __repr__(self):
+        return f'text({self._start},{self._textContent}, {self._textFont.family()},' \
+               f' {self._textFont.style()}, {self._textHeight}, {self._textAlign},' \
+               f'{self._textOrient}, {self._gridTuple})'
+
+    def setOrient(self):
+        if self._labelOrient == label.labelOrients[0]:
+            self.setRotation(0)
+        elif self._labelOrient == label.labelOrients[1]:
+            self.setRotation(90)
+        elif self._labelOrient == label.labelOrients[2]:
+            self.setRotation(180)
+        elif self._labelOrient == label.labelOrients[3]:
+            self.setRotation(270)
+        elif self._labelOrient == label.labelOrients[4]:
+            self.flip('x')
+        elif self._labelOrient == label.labelOrients[5]:
+            self.flip('x')
+            self.setRotation(90)
+        elif self._labelOrient == label.labelOrients[6]:
+            self.flip('y')
+            self.setRotation(90)
+
+    def flip(self, direction: str):
+        currentTransform = self.transform()
+        newTransform = QTransform()
+        if direction == 'x':
+            currentTransform = newTransform.scale(-1, 1) * currentTransform
+        elif direction == 'y':
+            currentTransform = newTransform.scale(1, -1) * currentTransform
+        self.setTransform(currentTransform)
 
     def boundingRect(self):
         if self._textAlign == text.textAlignments[0]:
@@ -1062,7 +1091,7 @@ class label(shape):
 
     def __init__(self, start: QPoint, labelDefinition: str, labelType: str,
                  labelHeight: str, labelAlign: str, labelOrient: str, labelUse: str,
-                gridTuple: tuple[int, int]):
+                 gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
         self._start = start  # top left corner
         self._labelDefinition = labelDefinition  # label definition is what is
@@ -1084,9 +1113,10 @@ class label(shape):
         self._fm = QFontMetrics(self._labelFont)
         self._rect = self._fm.boundingRect(self._labelDefinition)
 
-    def __str__(self):
-        return f"label: {self._labelText} for {self._labelDefinition} at {self._start}, " \
-               f"value =  {self._labelValue}"
+    def __repr__(self):
+        return f'label({self._start},{self._labelDefinition},' \
+               f' {self._labelType}, {self._labelHeight}, {self._labelAlign}, {self._labelOrient},' \
+               f' {self._labelUse}, {self._gridTuple})'
 
     def boundingRect(self):
         return QRect(self._start.x(), self._start.y(), self._rect.width(),
@@ -1401,9 +1431,8 @@ class symbolShape(shape):
                 self.borderRect = self.borderRect.united(draw.sceneBoundingRect())
         self.dashLines = dict()
 
-    def __str__(self):
-        return (f"symbolShape(name={self.cellName}, scene position= {self.scenePos()}, "
-                f"pins = {self.pins}, labels = {self.labels}, ")
+    def __repr__(self):
+        return f'symbolShape({self.shapes}, {self._gridTuple})'
 
     def paint(self, painter, option, widget):
         self.setZValue(symlyr.symbolLayer.z)
@@ -1584,9 +1613,9 @@ class schematicPin(shape):
         self._pinType = pinType
         self._netTupleSet = set()
 
-    def __str__(self):
+    def __repr__(self):
         return f"schematicPin({self._start}, {self._pinName}, {self._pinDir}, " \
-               f"{self._pinType})"
+               f"{self._pinType}, {self._gridTuple})"
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1725,6 +1754,3 @@ class schematicPin(shape):
     def pinType(self, pintype: str):
         if pintype in self.pinTypes:
             self._pinType = pintype
-
-
-

@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (QLineEdit, QLabel, QWidget)
 class shortLineEdit(QLineEdit):
     def __init__(self, value:str = ''):
         super().__init__(None)
-        self.setMaximumWidth(80)
+        self.setMaximumWidth(90)
         if type(value) == str:
             self.setText(value)
         else:

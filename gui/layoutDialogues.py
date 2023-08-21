@@ -19,23 +19,20 @@
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
-import revedaEditor.gui.editFunctions as edf
-import pdk.pcells as pcl
-import inspect
 import importlib
-import revedaEditor.gui.lsw as lsw
-import pdk.layoutLayers as laylyr
-import revedaEditor.common.layoutShapes as lshp
-from PySide6.QtGui import (QStandardItemModel, QStandardItem)
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+import inspect
+
+from PySide6.QtGui import (QStandardItem, QFontDatabase)
+from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
+                               QLabel, QLineEdit,
                                QVBoxLayout, QRadioButton, QButtonGroup,
-                               QPushButton, QGroupBox, QTableView, QMenu,
-                               QCheckBox)
+                               QGroupBox)
+import revedaEditor.common.layoutShapes as lshp
+import revedaEditor.gui.editFunctions as edf
 
 
 class pcellInstanceDialog(QDialog):
-    def __init__(self, parent, item:lshp.pcell):
+    def __init__(self, parent, item: lshp.pcell):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("PCell Instance Options")
@@ -62,9 +59,10 @@ class pcellInstanceDialog(QDialog):
             instanceParamsLayout.addRow("PCell Name:", self.pcellName)
             initArgs = inspect.signature(item.__class__.__init__).parameters
             argsUsed = [param for param in initArgs if (param != 'self' and
-                                                          param != 'gridTuple')]
+                                                        param != 'gridTuple')]
             argDict = {arg: getattr(item, arg) for arg in argsUsed}
-            self.lineEditDict = {key:edf.shortLineEdit(value) for key, value in argDict.items()}
+            self.lineEditDict = {key: edf.shortLineEdit(value) for key, value in
+                                 argDict.items()}
             for key, value in self.lineEditDict.items():
                 instanceParamsLayout.addRow(key, value)
         vLayout.addWidget(instanceParamsGroup)
@@ -73,14 +71,15 @@ class pcellInstanceDialog(QDialog):
         self.setLayout(vLayout)
         self.show()
 
+
 class pcellSettingDialogue(QDialog):
-    def __init__(self,parent,viewItem: QStandardItem, module: str):
+    def __init__(self, parent, viewItem: QStandardItem, module: str):
         super().__init__(parent)
         # self.logger = parent.logger
         self.viewItem = viewItem
         self.module = module
         self.setWindowTitle('PCell Settings')
-        self.setMinimumSize(600,300)
+        self.setMinimumSize(600, 300)
         self.mainLayout = QVBoxLayout()
         groupBox = QGroupBox()
         formLayout = QFormLayout()
@@ -98,7 +97,6 @@ class pcellSettingDialogue(QDialog):
         self.setLayout(self.mainLayout)
         self.show()
 
-
     @staticmethod
     def getClasses(module_name):
         module = importlib.import_module(module_name)
@@ -108,11 +106,12 @@ class pcellSettingDialogue(QDialog):
                 classes.append(name)
         return classes
 
+
 class pathSettingsDialogue(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle('Create Path')
-        self.setMinimumSize(400,200)
+        self.setMinimumSize(400, 200)
         mainLayout = QVBoxLayout()
         pathOrientBox = QGroupBox('Path Orientation')
         horizontalLayout = QHBoxLayout(pathOrientBox)
@@ -154,3 +153,141 @@ class pathSettingsDialogue(QDialog):
         self.setLayout(mainLayout)
         self.show()
 
+
+class createLayoutPinDialog(QDialog):
+    def __init__(self, parent) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Create Layout Pin")
+        self.setMinimumWidth(300)
+        fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
+        fixedFamilies = [family for family in fontFamilies if
+                         QFontDatabase.isFixedPitch(family)]
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.mainLayout = QVBoxLayout()
+        self.pinPropGroupBox = QGroupBox('Pin Properties')
+        fLayout = QFormLayout()
+        self.pinPropGroupBox.setLayout(fLayout)
+        self.pinName = QLineEdit()
+        self.pinName.setPlaceholderText("Pin Name")
+        self.pinName.setToolTip("Enter pin name")
+        fLayout.addRow(edf.boldLabel("Pin Name"), self.pinName)
+        self.pinDir = QComboBox()
+        self.pinDir.addItems(lshp.layoutPin.pinDirs)
+        self.pinDir.setToolTip("Select pin direction")
+        fLayout.addRow(edf.boldLabel("Pin Direction"), self.pinDir)
+        self.pinType = QComboBox()
+        self.pinType.addItems(lshp.layoutPin.pinTypes)
+        self.pinType.setToolTip("Select pin type")
+        fLayout.addRow(edf.boldLabel("Pin Type"), self.pinType)
+        self.mainLayout.addWidget(self.pinPropGroupBox)
+        self.layerSelectGroupBox = QGroupBox('Select layers')
+        layerFormLayout = QFormLayout()
+        self.layerSelectGroupBox.setLayout(layerFormLayout)
+        self.pinLayerCB = QComboBox()
+        layerFormLayout.addRow(edf.boldLabel('Pin Layer:'), self.pinLayerCB)
+        self.labelLayerCB = QComboBox()
+        layerFormLayout.addRow(edf.boldLabel('Label Layer:'), self.labelLayerCB)
+        self.mainLayout.addWidget(self.layerSelectGroupBox)
+        labelPropBox = QGroupBox('Label Properties')
+        labelPropLayout = QFormLayout()
+        labelPropBox.setLayout(labelPropLayout)
+        self.familyCB = QComboBox()
+        self.familyCB.addItems(fixedFamilies)
+        self.familyCB.currentTextChanged.connect(self.familyFontStyles)
+        labelPropLayout.addRow(edf.boldLabel('Font Name'),self.familyCB)
+        self.fontStyleCB = QComboBox()
+        self.fontStyles = QFontDatabase.styles(fixedFamilies[0])
+        self.fontStyleCB.addItems(self.fontStyles)
+        self.fontStyleCB.currentTextChanged.connect(self.styleFontSizes)
+        labelPropLayout.addRow(edf.boldLabel('Font Style'), self.fontStyleCB)
+        self.labelHeightCB = QComboBox()
+        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(fixedFamilies[0],
+                                                          self.fontStyles[0])]
+        self.labelHeightCB.addItems(self.fontSizes)
+        labelPropLayout.addRow(edf.boldLabel('Label Height'),self.labelHeightCB)
+        self.labelAlignCB = QComboBox()
+        self.labelAlignCB.addItems(lshp.layoutLabel.labelAlignments)
+        labelPropLayout.addRow(QLabel("Label Alignment"), self.labelAlignCB)
+        self.labelOrientCB = QComboBox()
+        self.labelOrientCB.addItems(lshp.layoutLabel.labelOrients)
+        labelPropLayout.addRow(QLabel("Label Orientation"), self.labelOrientCB)
+        self.mainLayout.addWidget(labelPropBox)
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+        self.show()
+
+    def familyFontStyles(self,s):
+        self.fontStyleCB.clear()
+        self.fontStyles = QFontDatabase.styles(self.familyCB.currentText())
+        self.fontStyleCB.addItems(self.fontStyles)
+
+    def styleFontSizes(self,s):
+        self.labelHeightCB.clear()
+        selectedFamily = self.familyCB.currentText()
+        selectedStyle = self.fontStyleCB.currentText()
+        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(
+            selectedFamily, selectedStyle)]
+        self.labelHeightCB.addItems(self.fontSizes)
+
+class createLayoutLabelDialog(QDialog):
+    def __init__(self, parent) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Create Layout Label")
+        self.setMinimumWidth(300)
+        fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
+        fixedFamilies = [family for family in fontFamilies if
+                         QFontDatabase.isFixedPitch(family)]
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.mainLayout = QVBoxLayout()
+        labelPropBox = QGroupBox('Label Properties')
+        labelPropLayout = QFormLayout()
+        labelPropBox.setLayout(labelPropLayout)
+        self.labelName = QLineEdit()
+        self.labelName.setPlaceholderText("Label Name")
+        self.labelName.setToolTip("Enter label name")
+        labelPropLayout.addRow(edf.boldLabel("Label Name"), self.labelName)
+        self.labelLayerCB = QComboBox()
+        labelPropLayout.addRow(edf.boldLabel('Label Layer:'), self.labelLayerCB)
+        self.familyCB = QComboBox()
+        self.familyCB.addItems(fixedFamilies)
+        self.familyCB.currentTextChanged.connect(self.familyFontStyles)
+        labelPropLayout.addRow(edf.boldLabel('Font Name'),self.familyCB)
+        self.fontStyleCB = QComboBox()
+        self.fontStyles = QFontDatabase.styles(fixedFamilies[0])
+        self.fontStyleCB.addItems(self.fontStyles)
+        self.fontStyleCB.currentTextChanged.connect(self.styleFontSizes)
+        labelPropLayout.addRow(edf.boldLabel('Font Style'), self.fontStyleCB)
+        self.labelHeightCB = QComboBox()
+        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(fixedFamilies[0],
+                                                          self.fontStyles[0])]
+        self.labelHeightCB.addItems(self.fontSizes)
+        labelPropLayout.addRow(edf.boldLabel('Label Height'),self.labelHeightCB)
+        self.labelAlignCB = QComboBox()
+        self.labelAlignCB.addItems(lshp.layoutLabel.labelAlignments)
+        labelPropLayout.addRow(QLabel("Label Alignment"), self.labelAlignCB)
+        self.labelOrientCB = QComboBox()
+        self.labelOrientCB.addItems(lshp.layoutLabel.labelOrients)
+        labelPropLayout.addRow(QLabel("Label Orientation"), self.labelOrientCB)
+        self.mainLayout.addWidget(labelPropBox)
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+        self.show()
+
+    def familyFontStyles(self,s):
+        self.fontStyleCB.clear()
+        self.fontStyles = QFontDatabase.styles(self.familyCB.currentText())
+        self.fontStyleCB.addItems(self.fontStyles)
+
+    def styleFontSizes(self,s):
+        self.labelHeightCB.clear()
+        selectedFamily = self.familyCB.currentText()
+        selectedStyle = self.fontStyleCB.currentText()
+        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(
+            selectedFamily, selectedStyle)]
+        self.labelHeightCB.addItems(self.fontSizes)
