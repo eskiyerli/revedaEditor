@@ -901,9 +901,8 @@ class layoutLabel(layoutShape):
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignCenter)
         elif self._labelAlign == layoutLabel.labelAlignments[2]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.setOrient()
-
-
+        # self.setOrient()
+        self.setPos(self._start)
 
     def __repr__(self):
         return (
@@ -932,14 +931,14 @@ class layoutLabel(layoutShape):
             self.setRotation(90)
 
     def boundingRect(self):
-        return self._fm.boundingRect(self._labelText).adjusted(-5,-5,5,5)
+        return self._fm.boundingRect(self._labelText).normalized().adjusted(-5,-5,5,5)
 
     def paint(self, painter, option, widget):
         painter.setPen(self._pen)
         # painter.setBrush(self._brush)
         self._labelFont.setPointSize(int(self._labelHeight))
         painter.setFont(self._labelFont)
-        painter.drawText(self.boundingRect(),
+        painter.drawText(self._start,
             self._labelText,
         )
         painter.drawRect(self.boundingRect())
@@ -1002,41 +1001,3 @@ class layoutLabel(layoutShape):
     @inpEdLayer.setter
     def inpEdLayer(self, value):
         self._inpEdLayer = value
-
-class simpleLayoutLabel(QGraphicsSimpleTextItem):
-    def __init__(
-        self,
-        start: QPoint,
-        labelText: str,
-        fontFamily: str,
-        fontStyle: str,
-        labelHeight: str,
-        labelAlign: str,
-        labelOrient: str,
-        inpEdLayer: ddef.layLayer,
-        gridTuple: tuple[int, int],
-    ):
-        super().__init__(labelText)
-
-        self._start = start
-        self._labelText = labelText
-        self._fontFamily = fontFamily
-        self._fontStyle = fontStyle
-        self._labelHeight = labelHeight
-        self._labelAlign = labelAlign
-        self._labelOrient = labelOrient
-        self._inpEdLayer = inpEdLayer
-        self._pen = QPen(self._inpEdLayer.pcolor, 2, Qt.SolidLine)
-        self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
-        self._brush = QBrush(self._inpEdLayer.bcolor)
-        self._labelFont = QFont(fontFamily)
-        self._labelFont.setStyleName(fontStyle)
-        # self._labelFont.setPointSize(int(float(self._labelHeight)))
-        self._labelFont.setPointSize(int(float(self._labelHeight)))
-        self._labelFont.setKerning(False)
-        self.setPen(self._pen)
-        self.setBrush(self._brush)
-        # self.setOpacity(1)
-
-    def paint(self, painter, option, widget):
-        super().paint(painter, option, widget)

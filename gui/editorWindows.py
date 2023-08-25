@@ -63,6 +63,8 @@ from PySide6.QtGui import (
     QUndoStack,
     QTransform,
     QFontDatabase,
+    QFont,
+    QWheelEvent,
 )
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import (
@@ -75,6 +77,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QSizePolicy,
     QGraphicsRectItem,
+    QGraphicsTextItem,
     QGraphicsScene,
     QGraphicsSceneMouseEvent,
     QGraphicsView,
@@ -1292,6 +1295,7 @@ class symbolEditor(editorWindow):
     def createLabelClick(self):
         createLabelDlg = pdlg.createSymbolLabelDialog(self)
         self.messageLine.setText("Place a label")
+        createLabelDlg.labelHeightEdit.setText("12")
         if createLabelDlg.exec() == QDialog.Accepted:
             modeList = [False for _ in range(8)]
             modeList[5] = True
@@ -1688,6 +1692,7 @@ class symbol_scene(editor_scene):
                     self.newArc.setSelected(False)
                 elif self.addLabel:
                     self.newLabel.setSelected(False)
+                    self.addLabel = False
                 elif self.itemSelect and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
@@ -3258,9 +3263,6 @@ class layout_scene(editor_scene):
         self.newPathWidth = 0.0
         self.draftLine = None
         self.pathMode = [False for _ in range(5)]
-        self.mousePressLoc = None
-        self.mouseMoveLoc = None
-        self.mouseReleaseLoc = None
         self.m45Rotate = QTransform()
         self.m45Rotate.rotate(-45)
         self.newPinTuple = None
@@ -3272,63 +3274,60 @@ class layout_scene(editor_scene):
         return any((self.drawPath, self.drawRect))
 
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        super().mousePressEvent(mouse_event)
-        try:
-            modifiers = QGuiApplication.keyboardModifiers()
-            self.viewRect = self.parent.view.mapToScene(
-                self.parent.view.viewport().rect()
-            ).boundingRect()
-            if mouse_event.button() == Qt.LeftButton:
-                self.mousePressLoc = mouse_event.scenePos().toPoint()
-                if self.addInstance:
-                    self.newInstance = self.drawInstance(self.mousePressLoc)
-                    self.newInstance.setSelected(True)
-                    self.addInstance = False
-                elif self.changeOrigin:  # change origin of the symbol
-                    self.origin = self.mousePressLoc
-                    self.changeOrigin = False
-                elif self.itemSelect:
-                    self.selectSceneItems(modifiers)
-                elif self.drawRect:
-                    self.newRect = lshp.layoutRect(
-                        self.mousePressLoc,
-                        self.mousePressLoc,
-                        self.selectEdLayer,
-                        self.gridTuple,
-                    )
-                    self.addUndoStack(self.newRect)
-                elif self.drawPin:
-                    self.newPin = lshp.layoutPin(
-                        self.mousePressLoc,
-                        self.mousePressLoc,
-                        *self.newPinTuple,
-                        self.gridTuple,
-                    )
-                    self.addUndoStack(self.newPin)
+     super().mousePressEvent(mouse_event)
+     try:
+         modifiers = QGuiApplication.keyboardModifiers()
+         self.viewRect = self.parent.view.mapToScene(
+             self.parent.view.viewport().rect()
+         ).boundingRect()
+         if mouse_event.button() == Qt.LeftButton:
+             self.mousePressLoc = mouse_event.scenePos().toPoint()
+             if self.addInstance:
+                 self.newInstance = self.drawInstance(self.mousePressLoc)
+                 self.newInstance.setSelected(True)
+                 self.addInstance = False
+             elif self.changeOrigin:  # change origin of the symbol
+                 self.origin = self.mousePressLoc
+                 self.changeOrigin = False
+             elif self.itemSelect:
+                 self.selectSceneItems(modifiers)
+             elif self.drawRect:
+                 self.newRect = lshp.layoutRect(
+                     self.mousePressLoc,
+                     self.mousePressLoc,
+                     self.selectEdLayer,
+                     self.gridTuple,
+                 )
+                 self.addUndoStack(self.newRect)
+             elif self.drawPin:
+                 self.newPin = lshp.layoutPin(
+                     self.mousePressLoc,
+                     self.mousePressLoc,
+                     *self.newPinTuple,
+                     self.gridTuple,
+                 )
+                 self.addUndoStack(self.newPin)
+ 
+             elif self.drawPath:
+                 if self.newPath is None:  # new path
+                     self.newPath = lshp.layoutPath(
+                         QLineF(self.mousePressLoc, self.mousePressLoc),
+                         self.selectEdLayer,
+                         self.gridTuple,
+                         self.newPathWidth,
+                     )
+                     self.newPath.mode = self.pathMode.index(True)
+                     self.addUndoStack(self.newPath)
+                 else:
+                     self.newPath.draftLine = QLineF(
+                         self.newPath.draftLine.p1(), self.mousePressLoc
+                     )
+                     self.newPath = None
+             elif self.newLabel:
+                 self.newLabel.setPos(self.mousePressLoc)
 
-                elif self.drawPath:
-                    if self.newPath is None:  # new path
-                        self.newPath = lshp.layoutPath(
-                            QLineF(self.mousePressLoc, self.mousePressLoc),
-                            self.selectEdLayer,
-                            self.gridTuple,
-                            self.newPathWidth,
-                        )
-                        self.newPath.mode = self.pathMode.index(True)
-                        self.addUndoStack(self.newPath)
-                    else:
-                        self.newPath.draftLine = QLineF(
-                            self.newPath.draftLine.p1(), self.mousePressLoc
-                        )
-                        self.newPath = None
-                elif self.addLabel:
-                    self.newLabel=lshp.simpleLayoutLabel(self.mousePressLoc,*self.newLabelTuple,
-                                 self.gridTuple)
-                    self.addUndoStack(self.newLabel)
-                    self.newLabel.setSelected(True)
-
-        except Exception as e:
-            self.logger.error(f"mouse press error: {e}")
+     except Exception as e:
+         self.logger.error(f"mouse press error: {e}")
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(mouse_event)
@@ -3337,7 +3336,7 @@ class layout_scene(editor_scene):
         if mouse_event.buttons() == Qt.LeftButton:
             if self.selectedItems() is not None:
                 for item in self.selectedItems():
-                    item.setPos(item.pos() + (self.mouseMoveLoc - self.mousePressLoc))
+                    item.setPos(item.mapFromScene(self.mouseMoveLoc))
                     self.mousePressLoc = self.mouseMoveLoc
             if self.drawRect:
                 self.editorWindow.messageLine.setText(
@@ -3355,8 +3354,16 @@ class layout_scene(editor_scene):
                 self.newPath.draftLine = QLineF(
                     self.newPath.draftLine.p1(), self.mouseMoveLoc
                 )
-            elif self.addLabel and self.newLabel is not None:
-                self.newLabel.setPos(self.mouseMoveLoc)
+        else:
+            if self.addLabel:
+                print('add label')
+                if self.newLabel:
+                    self.newLabel.setPos(self.mouseMoveLoc)
+
+                else:
+                    self.newLabel = lshp.layoutLabel(self.mouseMoveLoc, *self.newLabelTuple,
+                                                     self.gridTuple)
+                    self.addItem(self.newLabel)
         self.statusLine.showMessage(
             f"Cursor Position: {(self.mouseMoveLoc - self.origin).toTuple()}"
         )
@@ -3592,24 +3599,28 @@ class editor_view(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.TextAntialiasing, True)
         self.setMouseTracking(True)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setInteractive(True)
 
-    # def wheelEvent(self, mouse_event):
-    #     super().wheelEvent(mouse_event)
-    #     factor = 0.9 if mouse_event.angleDelta().y() < 0 else 1.1
-    #     view_pos = QPoint(int(mouse_event.globalPosition().x()),
-    #                       int(mouse_event.globalPosition().y()))
-    #     scene_pos = self.mapToScene(view_pos)
-    #     self.centerOn(scene_pos)
-    #     self.scale(factor, factor)
-    #     delta = self.mapToScene(view_pos) - self.mapToScene(self.viewport().rect().center())
-    #     self.centerOn(scene_pos - delta)
-    def wheelEvent(self, mouse_event):
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        # Get the current center point of the view
+        old_pos = self.mapToScene(self.viewport().rect().center())
 
-        factor = 0.9 if mouse_event.angleDelta().y() < 0 else 1.1
-        self.scale(factor, factor)
-        new_cursor_pos = self.mapToScene(mouse_event.position().toPoint())
-        self.centerOn(new_cursor_pos)
-        super().wheelEvent(mouse_event)
+        # Perform the zoom
+        zoom_factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
+        self.scale(zoom_factor, zoom_factor)
+
+        # Get the new center point of the view
+        new_pos = self.mapToScene(self.viewport().rect().center())
+
+        # Calculate the delta and adjust the scene position
+        delta = new_pos - old_pos
+        self.translate(delta.x(), delta.y())
+
+
+
+
 
     def snapToBase(self, number, base):
         """
