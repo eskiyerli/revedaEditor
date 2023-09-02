@@ -42,6 +42,7 @@ from PySide6.QtGui import (
     QFont,
     QTextOption,
     QFontDatabase,
+    QPainterPath,
 )
 from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsSimpleTextItem,
@@ -774,13 +775,14 @@ class layoutPin(layoutShape):
         gridTuple: tuple[int, int],
     ):
         super().__init__(gridTuple)
-        self._start = start
-        self._end = end
+
         self._pinName = pinName
         self._pinDir = pinDir
         self._pinType = pinType
         self._connected = False  # True if the pin is connected to a net.
         self._rect = QRect(start, end).normalized()
+        self._start = self._rect.topLeft()
+        self._end = self._rect.bottomRight()
         self._inpEdLayer = inpEdLayer
         self._pen = QPen(
             self._inpEdLayer.pcolor, self._inpEdLayer.pwidth, self._inpEdLayer.pstyle
@@ -791,6 +793,8 @@ class layoutPin(layoutShape):
         self._brush = QBrush(self._inpEdLayer.bcolor, self._bitmap)
         self._selectedPen = QPen(QColor("yellow"), self._inpEdLayer.pwidth, Qt.DashLine)
         self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+        print(f'start: {self.mapFromScene(start)}')
+        print(f'end: {self.mapFromScene(end)}')
 
     def __repr__(self):
         return (
@@ -846,7 +850,7 @@ class layoutPin(layoutShape):
     def start(self, start: QPoint):
         self.prepareGeometryChange()
         self._rect = QRectF(start, self._end).normalized()
-        self._start = start
+        self._start = self._rect.topLeft()
 
     @property
     def end(self):
@@ -856,7 +860,7 @@ class layoutPin(layoutShape):
     def end(self, end: QPoint):
         self.prepareGeometryChange()
         self._rect = QRectF(self._start, end).normalized()
-        self._end = end
+        self._end = self._rect.bottomRight()
 
 
 class layoutLabel(layoutShape):
@@ -894,6 +898,7 @@ class layoutLabel(layoutShape):
         self._labelFont.setKerning(False)
         # self.setOpacity(1)
         self._fm = QFontMetrics(self._labelFont)
+        self._rect = self._fm.boundingRect(self._labelText)
         self._textOptions = QTextOption()
         if self._labelAlign == layoutLabel.labelAlignments[0]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -901,8 +906,7 @@ class layoutLabel(layoutShape):
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignCenter)
         elif self._labelAlign == layoutLabel.labelAlignments[2]:
             self._textOptions.setAlignment(Qt.AlignmentFlag.AlignRight)
-        # self.setOrient()
-        self.setPos(self._start)
+        self.setOrient()
 
     def __repr__(self):
         return (
@@ -931,18 +935,32 @@ class layoutLabel(layoutShape):
             self.setRotation(90)
 
     def boundingRect(self):
-        return self._fm.boundingRect(self._labelText).normalized().adjusted(-5,-5,5,5)
+        return QRect(self._start.x(), self._start.y(), self._rect.width(),
+                     self._rect.height()).normalized().adjusted(-self._gridTuple[0] * 0.5,
+                                                                self._gridTuple[1] * 0.5,
+                                                                self._gridTuple[0] * 0.5,
+                                                                self._gridTuple[1] * 0.5)  #
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        path.addRect(self.boundingRect())
+        return path
 
     def paint(self, painter, option, widget):
-        painter.setPen(self._pen)
-        # painter.setBrush(self._brush)
         self._labelFont.setPointSize(int(self._labelHeight))
         painter.setFont(self._labelFont)
-        painter.drawText(self._start,
-            self._labelText,
-        )
-        painter.drawRect(self.boundingRect())
+        if self.isSelected():
+            painter.setPen(self._selectedPen)
+            painter.drawRect(self.boundingRect())
+            self.setZValue(99)
+        else:
+            painter.setPen(self._pen)
+            self.setZValue(self._inpEdLayer.z)
+        painter.drawText(QPoint(self._start.x(), self._start.y() + self._rect.height()),
+                             self._labelText, )
         painter.drawPoint(self._start)
+
+
 
     def flip(self, direction: str):
         currentTransform = self.transform()
@@ -959,6 +977,7 @@ class layoutLabel(layoutShape):
 
     @start.setter
     def start(self, value: QPoint):
+        self.prepareGeometryChange()
         self._start = value
 
     @property

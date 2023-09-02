@@ -1120,7 +1120,10 @@ class label(shape):
 
     def boundingRect(self):
         return QRect(self._start.x(), self._start.y(), self._rect.width(),
-                     self._rect.height()).normalized().adjusted(0, 0, 0, 5)  #
+                     self._rect.height()).normalized().adjusted(-self._gridTuple[0] * 0.5,
+                                                                self._gridTuple[1] * 0.5,
+                                                                self._gridTuple[0] * 0.5,
+                                                                self._gridTuple[1] * 0.5)  #
 
     def shape(self) -> QPainterPath:
         path = QPainterPath()
@@ -1144,8 +1147,7 @@ class label(shape):
         else:
             painter.drawText(QPoint(self._start.x(), self._start.y() + self._rect.height()),
                              self._labelDefinition, )
-        self._fm = QFontMetrics(self._labelFont)
-        self._rect = self._fm.boundingRect(self._labelDefinition)
+
 
     @property
     def start(self):
