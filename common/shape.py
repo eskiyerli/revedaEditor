@@ -32,6 +32,7 @@ from quantiphy import Quantity
 
 import pdk.schLayers as schlyr
 import pdk.symLayers as symlyr
+import pdk.callbacks as cb
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.common.net as net
 
@@ -933,20 +934,20 @@ class text(shape):
                f'{self._textOrient}, {self._gridTuple})'
 
     def setOrient(self):
-        if self._labelOrient == label.labelOrients[0]:
+        if self._textOrient == text.textOrients[0]:
             self.setRotation(0)
-        elif self._labelOrient == label.labelOrients[1]:
+        elif self._textOrient == text.textOrients[1]:
             self.setRotation(90)
-        elif self._labelOrient == label.labelOrients[2]:
+        elif self._textOrient == text.textOrients[2]:
             self.setRotation(180)
-        elif self._labelOrient == label.labelOrients[3]:
+        elif self._textOrient == text.textOrients[3]:
             self.setRotation(270)
-        elif self._labelOrient == label.labelOrients[4]:
+        elif self._textOrient == text.textOrients[4]:
             self.flip('x')
-        elif self._labelOrient == label.labelOrients[5]:
+        elif self._labelOrient == text.textOrients[5]:
             self.flip('x')
             self.setRotation(90)
-        elif self._labelOrient == label.labelOrients[6]:
+        elif self._labelOrient == text.textOrients[6]:
             self.flip('y')
             self.setRotation(90)
 

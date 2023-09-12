@@ -22,28 +22,51 @@
 from collections import namedtuple
 from dataclasses import dataclass
 
-from PySide6.QtCore import (Qt)
-from PySide6.QtGui import (QColor)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 
-viewTuple = namedtuple('viewTuple', ['libraryName', 'cellName', 'viewName'])
-cellTuple = namedtuple('cellTuple', ['libraryName', 'cellName'])
-viewItemTuple = namedtuple('viewItemTuple', ['libraryItem', 'cellItem',
-                                             'viewItem'])
-pinNetTuple = namedtuple('pinNetTuple', ['pin', 'net', 'start'])
-netTuple = namedtuple('netTuple', ['net', 'start'])
+viewTuple = namedtuple("viewTuple", ["libraryName", "cellName", "viewName"])
+cellTuple = namedtuple("cellTuple", ["libraryName", "cellName"])
+viewItemTuple = namedtuple("viewItemTuple", ["libraryItem", "cellItem", "viewItem"])
+pinNetTuple = namedtuple("pinNetTuple", ["pin", "net", "start"])
+netTuple = namedtuple("netTuple", ["net", "start"])
 # this namedtuple is used to collect information on dashed lines.
 # net is the dashed line
 # index is the index of the self (schematicNet) where dashed line ends,
 # 0: start,
 # 1: end
 # orient is True if self is horizontal, otherwise False
-netEndTuple = namedtuple('netEndTuple', ['net', 'index', 'orient'])
+netEndTuple = namedtuple("netEndTuple", ["net", "index", "orient"])
 
-layoutPinTuple = namedtuple('layoutPinTuple', ['pinName', 'pinDir', 'pinType', 'pinLayer'])
-layoutLabelTuple = namedtuple('layoutLabelTuple', ['labelText', 'fontFamily', 'fontStyle',
-                                    'labelHeight', 'labelAlign', 'labelOrient', 'labelLayer'])
+layoutPinTuple = namedtuple(
+    "layoutPinTuple", ["pinName", "pinDir", "pinType", "pinLayer"]
+)
+layoutLabelTuple = namedtuple(
+    "layoutLabelTuple",
+    [
+        "labelText",
+        "fontFamily",
+        "fontStyle",
+        "labelHeight",
+        "labelAlign",
+        "labelOrient",
+        "labelLayer",
+    ],
+)
+layoutViaTuple = namedtuple(
+    "layoutViaTuple", ["layer", "type", "width", "height", "spacing"]
+)
 
-rectCoords = namedtuple('rectCoords', ['left', 'top', 'w', 'h'])
+arrayViaTuple = namedtuple(
+    "arrayViaTuple", ["singleViaTuple", "xnum", "ynum"]
+)
+
+rectCoords = namedtuple("rectCoords", ["left", "top", "w", "h"])
+
+# pdk related classes and namedtuples
+viaDefTuple = namedtuple(
+    "viaDefTuple", ["name", "layer", "type", "width", "height", "spacing"]
+)
 
 
 @dataclass
@@ -70,7 +93,7 @@ class layLayer:
     pwidth: int = 1  # pen width
     pstyle: Qt.PenStyle = Qt.SolidLine  # pen style
     bcolor: QColor = Qt.transparent  # brush colour
-    btexture: str = ''  # brush texture
+    btexture: str = ""  # brush texture
     z: int = 1  # z-index
     selectable: bool = True  # selectable
     visible: bool = True  # visible

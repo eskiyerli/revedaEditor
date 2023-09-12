@@ -23,11 +23,24 @@
 
 import pathlib
 import inspect
-from PySide6.QtGui import (QFontDatabase, )
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-                               QDialogButtonBox, QLineEdit, QLabel, QComboBox,
-                               QGroupBox, QRadioButton, QGridLayout, QTextEdit,
-                               QMenu)
+from PySide6.QtGui import (
+    QFontDatabase,
+)
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFormLayout,
+    QDialogButtonBox,
+    QLineEdit,
+    QLabel,
+    QComboBox,
+    QGroupBox,
+    QRadioButton,
+    QGridLayout,
+    QTextEdit,
+    QMenu,
+)
 
 import revedaEditor.common.net as net
 import revedaEditor.common.shape as shp
@@ -35,9 +48,10 @@ import revedaEditor.gui.editFunctions as edf
 
 
 class rectPropertyDialog(QDialog):
-    '''
+    """
     Property dialog for symbol rectangles.
-    '''
+    """
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -91,6 +105,7 @@ class circlePropertyDialog(QDialog):
         self.setLayout(self.mainLayout)
         self.show()
 
+
 class arcPropertyDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
@@ -122,6 +137,7 @@ class arcPropertyDialog(QDialog):
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
         self.show()
+
 
 class linePropertyDialog(QDialog):
     def __init__(self, parent):
@@ -219,7 +235,7 @@ class createSymbolLabelDialog(QDialog):
         self.fLayout.addRow(QLabel("Label Use"), self.labelUseCombo)
         self.labelVisiCombo = QComboBox()
         self.labelVisiCombo.addItems(["Yes", "No"])
-        self.fLayout.addRow(QLabel("Label Visible"),self.labelVisiCombo)
+        self.fLayout.addRow(QLabel("Label Visible"), self.labelVisiCombo)
         self.mainLayout.addLayout(self.fLayout)
         self.labelTypeGroup = QGroupBox("Label Type")
         self.labelTypeLayout = QHBoxLayout()
@@ -299,8 +315,7 @@ class symbolLabelsDialogue(QDialog):
         for item in self.attributes:
             self.attributeNameList.append(edf.longLineEdit())
             self.attributeNameList[i].setText(item.name)
-            self.symbolPropsLayout.addWidget(self.attributeNameList[i], i + 1,
-                0)
+            self.symbolPropsLayout.addWidget(self.attributeNameList[i], i + 1, 0)
             self.attributeDefList.append(edf.longLineEdit())
             self.attributeDefList[i].setText(item.definition)
             self.symbolPropsLayout.addWidget(self.attributeDefList[i], i + 1, 1)
@@ -313,7 +328,8 @@ class symbolLabelsDialogue(QDialog):
         self.attributeNameList[-1].setPlaceholderText("Enter Attribute Name")
         self.attributeDefList[-1].setToolTip("Enter Attribute Definition")
         self.attributeDefList[-1].editingFinished.connect(
-            lambda: self.updateAttributeDef(i + 1))
+            lambda: self.updateAttributeDef(i + 1)
+        )
 
     def updateAttributeDef(self, i):
         i += 1
@@ -324,7 +340,8 @@ class symbolLabelsDialogue(QDialog):
         self.attributeNameList[-1].setPlaceholderText("Enter Attribute Name")
         self.attributeDefList[-1].setToolTip("Enter Attribute Definition")
         self.attributeDefList[-1].editingFinished.connect(
-            lambda: self.updateAttributeDef(i))
+            lambda: self.updateAttributeDef(i)
+        )
 
     def symbolLabelsMethod(self):
         self.labelDefinitionList = []
@@ -348,22 +365,18 @@ class symbolLabelsDialogue(QDialog):
                 self.labelDefinitionList.append(edf.longLineEdit())
                 self.labelDefinitionList[-1].setText(item.labelDefinition)
                 self.labelDefinitionList[-1].setReadOnly(True)
-                self.symbolLabelsLayout.addWidget(
-                    self.labelDefinitionList[i - 1], i, 0)
+                self.symbolLabelsLayout.addWidget(self.labelDefinitionList[i - 1], i, 0)
                 self.labelHeightList.append(edf.shortLineEdit())
                 self.labelHeightList[-1].setText(str(item.labelHeight))
-                self.symbolLabelsLayout.addWidget(self.labelHeightList[i - 1],
-                    i, 1)
+                self.symbolLabelsLayout.addWidget(self.labelHeightList[i - 1], i, 1)
                 self.labelAlignmentList.append(QComboBox())
                 self.labelAlignmentList[-1].addItems(shp.label.labelAlignments)
                 self.labelAlignmentList[-1].setCurrentText(item.labelAlign)
-                self.symbolLabelsLayout.addWidget(self.labelAlignmentList[-1],
-                    i, 2)
+                self.symbolLabelsLayout.addWidget(self.labelAlignmentList[-1], i, 2)
                 self.labelOrientationList.append(QComboBox())
                 self.labelOrientationList[-1].addItems(shp.label.labelOrients)
                 self.labelOrientationList[-1].setCurrentText(item.labelOrient)
-                self.symbolLabelsLayout.addWidget(self.labelOrientationList[-1],
-                    i, 3)
+                self.symbolLabelsLayout.addWidget(self.labelOrientationList[-1], i, 3)
                 self.labelUseList.append(QComboBox())
                 self.labelUseList[-1].addItems(shp.label.labelUses)
                 self.labelUseList[-1].setCurrentText(item.labelUse)
@@ -373,8 +386,7 @@ class symbolLabelsDialogue(QDialog):
                 self.labelTypeList[-1].setCurrentText(item.labelType)
                 self.symbolLabelsLayout.addWidget(self.labelTypeList[-1], i, 5)
         if i == 0:  # no labels to edit
-            self.symbolLabelsLayout.addWidget(QLabel("No symbol labels found."),
-                1, 0)
+            self.symbolLabelsLayout.addWidget(QLabel("No symbol labels found."), 1, 0)
 
 
 class instanceProperties(QDialog):
@@ -410,7 +422,7 @@ class instanceProperties(QDialog):
         self.instNameEdit.setText(self.instance.instanceName)
         self.instNameEdit.setToolTip("Instance Name")
         formLayout.addRow(edf.boldLabel("Instance Name", self), self.instNameEdit)
-        location = (self.instance.scenePos()-self.instance.scene().origin).toTuple()
+        location = (self.instance.scenePos() - self.instance.scene().origin).toTuple()
         self.xLocationEdit = edf.shortLineEdit()
         self.xLocationEdit.setText(str(location[0]))
         formLayout.addRow(edf.boldLabel("x location", self), self.xLocationEdit)
@@ -432,11 +444,11 @@ class instanceProperties(QDialog):
         for label in self.instance.labels.values():
             if label.labelDefinition not in shp.label.predefinedLabels:
                 self.instanceLabelsLayout.addWidget(
-                    edf.boldLabel(label.labelName, self), row_index, 0)
+                    edf.boldLabel(label.labelName, self), row_index, 0
+                )
                 labelValueEdit = edf.longLineEdit()
                 labelValueEdit.setText(str(label.labelValue))
-                self.instanceLabelsLayout.addWidget(labelValueEdit, row_index,
-                    1)
+                self.instanceLabelsLayout.addWidget(labelValueEdit, row_index, 1)
                 visibleCombo = QComboBox(self)
                 visibleCombo.setInsertPolicy(QComboBox.NoInsert)
                 visibleCombo.addItems(["True", "False"])
@@ -444,7 +456,7 @@ class instanceProperties(QDialog):
                     visibleCombo.setCurrentIndex(0)
                 else:
                     visibleCombo.setCurrentIndex(1)
-                self.instanceLabelsLayout.addWidget(visibleCombo,row_index,2)
+                self.instanceLabelsLayout.addWidget(visibleCombo, row_index, 2)
                 row_index += 1
 
         instanceAttributesLayout = QGridLayout()
@@ -454,8 +466,7 @@ class instanceProperties(QDialog):
         instanceAttributesLayout.setColumnStretch(1, 1)
         # now list instance attributes
         for counter, name in enumerate(self.instance.attr.keys()):
-            instanceAttributesLayout.addWidget(edf.boldLabel(name, self), counter,
-                0)
+            instanceAttributesLayout.addWidget(edf.boldLabel(name, self), counter, 0)
             labelType = edf.longLineEdit()
             labelType.setReadOnly(True)
             labelNameEdit = edf.longLineEdit()
@@ -488,7 +499,7 @@ class netProperties(QDialog):
         self.mainLayout = QVBoxLayout()
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
-        formBox = QGroupBox('Net Properties')
+        formBox = QGroupBox("Net Properties")
         formLayout = QFormLayout()
         self.netNameEdit = edf.longLineEdit()
         self.netNameEdit.setText(self.net.name)
@@ -524,26 +535,29 @@ class schematicPinPropertiesDialog(createPinDialog):
 
 
 class symbolNameDialog(QDialog):
-    def __init__(self, cellPath:pathlib.Path, cellName: str, parent):
+    def __init__(self, cellPath: pathlib.Path, cellName: str, parent):
         super().__init__(parent)
         self.cellPath = cellPath
         self.cellName = cellName
-        self.symbolViewNames = [view.stem for view in cellPath.iterdir() if 'symbol' in
-                                view.stem]
+        self.symbolViewNames = [
+            view.stem for view in cellPath.iterdir() if "symbol" in view.stem
+        ]
         self.initUI()
+
     def initUI(self):
-        self.setWindowTitle('Create a symbol?')
+        self.setWindowTitle("Create a symbol?")
         self.mainLayout = QVBoxLayout()
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         formLayout = QFormLayout()
-        formLayout.addRow(edf.boldLabel('Library Name'), QLabel(
-            self.cellPath.parent.stem) )
-        formLayout.addRow(edf.boldLabel('Cell Name'), QLabel(self.cellPath.stem))
+        formLayout.addRow(
+            edf.boldLabel("Library Name"), QLabel(self.cellPath.parent.stem)
+        )
+        formLayout.addRow(edf.boldLabel("Cell Name"), QLabel(self.cellPath.stem))
         self.symbolViewsCB = QComboBox()
         self.symbolViewsCB.addItems(self.symbolViewNames)
         self.symbolViewsCB.setEditable(True)
-        formLayout.addRow(edf.boldLabel('Symbol View Name:'), self.symbolViewsCB)
+        formLayout.addRow(edf.boldLabel("Symbol View Name:"), self.symbolViewsCB)
         self.mainLayout.addLayout(formLayout)
         self.mainLayout.addSpacing(40)
         self.mainLayout.addWidget(self.buttonBox)
@@ -551,9 +565,11 @@ class symbolNameDialog(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
+
 class symbolCreateDialog(QDialog):
-    def __init__(self, parent, inputPinNames: list, outputPinNames: list,
-                 inoutPinNames: list):
+    def __init__(
+        self, parent, inputPinNames: list, outputPinNames: list, inoutPinNames: list
+    ):
         super().__init__(parent)
         self.parent = parent
         self.inputPinNames = inputPinNames
@@ -566,30 +582,30 @@ class symbolCreateDialog(QDialog):
 
         self.fLayout = QFormLayout()
         self.topPinsEdit = edf.longLineEdit()
-        self.topPinsEdit.setText(', '.join(self.inoutPinNames))
+        self.topPinsEdit.setText(", ".join(self.inoutPinNames))
         self.topPinsEdit.setToolTip("Enter top pins")
         self.fLayout.addRow(edf.boldLabel("Top Pins:"), self.topPinsEdit)
         self.leftPinsEdit = edf.longLineEdit()
-        self.leftPinsEdit.setText(', '.join(self.inputPinNames))
+        self.leftPinsEdit.setText(", ".join(self.inputPinNames))
         self.leftPinsEdit.setToolTip("Enter left pins")
         self.fLayout.addRow(edf.boldLabel("Left Pins:"), self.leftPinsEdit)
         self.bottomPinsEdit = edf.longLineEdit()
         self.bottomPinsEdit.setToolTip("Enter bottom pins")
         self.fLayout.addRow(edf.boldLabel("Bottom Pins:"), self.bottomPinsEdit)
         self.rightPinsEdit = edf.longLineEdit()
-        self.rightPinsEdit.setText(', '.join(self.outputPinNames))
+        self.rightPinsEdit.setText(", ".join(self.outputPinNames))
         self.rightPinsEdit.setToolTip("Enter right pins")
         self.fLayout.addRow(edf.boldLabel("Right Pins:"), self.rightPinsEdit)
         self.mainLayout.addLayout(self.fLayout)
         self.mainLayout.addSpacing(20)
         self.geomLayout = QFormLayout()
         self.stubLengthEdit = QLineEdit()
-        self.stubLengthEdit.setText('60')
-        self.stubLengthEdit.setToolTip('Enter stub lengths')
+        self.stubLengthEdit.setText("60")
+        self.stubLengthEdit.setToolTip("Enter stub lengths")
         self.geomLayout.addRow(edf.boldLabel("Stub Length:"), self.stubLengthEdit)
         self.pinDistanceEdit = QLineEdit()
-        self.pinDistanceEdit.setText('80')
-        self.pinDistanceEdit.setToolTip('Enter pin spacing')
+        self.pinDistanceEdit.setText("80")
+        self.pinDistanceEdit.setToolTip("Enter pin spacing")
         self.geomLayout.addRow(edf.boldLabel("Pin spacing:"), self.pinDistanceEdit)
         self.mainLayout.addLayout(self.geomLayout)
         self.mainLayout.addSpacing(40)
@@ -602,10 +618,11 @@ class symbolCreateDialog(QDialog):
 
 
 class noteTextEdit(QDialog):
-    '''
+    """
     Set text properties.
-    '''
-    def __init__(self,parent):
+    """
+
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Edit Text")
@@ -615,29 +632,32 @@ class noteTextEdit(QDialog):
         self.plainTextEdit = QTextEdit()
         mainLayout.addWidget(self.plainTextEdit)
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
-        fixedFamilies = [family for family in fontFamilies if
-                         QFontDatabase.isFixedPitch(family)]
+        fixedFamilies = [
+            family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
+        ]
         formLayout = QFormLayout()
         self.familyCB = QComboBox()
         self.familyCB.addItems(fixedFamilies)
         self.familyCB.currentTextChanged.connect(self.familyFontStyles)
-        formLayout.addRow(edf.boldLabel('Font Name'),self.familyCB)
+        formLayout.addRow(edf.boldLabel("Font Name"), self.familyCB)
         self.fontStyleCB = QComboBox()
         self.fontStyles = QFontDatabase.styles(fixedFamilies[0])
         self.fontStyleCB.addItems(self.fontStyles)
         self.fontStyleCB.currentTextChanged.connect(self.styleFontSizes)
-        formLayout.addRow(edf.boldLabel('Font Style'), self.fontStyleCB)
+        formLayout.addRow(edf.boldLabel("Font Style"), self.fontStyleCB)
         self.fontsizeCB = QComboBox()
-        self.fontSizes = [str(size) for size in QFontDatabase.pointSizes(fixedFamilies[0],
-                                                          self.fontStyles[0])]
+        self.fontSizes = [
+            str(size)
+            for size in QFontDatabase.pointSizes(fixedFamilies[0], self.fontStyles[0])
+        ]
         self.fontsizeCB.addItems(self.fontSizes)
-        formLayout.addRow(edf.boldLabel('Font Size'),self.fontsizeCB)
+        formLayout.addRow(edf.boldLabel("Font Size"), self.fontsizeCB)
         self.textAlignmCB = QComboBox()
         self.textAlignmCB.addItems(shp.text.textAlignments)
-        formLayout.addRow(edf.boldLabel('Text Alignment'),self.textAlignmCB)
+        formLayout.addRow(edf.boldLabel("Text Alignment"), self.textAlignmCB)
         self.textOrientCB = QComboBox()
         self.textOrientCB.addItems(shp.text.textOrients)
-        formLayout.addRow(edf.boldLabel('Text Orientation'), self.textOrientCB)
+        formLayout.addRow(edf.boldLabel("Text Orientation"), self.textOrientCB)
         mainLayout.addLayout(formLayout)
         mainLayout.addSpacing(40)
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -647,10 +667,24 @@ class noteTextEdit(QDialog):
         self.setLayout(mainLayout)
         self.show()
 
+    def familyFontStyles(self, s):
+        self.fontStyleCB.clear()
+        self.fontStyles = QFontDatabase.styles(self.familyCB.currentText())
+        self.fontStyleCB.addItems(self.fontStyles)
+
+    def styleFontSizes(self, s):
+        self.fontsizeCB.clear()
+        selectedFamily = self.familyCB.currentText()
+        selectedStyle = self.fontStyleCB.currentText()
+        self.fontSizes = [
+            str(size)
+            for size in QFontDatabase.pointSizes(selectedFamily, selectedStyle)
+        ]
+        self.fontsizeCB.addItems(self.fontSizes)
 
 
 class noteTextEditProperties(noteTextEdit):
-    def __init__(self,parent, note:shp.text):
+    def __init__(self, parent, note: shp.text):
         super().__init__(parent)
         self.note = note
         self.plainTextEdit.setText(self.note.textContent)
@@ -679,10 +713,10 @@ class displayConfigDialog(QDialog):
 
         gridTypeGroup = QGroupBox("Grid Type")
         gridTypeLayout = QHBoxLayout()
-        self.dotType = QRadioButton('Dot Grid')
+        self.dotType = QRadioButton("Dot Grid")
         self.dotType.setChecked(True)
-        self.lineType = QRadioButton('Line Grid')
-        self.noType = QRadioButton('No Grid')
+        self.lineType = QRadioButton("Line Grid")
+        self.noType = QRadioButton("No Grid")
         gridTypeLayout.addWidget(self.dotType)
         gridTypeLayout.addWidget(self.lineType)
         gridTypeLayout.addWidget(self.noType)
@@ -696,6 +730,7 @@ class displayConfigDialog(QDialog):
         self.setLayout(self.vLayout)
         self.show()
 
+
 class selectConfigDialogue(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
@@ -708,8 +743,8 @@ class selectConfigDialogue(QDialog):
         vLayout = QVBoxLayout()
         selectionTypeGroup = QGroupBox("Selection Type")
         selectionTypeLayout = QHBoxLayout()
-        self.fullSelection = QRadioButton('Full')
-        self.partialSelection = QRadioButton('Partial')
+        self.fullSelection = QRadioButton("Full")
+        self.partialSelection = QRadioButton("Partial")
         selectionTypeLayout.addWidget(self.fullSelection)
         selectionTypeLayout.addWidget(self.partialSelection)
         selectionTypeGroup.setLayout(selectionTypeLayout)
