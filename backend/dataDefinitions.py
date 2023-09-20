@@ -38,6 +38,9 @@ netTuple = namedtuple("netTuple", ["net", "start"])
 # orient is True if self is horizontal, otherwise False
 netEndTuple = namedtuple("netEndTuple", ["net", "index", "orient"])
 
+layoutPathTuple = namedtuple(
+    "layoutPathTuple", ["layer", "name", "mode", "width", "startExtend", "endExtend"]
+)
 layoutPinTuple = namedtuple(
     "layoutPinTuple", ["pinName", "pinDir", "pinType", "pinLayer"]
 )
@@ -47,26 +50,28 @@ layoutLabelTuple = namedtuple(
         "labelText",
         "fontFamily",
         "fontStyle",
-        "labelHeight",
+        "fontHeight",
         "labelAlign",
         "labelOrient",
         "labelLayer",
     ],
 )
-layoutViaTuple = namedtuple(
-    "layoutViaTuple", ["layer", "type", "width", "height", "spacing"]
+# pdk related classes and namedtuples
+# this tuple defines the minimum dimensions of a via
+# This can be extended to define the maximum dimensions
+viaDefTuple = namedtuple(
+    "viaDefTuple", ["name", "layer", "type", "minWidth", "maxWidth",  "minHeight", "maxHeight", "minSpacing", "maxSpacing"]
+)
+# Single and array via definitions
+singleViaTuple = namedtuple(
+    "singleViaTuple", ["viaDefTuple", "width", "height"]
 )
 
-arrayViaTuple = namedtuple(
-    "arrayViaTuple", ["singleViaTuple", "xnum", "ynum"]
-)
+arrayViaTuple = namedtuple("arrayViaTuple", ["singleViaTuple", "spacing","xnum", "ynum"])
 
 rectCoords = namedtuple("rectCoords", ["left", "top", "w", "h"])
 
-# pdk related classes and namedtuples
-viaDefTuple = namedtuple(
-    "viaDefTuple", ["name", "layer", "type", "width", "height", "spacing"]
-)
+
 
 
 @dataclass

@@ -39,7 +39,7 @@ class layoutEncoder(json.JSONEncoder):
                 itemDict = {"type": "layoutRect", "rect": item.rect.getCoords(),
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle,
-                            "lnum": laylyr.pdkLayoutLayers.index(item.layer)}
+                            "lnum": laylyr.pdkDrawingLayers.index(item.layer)}
             case lshp.layoutPath:
                 itemDict = {"type": "layoutPath"}
             case default: # now check super class types:

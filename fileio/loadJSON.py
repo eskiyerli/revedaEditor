@@ -293,7 +293,7 @@ def createLayoutInstance(gridTuple, item, libraryDict):
 def createRectShape(item, gridTuple:tuple[int,int]):
         start = QPoint(item["rect"][0], item["rect"][1])
         end = QPoint(item["rect"][2], item["rect"][3])
-        layoutLayer = laylyr.pdkLayoutLayers[item["lnum"]]
+        layoutLayer = laylyr.pdkDrawingLayers[item["lnum"]]
         rect = lshp.layoutInstance(start, end, layoutLayer, gridTuple)
         rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item["ang"]

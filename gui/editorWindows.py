@@ -62,6 +62,7 @@ from PySide6.QtGui import (
     QUndoStack,
     QTransform,
     QWheelEvent,
+    QFontDatabase,
 )
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import (
@@ -424,6 +425,8 @@ class editorWindow(QMainWindow):
         self.selectAllAction.triggered.connect(self.selectAllClick)
         self.deselectAllAction.triggered.connect(self.deselectAllClick)
         self.deleteAction.triggered.connect(self.deleteClick)
+        self.undoAction.triggered.connect(self.undoClick)
+        self.redoAction.triggered.connect(self.redoClick)
 
     def _createShortcuts(self):
         self.redoAction.setShortcut("Shift+U")
@@ -537,7 +540,6 @@ class editorWindow(QMainWindow):
     def redoClick(self, s):
         self.centralW.scene.undoStack.redo()
 
-
 class layoutEditor(editorWindow):
     def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView) -> None:
         super().__init__(viewItem, libraryDict, libraryView)
@@ -581,6 +583,7 @@ class layoutEditor(editorWindow):
         self.createLabelAction.triggered.connect(self.createLabelClick)
         self.createViaAction.triggered.connect(self.createViaClick)
         self.deleteAction.triggered.connect(self.deleteClick)
+        self.objPropAction.triggered.connect(self.objPropClick)
 
     def _createShortcuts(self):
         super()._createShortcuts()
@@ -610,27 +613,44 @@ class layoutEditor(editorWindow):
         self.setDrawMode(*modeList)
 
     def createPathClick(self, s):
-        dlg = ldlg.pathSettingsDialogue(self)
+        dlg = ldlg.createPathDialogue(self)
+        dlg.pathLayerCB.addItems([item.name for item in laylyr.pdkDrawingLayers])
         dlg.pathWidth.setText("1.0")
-        self.centralW.scene.pathMode = [False for _ in range(5)]
+        dlg.startExtendEdit.setText("0.5")
+        dlg.endExtendEdit.setText("0.5")
+
         if dlg.exec() == QDialog.Accepted:
             if dlg.manhattanButton.isChecked():
-                self.centralW.scene.pathMode[0] = True
+                pathMode = 0
             elif dlg.diagonalButton.isChecked():
-                self.centralW.scene.pathMode[1] = True
+                pathMode = 1
             elif dlg.anyButton.isChecked():
-                self.centralW.scene.pathMode[2] = True
+                pathMode = 2
             elif dlg.horizontalButton.isChecked():
-                self.centralW.scene.pathMode[3] = True
+                pathMode = 3
             elif dlg.verticalButton.isChecked():
-                self.centralW.scene.pathMode[4] = True
-            if dlg.pathWidth.text().strip():
-                self.centralW.scene.newPathWidth = fabproc.dbu * float(
-                    dlg.pathWidth.text().strip()
-                )
+                pathMode = 4
             else:
-                self.centralW.scene.newPathWidth = fabproc.dbu * 1.0
-
+                pathMode = 0
+            if dlg.pathWidth.text().strip():
+                pathWidth = fabproc.dbu * float(
+                    dlg.pathWidth.text().strip())
+            else:
+                pathWidth = fabproc.dbu * 1.0
+            pathName = dlg.pathNameEdit.text()
+            pathLayerName = dlg.pathLayerCB.currentText()
+            pathLayer = [
+                item for item in laylyr.pdkDrawingLayers if item.name == pathLayerName
+            ][0]
+            print(pathLayer)
+            startExtend = float(dlg.startExtendEdit.text().strip())*fabproc.dbu
+            endExtend = float(dlg.endExtendEdit.text().strip())*fabproc.dbu
+            self.centralW.scene.newPathTuple = ddef.layoutPathTuple(pathLayer,
+                                                                    pathName,
+                                                                    pathMode,
+                                                                    pathWidth,
+                                                                    startExtend,
+                                                                    endExtend)
         modeList = [False for _ in range(8)]
         modeList[4] = True
         self.setDrawMode(*modeList)
@@ -654,7 +674,7 @@ class layoutEditor(editorWindow):
             dlg.familyCB.setCurrentText(self.centralW.scene.newLabelTuple.fontFamily)
             dlg.fontStyleCB.setCurrentText(self.centralW.scene.newLabelTuple.fontStyle)
             dlg.labelHeightCB.setCurrentText(
-                str(self.centralW.scene.newLabelTuple.labelHeight)
+                str(self.centralW.scene.newLabelTuple.fontHeight)
             )
             dlg.labelAlignCB.setCurrentText(
                 self.centralW.scene.newLabelTuple.labelAlign
@@ -723,14 +743,14 @@ class layoutEditor(editorWindow):
             ][0]
             fontFamily = dlg.familyCB.currentText()
             fontStyle = dlg.fontStyleCB.currentText()
-            labelHeight = float(dlg.labelHeightCB.currentText())
+            fontHeight = float(dlg.labelHeightCB.currentText())
             labelAlign = dlg.labelAlignCB.currentText()
             labelOrient = dlg.labelOrientCB.currentText()
             self.centralW.scene.newLabelTuple = ddef.layoutLabelTuple(
                 labelName,
                 fontFamily,
                 fontStyle,
-                labelHeight,
+                fontHeight,
                 labelAlign,
                 labelOrient,
                 labelLayer,
@@ -745,39 +765,37 @@ class layoutEditor(editorWindow):
         if dlg.exec() == QDialog.Accepted:
             self.centralW.scene.addVia = True
             if dlg.singleViaRB.isChecked():
-                layer = [
-                    viatuple.layer
-                    for viatuple in fabproc.processVias
-                    if viatuple.name == dlg.singleViaNamesCB.currentText()
-                ][0]
-                self.centralW.scene.singleViaTuple = ddef.layoutViaTuple(
-                    layer,
-                    "input",
-                    fabproc.dbu * float(dlg.singleViaWidthEdit.text().strip()),
-                    fabproc.dbu * float(dlg.singleViaHeightEdit.text().strip()),
-                    0.0,
-                )
+                selViaDefTuple = [viaDefTuple for viaDefTuple in fabproc.processVias if
+                                  viaDefTuple.name == dlg.singleViaNamesCB.currentText()][0]
 
-            else:
-                layer = [
-                    viatuple.layer
-                    for viatuple in fabproc.processVias
-                    if viatuple.name == dlg.arrayViaNamesCB.currentText()
-                ][0]
-                singleViaTuple = ddef.layoutViaTuple(
-                    layer,
-                    "input",
+                singleViaTuple = ddef.singleViaTuple(
+                    selViaDefTuple,
                     fabproc.dbu * float(dlg.singleViaWidthEdit.text().strip()),
                     fabproc.dbu * float(dlg.singleViaHeightEdit.text().strip()),
-                    fabproc.dbu * float(dlg.arrayViaSpacingEdit.text().strip()),
+                )
+                self.centralW.scene.arrayViaTuple = ddef.arrayViaTuple(
+                    singleViaTuple,fabproc.dbu*float(selViaDefTuple.minSpacing), 1,1)
+            else:
+                selViaDefTuple = [viaDefTuple for viaDefTuple in fabproc.processVias if
+                                  viaDefTuple.name == dlg.singleViaNamesCB.currentText()][0]
+
+                singleViaTuple = ddef.singleViaTuple(
+                    selViaDefTuple,
+                    fabproc.dbu * float(dlg.arrayViaWidthEdit.text().strip()),
+                    fabproc.dbu * float(dlg.arrayViaHeightEdit.text().strip()),
                 )
                 self.centralW.scene.arrayViaTuple = ddef.arrayViaTuple(
                     singleViaTuple,
+                    fabproc.dbu * float(dlg.arrayViaSpacingEdit.text().strip()),
                     int(float(dlg.arrayXNumEdit.text().strip())),
                     int(float(dlg.arrayYNumEdit.text().strip())),
                 )
         else:
             self.centralW.scene.resetSceneMode()
+
+    def objPropClick(self, s):
+        self.centralW.scene.viewObjProperties()
+
 
     def checkSaveCell(self):
         self.centralW.scene.saveLayoutCell(self.file)
@@ -865,8 +883,8 @@ class schematicEditor(editorWindow):
         self.copyAction.triggered.connect(self.copyClick)
 
         self.objPropAction.triggered.connect(self.objPropClick)
-        self.undoAction.triggered.connect(self.undoClick)
-        self.redoAction.triggered.connect(self.redoClick)
+
+
         self.netlistAction.triggered.connect(self.createNetlistClick)
         self.rotateAction.triggered.connect(self.rotateItemClick)
         self.simulateAction.triggered.connect(self.startSimClick)
@@ -1241,8 +1259,6 @@ class symbolEditor(editorWindow):
         self.createPinAction.triggered.connect(self.createPinClick)
         self.objPropAction.triggered.connect(self.objPropClick)
         self.copyAction.triggered.connect(self.copyClick)
-        self.redoAction.triggered.connect(self.redoClick)
-        self.undoAction.triggered.connect(self.undoClick)
         self.rotateAction.triggered.connect(self.rotateItemClick)
         self.deleteAction.triggered.connect(self.deleteClick)
         self.stretchAction.triggered.connect(self.stretchClick)
@@ -1443,7 +1459,7 @@ class layoutContainer(QWidget):
 
     def layerSelected(self, layerName):
         self.scene.selectEdLayer = [
-            item for item in laylyr.pdkLayoutLayers if item.name == layerName
+            item for item in laylyr.pdkDrawingLayers if item.name == layerName
         ][0]
 
 
@@ -1578,7 +1594,7 @@ class editor_scene(QGraphicsScene):
                 # self.removeItem(item)
                 undoCommand = us.deleteShapeUndo(self, item)
                 self.undoStack.push(undoCommand)
-            self.update()  # self.selectMode()
+            self.update()  # update the scene
 
 
 class symbol_scene(editor_scene):
@@ -3286,7 +3302,7 @@ class schematic_scene(editor_scene):
 class layout_scene(editor_scene):
     def __init__(self, parent):
         super().__init__(parent)
-        self.selectEdLayer = laylyr.pdkLayoutLayers[0]
+        self.selectEdLayer = laylyr.pdkDrawingLayers[0]
         self.itemSelect = True  # flag to select item
         self.layoutShapes = ["layoutRect", "layoutCell"]
         self.drawPin = False
@@ -3302,16 +3318,14 @@ class layout_scene(editor_scene):
         self.addInstance = False
         self.itemCounter = 0
         self.newPath = None
-        self.newPathWidth = 0.0
+        self.newPathTuple = None
         self.draftLine = None
-        self.pathMode = [False for _ in range(5)]
         self.m45Rotate = QTransform()
         self.m45Rotate.rotate(-45)
         self.newPin = None
         self.newPinTuple = None
         self.newLabelTuple = None
         self.newLabel = None
-        self.singleViaTuple = None
         self.arrayViaTuple = None
         self.singleVia = None
         self.arrayVia = None
@@ -3356,11 +3370,12 @@ class layout_scene(editor_scene):
                 elif self.drawPath:
                     self.newPath = lshp.layoutPath(
                         QLineF(self.mousePressLoc, self.mousePressLoc),
-                        self.selectEdLayer,
+                        self.newPathTuple.layer,
                         self.gridTuple,
-                        self.newPathWidth,
+                        self.newPathTuple.width, self.newPathTuple.startExtend,
+                        self.newPathTuple.endExtend, self.newPathTuple.mode
                     )
-                    self.newPath.mode = self.pathMode.index(True)
+                    self.newPath.name = self.newPathTuple.name
                     self.addUndoStack(self.newPath)
                 elif self.drawPin and self.newLabel is None:
                     self.newPin = lshp.layoutPin(
@@ -3374,14 +3389,10 @@ class layout_scene(editor_scene):
                     self.newLabelTuple = None
                     self.newLabel = None
                     self.addLabel = False
-                elif self.addVia:
-                    if self.singleVia is not None:
-                        self.singleViaTuple = None
-                        self.singleVia = None
-                    elif self.arrayVia is not None:
-                        self.arrayViaTuple = None
-                        self.arrayVia = None
-                    self.editorWindow.createViaClick()
+                elif self.addVia and self.arrayVia is not None:
+                    self.arrayViaTuple = None
+                    self.arrayVia = None
+                    self.resetSceneMode()
 
                 elif self.itemSelect:
                     self.selectSceneItems(modifiers)
@@ -3409,15 +3420,7 @@ class layout_scene(editor_scene):
                 )
             elif self.drawPin and self.newPin is not None:
                 self.newPin.end = self.mouseMoveLoc
-            elif self.addLabel:
-                if self.newLabel is not None:  # already defined a new label
-                    self.newLabel.start = self.mouseMoveLoc
-                # there is no new label but there is a new label tuple defined
-                elif self.newLabelTuple is not None:
-                    self.newLabel = lshp.layoutLabel(
-                        self.mouseMoveLoc, *self.newLabelTuple, self.gridTuple
-                    )
-                    self.addUndoStack(self.newLabel)
+
 
             elif self.itemSelect and modifiers == Qt.ShiftModifier:
                 self.selectionRectItem.setRect(
@@ -3427,34 +3430,34 @@ class layout_scene(editor_scene):
             if self.drawPin and self.newPin is None:
                 if self.newLabel is not None:
                     self.newLabel.start = self.mouseMoveLoc
-            elif self.addVia:
-                if self.singleViaTuple is not None:
-                    if self.singleVia is None:
-                        self.singleVia = lshp.layoutVia(
-                            self.mouseMoveLoc, *self.singleViaTuple, self.gridTuple
-                        )
-                        self.addUndoStack(self.singleVia)
-                    else:
-                        self.singleVia.start = self.mouseMoveLoc
-                        self.singleVia.setSelected(True)
-                elif self.arrayViaTuple is not None:
-                    if self.arrayVia is None:
-                        singleVia = lshp.layoutVia(
-                            QPoint(0, 0),
-                            *self.arrayViaTuple.singleViaTuple,
-                            self.gridTuple,
-                        )
-                        self.arrayVia = lshp.layoutViaArray(
-                            self.mouseMoveLoc,
-                            singleVia,
-                            self.arrayViaTuple.xnum,
-                            self.arrayViaTuple.ynum,
-                            self.gridTuple,
-                        )
-                        self.addUndoStack(self.arrayVia)
-                    else:
-                        self.arrayVia.setPos(self.mouseMoveLoc - self.arrayVia.start)
-                        self.arrayVia.setSelected(True)
+            elif self.addLabel:
+                if self.newLabel is not None:  # already defined a new label
+                    self.newLabel.start = self.mouseMoveLoc
+                # there is no new label but there is a new label tuple defined
+                elif self.newLabelTuple is not None:
+                    self.newLabel = lshp.layoutLabel(
+                        self.mouseMoveLoc, *self.newLabelTuple, self.gridTuple
+                    )
+                    self.addUndoStack(self.newLabel)
+            elif self.addVia and self.arrayViaTuple is not None:
+                if self.arrayVia is None:
+                    singleVia = lshp.layoutVia(
+                        QPoint(0, 0),
+                        *self.arrayViaTuple.singleViaTuple,
+                        self.gridTuple,
+                    )
+                    self.arrayVia = lshp.layoutViaArray(
+                        self.mouseMoveLoc,
+                        singleVia,
+                        self.arrayViaTuple.spacing,
+                        self.arrayViaTuple.xnum,
+                        self.arrayViaTuple.ynum,
+                        self.gridTuple,
+                    )
+                    self.addUndoStack(self.arrayVia)
+                else:
+                    self.arrayVia.setPos(self.mouseMoveLoc - self.arrayVia.start)
+                    self.arrayVia.setSelected(True)
         super().mouseMoveEvent(mouse_event)
         cursorPositionX = (self.mouseMoveLoc - self.origin).x()
         cursorPositionY = (self.mouseMoveLoc - self.origin).y()
@@ -3474,17 +3477,18 @@ class layout_scene(editor_scene):
                     self.newRect.setSelected(False)
                     self.newRect = None
                     self.drawRect = False
-                elif self.drawPin:
-                    if self.newPin is not None and self.newLabel is None:  # still
-                        self.newPin = None
+                elif self.drawPin: # finish pin editing and start label editing
+                    if self.newPin is not None and self.newLabel is None:
+
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc, *self.newLabelTuple, self.gridTuple
                         )
                         self.addUndoStack(self.newLabel)
+                        self.newPin.label = self.newLabel
+                        self.newPin = None
                     elif self.newPin is None and self.newLabel is not None:
+                        # finish label editing
                         self.newLabel = None
-                        self.editorWindow.createPinClick()
-
                 elif self.itemSelect and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
@@ -3636,8 +3640,13 @@ class layout_scene(editor_scene):
         match key_event.key():
             case Qt.Key_Escape:
                 self.resetSceneMode()
-            case Qt.Key_Q:
-                self.viewObjProperties()
+
+    def deleteSelectedItems(self):
+        for item in self.selectedItems():
+            if isinstance(item,lshp.layoutPin) and item.label is not None:
+                undoCommand = us.deleteShapeUndo(self, item.label)
+                self.undoStack.push(undoCommand)
+        super().deleteSelectedItems()
 
     def viewObjProperties(self):
         """
@@ -3646,10 +3655,133 @@ class layout_scene(editor_scene):
         try:
             if self.selectedItems() is not None:
                 for item in self.selectedItems():
-                    if isinstance(item, lshp.layoutRect):
-                        pass
+                    match type(item):
+                        case lshp.layoutRect:
+                            pass
+                        case lshp.layoutPin:
+                            self.layoutPinProperties(item)
+                        case lshp.layoutLabel:
+                            self.layoutLabelProperties(item)
+                        case lshp.layoutPath:
+                            self.layoutPathProperties(item)
+                        case lshp.layoutViaArray:
+                            dlg = ldlg.layoutViaProperties(self.editorWindow)
+                            viaNames = [pvia.name for pvia in fabproc.processVias]
+                            dlg.singleViaNamesCB.addItems(viaNames)
+                            dlg.arrayViaNamesCB.addItems(viaNames)
+                            if item.xnum == 1 and item.ynum == 1:
+                                dlg.singleViaRB.setChecked(True)
+                                dlg.singleViaClicked()
+                                dlg.singleViaNamesCB.setCurrentText(item.name)
+                            else:
+                                dlg.arrayViaRB.setChecked(True)
+                                dlg.arrayViaClicked()
+
+
+
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error")
+
+    def layoutPathProperties(self, item):
+        dlg = ldlg.layoutPathPropertiesDialog(self.editorWindow)
+        match item.mode:
+            case 0:
+                dlg.manhattanButton.setChecked(True)
+            case 1:
+                dlg.diagonalButton.setChecked(True)
+            case 2:
+                dlg.anyButton.setChecked(True)
+            case 3:
+                dlg.horizontalButton.setChecked(True)
+            case 4:
+                dlg.verticalButton.setChecked(True)
+        dlg.pathLayerCB.addItems([item.name for item in
+                                  laylyr.pdkDrawingLayers])
+        dlg.pathLayerCB.setCurrentText(item.inpEdLayer.name)
+        dlg.pathWidth.setText(str(item.width / fabproc.dbu))
+        dlg.pathNameEdit.setText(item.name)
+        roundingFactor = len(str(fabproc.dbu)) - 1
+        dlg.startExtendEdit.setText(str(round((item.startExtend) / fabproc.dbu,
+                                              roundingFactor)))
+        dlg.endExtendEdit.setText(str(round((item.endExtend) / fabproc.dbu,
+                                            roundingFactor)))
+        dlg.p1PointEditX.setText(str(round((item.draftLine.p1().x(
+        )) / fabproc.dbu, roundingFactor)))
+        dlg.p1PointEditY.setText(str(round((item.draftLine.p1().y(
+        )) / fabproc.dbu, roundingFactor)))
+        dlg.p2PointEditX.setText(str(round((item.draftLine.p2().x(
+        )) / fabproc.dbu, roundingFactor)))
+        dlg.p2PointEditY.setText(str(round((item.draftLine.p2().y(
+        )) / fabproc.dbu, roundingFactor)))
+        if dlg.exec() == QDialog.Accepted:
+            item.name = dlg.pathNameEdit.text()
+            item.inpEdLayer = laylyr.pdkDrawingLayers[dlg.pathLayerCB.currentIndex()]
+            item.width = fabproc.dbu * float(dlg.pathWidth.text())
+            item.startExtend = fabproc.dbu * float(dlg.startExtendEdit.text())
+            item.endExtend = fabproc.dbu * float(dlg.endExtendEdit.text())
+            p1 = QPointF(
+                fabproc.dbu * float(dlg.p1PointEditX.text()),
+                fabproc.dbu * float(dlg.p1PointEditY.text()),
+            )
+            p2 = QPointF(
+                fabproc.dbu * float(dlg.p2PointEditX.text()),
+                fabproc.dbu * float(dlg.p2PointEditY.text()),
+            )
+            item.draftLine = QLineF(p1, p2)
+
+    def layoutLabelProperties(self, item):
+        dlg = ldlg.layoutLabelProperties(self.editorWindow)
+        dlg.labelName.setText(item.labelText)
+        dlg.labelLayerCB.addItems([item.name for item in laylyr.pdkTextLayers])
+        dlg.labelLayerCB.setCurrentText(item.inpEdLayer.name)
+        dlg.familyCB.setCurrentText(item.fontFamily)
+        dlg.fontStyleCB.setCurrentText(item.fontStyle)
+        dlg.labelHeightCB.setCurrentText(str(int(item.fontHeight)))
+        dlg.labelAlignCB.setCurrentText(item.labelAlign)
+        dlg.labelOrientCB.setCurrentText(item.labelOrient)
+        dlg.labelTopLeftX.setText(
+            str(item.mapToScene(item.start).x() / fabproc.dbu))
+        dlg.labelTopLeftY.setText(
+            str(item.mapToScene(item.start).y() / fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.labelText = dlg.labelName.text()
+            item.inpEdLayer = laylyr.pdkTextLayers[
+                dlg.labelLayerCB.currentIndex()]
+            item.fontFamily = dlg.familyCB.currentText()
+            item.fontStyle = dlg.fontStyleCB.currentText()
+            item.fontHeight = int(float(dlg.labelHeightCB.currentText()))
+            item.labelAlign = dlg.labelAlignCB.currentText()
+            item.labelOrient = dlg.labelOrientCB.currentText()
+            item.start = item.snapToGrid(item.mapFromScene(QPointF(
+                float(dlg.labelTopLeftX.text()) * fabproc.dbu,
+                float(dlg.labelTopLeftY.text()) * fabproc.dbu)), self.gridTuple)
+
+    def layoutPinProperties(self, item):
+        dlg = ldlg.layoutPinProperties(self.editorWindow)
+        dlg.pinName.setText(item.pinName)
+        dlg.pinDir.setCurrentText(item.pinDir)
+        dlg.pinType.setCurrentText(item.pinType)
+        dlg.pinLayerCB.addItems([item.name for item in laylyr.pdkPinLayers])
+        dlg.pinLayerCB.setCurrentText(item.inpEdLayer.name)
+        dlg.pinBottomLeftX.setText(
+            str(item.mapToScene(item.start).x() / fabproc.dbu))
+        dlg.pinBottomLeftY.setText(
+            str(item.mapToScene(item.start).y() / fabproc.dbu))
+        dlg.pinTopRightX.setText(str(item.mapToScene(item.end).x() / fabproc.dbu))
+        dlg.pinTopRightY.setText(str(item.mapToScene(item.end).y() / fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.pinName = dlg.pinName.text()
+            item.pinDir = dlg.pinDir.currentText()
+            item.pinType = dlg.pinType.currentText()
+            item.inpEdLayer = laylyr.pdkPinLayers[dlg.pinLayerCB.currentIndex()]
+            item.label.labelText = dlg.pinName.text()
+            item.start = item.snapToGrid(item.mapFromScene(QPointF(
+                float(dlg.pinBottomLeftX.text()) * fabproc.dbu,
+                float(dlg.pinBottomLeftY.text()) * fabproc.dbu)), self.gridTuple)
+            item.end = item.snapToGrid(item.mapFromScene(QPointF(
+                float(dlg.pinTopRightX.text()) * fabproc.dbu,
+                float(dlg.pinTopRightY.text()) * fabproc.dbu)), self.gridTuple)
+            item.inpEdLayer.name = dlg.pinLayerCB.currentText()
 
     def resetSceneMode(self):
         # modeList = [False for _ in range(8)]
