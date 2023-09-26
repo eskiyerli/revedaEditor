@@ -731,7 +731,6 @@ class layoutPath(layoutShape):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         eventPos = event.pos().toPoint()
-        print(eventPos)
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             if (eventPos-self._draftLine.p1().toPoint()).manhattanLength() <= self.scene(
@@ -972,6 +971,8 @@ class layoutPin(layoutShape):
         self._layer = layer
         self._definePensBrushes()
         self._label = None
+        self._stretchSide = None
+        self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
@@ -1061,6 +1062,74 @@ class layoutPin(layoutShape):
 
         else:
             self.scene().logger.error("Not a Label")
+
+    @property
+    def rect(self):
+        return self._rect
+
+    @rect.setter
+    def rect(self, rect: QRect):
+        self.prepareGeometryChange()
+        self._rect = rect
+
+    @property
+    def stretchSide(self):
+        return self._stretchSide
+
+    @stretchSide.setter
+    def stretchSide(self, value: str):
+        self.prepareGeometryChange()
+        self._stretchSide = value
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mousePressEvent(event)
+        eventPos = event.pos().toPoint()
+        if self._stretch:
+            self.setFlag(QGraphicsItem.ItemIsMovable, False)
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+                if self._rect.top() <= eventPos.y() <= self._rect.bottom():
+                    self.setCursor(Qt.SizeHorCursor)
+                    self._stretchSide = layoutRect.sides[0]
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+                if self._rect.top() <= eventPos.y() <= self._rect.bottom():
+                    self.setCursor(Qt.SizeHorCursor)
+                    self._stretchSide = layoutRect.sides[1]
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+                if self._rect.left() <= eventPos.x() <= self._rect.right():
+                    self.setCursor(Qt.SizeVerCursor)
+                    self._stretchSide = layoutRect.sides[2]
+            elif eventPos.y() == self.snapToBase(self._rect.bottom(), self.gridTuple[1]):
+                if self._rect.left() <= eventPos.x() <= self._rect.right():
+                    self.setCursor(Qt.SizeVerCursor)
+                    self._stretchSide = layoutRect.sides[3]
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        eventPos = event.pos().toPoint()
+        if self.stretch:
+            self.prepareGeometryChange()
+            if self.stretchSide == layoutRect.sides[0]:
+                self.setCursor(Qt.SizeHorCursor)
+                self.rect.setLeft(eventPos.x())
+            elif self.stretchSide == layoutRect.sides[1]:
+                self.setCursor(Qt.SizeHorCursor)
+                self.rect.setRight(eventPos.x() - int(self._pen.width() / 2))
+            elif self.stretchSide == layoutRect.sides[2]:
+                self.setCursor(Qt.SizeVerCursor)
+                self.rect.setTop(eventPos.y())
+            elif self.stretchSide == layoutRect.sides[3]:
+                self.setCursor(Qt.SizeVerCursor)
+                self.rect.setBottom(eventPos.y() - int(self._pen.width() / 2))
+            self.update()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        super().mouseReleaseEvent(event)
+        if self.stretch:
+            self._stretch = False
+            self._stretchSide = None
+            self.setCursor(Qt.ArrowCursor)
 
 
 class layoutVia(layoutShape):
@@ -1332,7 +1401,8 @@ class layoutPolygon(layoutShape):
         self._gridTuple = gridTuple
         self._definePensBrushes()
         self._polygon = QPolygonF(self._points)
-
+        self._selectedCorner = None
+        self._selectedCornerIndex = None
 
     def __repr__(self):
         return f"layoutPolygon({self._points}, {self._layer}, {self._gridTuple})"
@@ -1341,6 +1411,8 @@ class layoutPolygon(layoutShape):
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.setBrush(self._selectedBrush)
+            if self._selectedCorner is not None:
+                painter.setPen(QPen(QColor("red"), 2, Qt.DashLine))
         else:
             painter.setPen(self._pen)
             painter.setBrush(self._brush)
@@ -1356,6 +1428,12 @@ class layoutPolygon(layoutShape):
 
     def boundingRect(self) -> QRectF:
         return self._polygon.boundingRect()
+
+    def shape(self):
+        # Create a QPainterPath that defines the shape of the polygon
+        path = QPainterPath()
+        path.addPolygon(self._points)
+        return path
 
     @property
     def polygon(self):
@@ -1394,3 +1472,30 @@ class layoutPolygon(layoutShape):
         self.prepareGeometryChange()
         self._layer = value
         self._definePensBrushes()
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mousePressEvent(event)
+        eventPos = event.pos().toPoint()
+        if self._stretch:
+            self.setFlag(QGraphicsItem.ItemIsMovable, False)
+            for point in self._points:
+                if (eventPos-point).manhattanLength() <= self.scene().snapDistance:
+                    self._selectedCorner = point
+                    self._selectedCornerIndex = self._points.index(point)
+            print(self._selectedCorner)
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        eventPos = event.pos().toPoint()
+        if self._stretch:
+            if self._selectedCorner is not None:
+                self._points[self._selectedCornerIndex] = eventPos
+                self.points = self._points
+        else:
+            super().mouseMoveEvent(event)
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseReleaseEvent(event)
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        if self.stretch:
+            self._stretch = False
+            self._selectedCorner = None
+            self._selectedCornerIndex = None
+            self.setCursor(Qt.ArrowCursor)

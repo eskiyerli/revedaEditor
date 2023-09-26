@@ -3726,32 +3726,33 @@ class layout_scene(editor_scene):
                         case lshp.layoutViaArray:
                             self.layoutViaProperties(item)
                         case lshp.layoutPolygon:
-                            dlg = ldlg.layoutPolygonProperties(self.editorWindow,
-                                                               len(item.points))
-                            dlg.polygonLayerCB.addItems(
-                                [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
-                            )
-                            dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} ["
-                                                           f"{item.layer.purpose}]")
-                            for i, point in enumerate(item.points):
-                                dlg.pointXEdits[i].setText(str(point.x()/fabproc.dbu))
-                                dlg.pointYEdits[i].setText(str(point.y()/fabproc.dbu))
-                            if dlg.exec() == QDialog.Accepted:
-                                item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
-                                tempPoints = []
-                                for i in range(dlg.polygonGroupLayout.rowCount()-2):
-                                    xedit= dlg.polygonGroupLayout.itemAtPosition(i+2,1).widget(
-                                    ).text()
-                                    yedit= dlg.polygonGroupLayout.itemAtPosition(i+2,2).widget(
-                                    ).text()
-                                    if xedit != "" and yedit != "":
-                                        tempPoints.append(QPointF(float(xedit)*fabproc.dbu,
-                                                                  float(yedit)*fabproc.dbu))
-                                item.points = tempPoints
-
-
+                            self.layoutPolygonProperties(item)
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
+
+    def layoutPolygonProperties(self, item):
+        dlg = ldlg.layoutPolygonProperties(self.editorWindow,
+                                           len(item.points))
+        dlg.polygonLayerCB.addItems(
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
+        )
+        dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} ["
+                                          f"{item.layer.purpose}]")
+        for i, point in enumerate(item.points):
+            dlg.pointXEdits[i].setText(str(point.x() / fabproc.dbu))
+            dlg.pointYEdits[i].setText(str(point.y() / fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
+            tempPoints = []
+            for i in range(dlg.polygonGroupLayout.rowCount() - 2):
+                xedit = dlg.polygonGroupLayout.itemAtPosition(i + 2, 1).widget(
+                ).text()
+                yedit = dlg.polygonGroupLayout.itemAtPosition(i + 2, 2).widget(
+                ).text()
+                if xedit != "" and yedit != "":
+                    tempPoints.append(QPointF(float(xedit) * fabproc.dbu,
+                                              float(yedit) * fabproc.dbu))
+            item.points = tempPoints
 
     def layoutRectProperties(self, item):
         dlg = ldlg.layoutRectProperties(self.editorWindow)
@@ -3980,8 +3981,9 @@ class editor_view(QGraphicsView):
 
     def init_UI(self):
         # self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
-        self.setOptimizationFlag(QGraphicsView.DontSavePainterState, True)
+        # self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
+        # self.setOptimizationFlag(QGraphicsView.DontSavePainterState, True)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setCacheMode(QGraphicsView.CacheBackground)
         self.standardCursor = QCursor(Qt.CrossCursor)
         self.setCursor(self.standardCursor)  # set cursor to standard arrow
