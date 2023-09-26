@@ -449,7 +449,6 @@ class editorWindow(QMainWindow):
             self.snapDistance = int(float(dcd.snapDistanceEntry.text()))
             self.centralW.view.gridTuple = (self.majorGrid, self.majorGrid)
 
-
             if dcd.dotType.isChecked():
                 self.centralW.view.gridbackg = True
                 self.centralW.view.linebackg = False
@@ -467,8 +466,10 @@ class editorWindow(QMainWindow):
             scd.partialSelection.setChecked(True)
         else:
             scd.fullSelection.setChecked(True)
+        scd.snapDistanceEntry.setText(str(self.snapDistance))
         if scd.exec() == QDialog.Accepted:
             self.centralW.scene.partialSelection = scd.partialSelection.isChecked()
+            self.snapDistance = int(float(scd.snapDistanceEntry.text()))
 
     def readOnlyCellClick(self):
         self.centralW.scene.readOnly = self.readOnlyCellAction.isChecked()
@@ -567,6 +568,7 @@ class layoutEditor(editorWindow):
 
     def _addActions(self):
         super()._addActions()
+        self.menuEdit.addAction(self.stretchAction)
         self.menuCreate.addAction(self.createInstAction)
         self.menuCreate.addAction(self.createRectAction)
         self.menuCreate.addAction(self.createWireAction)
@@ -589,6 +591,7 @@ class layoutEditor(editorWindow):
         self.createPolygonAction.triggered.connect(self.createPolygonClick)
         self.deleteAction.triggered.connect(self.deleteClick)
         self.objPropAction.triggered.connect(self.objPropClick)
+        self.stretchAction.triggered.connect(self.stretchClick)
 
     def _createShortcuts(self):
         super()._createShortcuts()
@@ -599,6 +602,7 @@ class layoutEditor(editorWindow):
         self.createLabelAction.setShortcut(Qt.Key_L)
         self.createViaAction.setShortcut(Qt.Key_V)
         self.createPolygonAction.setShortcut(Qt.Key_G)
+        self.stretchAction.setShortcut(Qt.Key_S)
 
     def setDrawMode(self, *args):
         """
@@ -806,6 +810,9 @@ class layoutEditor(editorWindow):
         modeList = [False for _ in range(9)]
         modeList[8] = True
         self.setDrawMode(*modeList)
+
+    def stretchClick(self, s):
+        self.centralW.scene.stretchSelectedItem()
 
     def objPropClick(self, s):
         self.centralW.scene.viewObjProperties()
@@ -1610,6 +1617,14 @@ class editor_scene(QGraphicsScene):
                 self.undoStack.push(undoCommand)
             self.update()  # update the scene
 
+    def stretchSelectedItem(self):
+        if self.selectedItems() is not None:
+            try:
+                for item in self.selectedItems():
+                    if hasattr(item, "stretch"):
+                        item.stretch = True
+            except AttributeError:
+                self.messageLine.setText("Nothing selected")
 
 class symbol_scene(editor_scene):
     """
@@ -2149,15 +2164,7 @@ class symbol_scene(editor_scene):
             except Exception as e:
                 self.logger.error(e)
 
-    def stretchSelectedItem(self):
-        if self.selectedItems() is not None:
-            try:
-                for item in self.selectedItems():
-                    if hasattr(item, "stretch"):
-                        item.stretch = True
 
-            except AttributeError:
-                self.messageLine.setText("Nothing selected")
 
     def viewSymbolProperties(self):
         """
@@ -3414,9 +3421,12 @@ class layout_scene(editor_scene):
                     self.resetSceneMode()
                 elif self.drawPolygon:
                     if self.newPolygon is None:
-                        self.newPolygon = lshp.layoutPolygon([self.mousePressLoc, self.mousePressLoc], self.selectEdLayer, self.gridTuple)
+                        self.newPolygon = lshp.layoutPolygon([self.mousePressLoc,
+                                                              self.mousePressLoc],
+                                                             self.selectEdLayer, self.gridTuple)
                         self.addUndoStack(self.newPolygon)
-                        self.polygonGuideLine = QGraphicsLineItem(QLineF(self.newPolygon.points[-2], self.newPolygon.points[-1]))
+                        self.polygonGuideLine = QGraphicsLineItem(QLineF(
+                            self.newPolygon.points[-2], self.newPolygon.points[-1]))
                         self.polygonGuideLine.setPen(QPen(QColor(255, 255, 0), 1, Qt.DashLine))
                         self.addUndoStack(self.polygonGuideLine)
                     else:
@@ -3538,6 +3548,8 @@ class layout_scene(editor_scene):
         try:
             if event.button() == Qt.LeftButton:
                 if self.drawPolygon:
+                    self.newPolygon.polygon.remove(0)
+                    self.newPolygon.points.pop(0)
                     self.drawPolygon = False
                     self.newPolygon = None
                     self.removeItem(self.polygonGuideLine)
@@ -3704,7 +3716,7 @@ class layout_scene(editor_scene):
                 for item in self.selectedItems():
                     match type(item):
                         case lshp.layoutRect:
-                            pass
+                            self.layoutRectProperties(item)
                         case lshp.layoutPin:
                             self.layoutPinProperties(item)
                         case lshp.layoutLabel:
@@ -3713,9 +3725,57 @@ class layout_scene(editor_scene):
                             self.layoutPathProperties(item)
                         case lshp.layoutViaArray:
                             self.layoutViaProperties(item)
+                        case lshp.layoutPolygon:
+                            dlg = ldlg.layoutPolygonProperties(self.editorWindow,
+                                                               len(item.points))
+                            dlg.polygonLayerCB.addItems(
+                                [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
+                            )
+                            dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} ["
+                                                           f"{item.layer.purpose}]")
+                            for i, point in enumerate(item.points):
+                                dlg.pointXEdits[i].setText(str(point.x()/fabproc.dbu))
+                                dlg.pointYEdits[i].setText(str(point.y()/fabproc.dbu))
+                            if dlg.exec() == QDialog.Accepted:
+                                item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
+                                tempPoints = []
+                                for i in range(dlg.polygonGroupLayout.rowCount()-2):
+                                    xedit= dlg.polygonGroupLayout.itemAtPosition(i+2,1).widget(
+                                    ).text()
+                                    yedit= dlg.polygonGroupLayout.itemAtPosition(i+2,2).widget(
+                                    ).text()
+                                    if xedit != "" and yedit != "":
+                                        tempPoints.append(QPointF(float(xedit)*fabproc.dbu,
+                                                                  float(yedit)*fabproc.dbu))
+                                item.points = tempPoints
+
 
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
+
+    def layoutRectProperties(self, item):
+        dlg = ldlg.layoutRectProperties(self.editorWindow)
+        dlg.rectLayerCB.addItems([f'{item.name} [{item.purpose}]' for item in
+                                  laylyr.pdkAllLayers])
+        dlg.rectLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
+        dlg.rectWidthEdit.setText(str(item.width / fabproc.dbu))
+        dlg.rectHeightEdit.setText(str(item.height / fabproc.dbu))
+        dlg.topLeftEditX.setText(str(
+            item.rect.topLeft().x() / fabproc.dbu))
+        dlg.topLeftEditY.setText(str(
+            item.rect.topLeft().y() / fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.layer = laylyr.pdkAllLayers[
+                dlg.rectLayerCB.currentIndex()]
+            item.width = float(dlg.rectWidthEdit.text()) * fabproc.dbu
+            item.height = float(dlg.rectHeightEdit.text()) * fabproc.dbu
+
+            item.rect = QRectF(
+                float(dlg.topLeftEditX.text()) * fabproc.dbu,
+                float(dlg.topLeftEditY.text()) * fabproc.dbu,
+                float(dlg.rectWidthEdit.text()) * fabproc.dbu,
+                float(dlg.rectHeightEdit.text()) * fabproc.dbu
+            )
 
     def layoutViaProperties(self, item):
         dlg = ldlg.layoutViaProperties(self.editorWindow)

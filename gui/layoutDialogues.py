@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QLineEdit,
     QVBoxLayout,
@@ -36,7 +37,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QGroupBox,
     QWidget,
-    QMessageBox,
+    QCheckBox,
 )
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.gui.editFunctions as edf
@@ -550,3 +551,98 @@ class layoutViaProperties(createLayoutViaDialog):
 
         self.viaLocationGroup.show()
         self.show()
+
+class layoutRectProperties(QDialog):
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setWindowTitle("Layout Rectangle Properties")
+        self.setMinimumWidth(300)
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        mainLayout = QVBoxLayout()
+        self.rectGroup = QGroupBox("Rectangle Properties")
+        self.rectGroupLayout = QFormLayout()
+        self.rectGroup.setLayout(self.rectGroupLayout)
+        self.rectLayerCB = QComboBox()
+        self.rectGroupLayout.addRow(edf.boldLabel("Rectangle Layer:"), self.rectLayerCB)
+        self.rectWidthEdit = edf.shortLineEdit()
+        self.rectGroupLayout.addRow(edf.boldLabel("Width:"), self.rectWidthEdit)
+        self.rectHeightEdit = edf.shortLineEdit()
+        self.rectGroupLayout.addRow(edf.boldLabel("Height:"), self.rectHeightEdit)
+        self.topLeftEditX = edf.shortLineEdit()
+        self.rectGroupLayout.addRow(edf.boldLabel("Top Left X:"), self.topLeftEditX)
+        self.topLeftEditY = edf.shortLineEdit()
+        self.rectGroupLayout.addRow(edf.boldLabel("Top Left Y:"), self.topLeftEditY)
+        mainLayout.addWidget(self.rectGroup)
+        mainLayout.addWidget(self.buttonBox)
+        self.setLayout(mainLayout)
+        self.show()
+
+class layoutPolygonProperties(QDialog):
+    def __init__(self, parent: QWidget, points: int):
+        super().__init__(parent)
+        self.setWindowTitle("Layout Polygon Properties")
+        self.setMinimumWidth(300)
+        self._points = points
+        self._i = 0
+        self._checkBoxList = []
+        self.pointXEdits = []
+        self.pointYEdits = []
+        self.mainLayout = QVBoxLayout()
+        self.polygonGroup = QGroupBox("Polygon Properties")
+        self.polygonGroupLayout = QGridLayout()
+        self.polygonGroup.setLayout(self.polygonGroupLayout)
+        self.polygonLayerCB = QComboBox()
+        self.polygonGroupLayout.addWidget(edf.boldLabel("Layer:"), 0, 0)
+        self.polygonGroupLayout.addWidget(self.polygonLayerCB, 0, 1, 1, 2)
+        self.polygonGroupLayout.addWidget(edf.boldLabel("Points:"), 1, 0)
+        self.polygonGroupLayout.addWidget(edf.boldLabel("X:"), 1, 1)
+        self.polygonGroupLayout.addWidget(edf.boldLabel("Y:"), 1, 2)
+        self.polygonGroupLayout.addWidget(edf.boldLabel("Delete:"), 1, 3)
+        for self._i in range(points+1):
+            self.polygonGroupLayout.addWidget(edf.boldLabel(f"Point {self._i+1}"),
+                                              self._i+2, 0)
+            self.pointXEdits.append(edf.shortLineEdit())
+            self.polygonGroupLayout.addWidget(self.pointXEdits[-1],
+                                              self._i+2, 1)
+            self.pointYEdits.append(edf.shortLineEdit())
+            self.polygonGroupLayout.addWidget(self.pointYEdits[-1],
+                                              self._i+2, 2)
+            self._checkBoxList.append(QCheckBox())
+            self.polygonGroupLayout.addWidget(self._checkBoxList[self._i], self._i+2, 3)
+            self._checkBoxList[self._i].stateChanged.connect(self._deleteRow)
+        # now add an empty row and when it is edited add a new row.
+        self.polygonGroupLayout.itemAtPosition(self._i+1,2).widget().editingFinished.connect(
+            self._newPointYChanged)
+        self.mainLayout.addWidget(self.polygonGroup)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+        self.show()
+
+    def _newPointYChanged(self):
+        self._i += 1
+        self.polygonGroupLayout.addWidget(edf.boldLabel(f"Point {self._i+1}"), self._i + 2, 0)
+        self.pointXEdits.append(edf.shortLineEdit())
+        self.polygonGroupLayout.addWidget(self.pointXEdits[-1], self._i + 2, 1)
+        self.pointYEdits.append(edf.shortLineEdit())
+        self.polygonGroupLayout.addWidget(self.pointYEdits[-1], self._i + 2, 2)
+        self._checkBoxList.append(QCheckBox())
+        self.polygonGroupLayout.addWidget(self._checkBoxList[self._i], self._i + 2, 3)
+        self._checkBoxList[self._i].stateChanged.connect(self._deleteRow)
+
+    def _deleteRow(self, state):
+        if state == 2:
+            sender = self.sender()
+            row = self._checkBoxList.index(sender)+1
+            for i in range(4):
+                widget = self.polygonGroupLayout.itemAtPosition(row, i).widget()
+                self.polygonGroupLayout.removeWidget(widget)
+                widget.deleteLater()
+            self.adjustSize()

@@ -187,6 +187,9 @@ class layoutRect(layoutShape):
         self._gridTuple = gridTuple
         self._stretchSide = None
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
+        self._definePensBrushes()
+
+    def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
         self._bitmap = QBitmap.fromImage(QPixmap(self._layer.btexture).scaled(10, 10).toImage())
         self._brush = QBrush(self._layer.bcolor, self._bitmap)
@@ -329,6 +332,7 @@ class layoutRect(layoutShape):
     def layer(self, value):
         self.prepareGeometryChange()
         self._layer = value
+        self._definePensBrushes()
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -527,6 +531,8 @@ class layoutPath(layoutShape):
         self._layer = layer
         self._mode = mode
         self._name = ""
+        self._stretch = False
+        self._stretchSide = None
         self._rect = QRectF(0, 0, 0, 0)
         self._rectCorners()
         self._layer = layer
@@ -725,30 +731,29 @@ class layoutPath(layoutShape):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         eventPos = event.pos().toPoint()
+        print(eventPos)
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos == self._line.p1():
+            if (eventPos-self._draftLine.p1().toPoint()).manhattanLength() <= self.scene(
+            ).snapDistance:
                 self._stretchSide = "p1"
                 self.setCursor(Qt.SizeHorCursor)
-            elif eventPos == self._line.p2():
+            elif (eventPos-self._draftLine.p2().toPoint()).manhattanLength() <= self.scene(
+            ).snapDistance:
+                print('p2')
                 self._stretchSide = "p2"
                 self.setCursor(Qt.SizeHorCursor)
+
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
         if self.stretch:
             self.prepareGeometryChange()
             if self._stretchSide == "p1":
-                if self._angle in [0, 180]:
-                    self._line.setP1(QPoint(eventPos.x(), self._line.p1().y()))
-                elif self._angle in [90, 270]:
-                    self._line.setP1(QPoint(self._line.p1().x(), eventPos.y()))
+                self.draftLine.setP1(eventPos)
             elif self._stretchSide == "p2":
-                if self._angle in [0, 180]:
-                    self._line.setP1(QPoint(eventPos.x(), self._line.p2().y()))
-                elif self._angle in [90, 270]:
-                    self._line.setP1(QPoint(self._line.p2().x(), eventPos.y()))
-            self.update()
+                self.draftLine.setP2(eventPos)
+            self._rectCorners()
         else:
             super().mouseMoveEvent(event)
 
@@ -1379,3 +1384,13 @@ class layoutPolygon(layoutShape):
     def tempLastPoint(self, value: QPoint):
         self.prepareGeometryChange()
         self._polygon = QPolygonF([*self._points, value])
+
+    @property
+    def layer(self):
+        return self._layer
+
+    @layer.setter
+    def layer(self, value: ddef.layLayer):
+        self.prepareGeometryChange()
+        self._layer = value
+        self._definePensBrushes()
