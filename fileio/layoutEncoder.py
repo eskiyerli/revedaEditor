@@ -37,7 +37,8 @@ class layoutEncoder(json.JSONEncoder):
                             "ang": item.angle, }
             case lshp.layoutRect:
                 itemDict = {"type": "layoutRect", "rect": item.rect.getCoords(),
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
+                            "end": (item.mapToScene(item.end) - item.scene().origin).toTuple(),
                             "ang": item.angle,
                             "lnum": laylyr.pdkDrawingLayers.index(item.layer)}
             case lshp.layoutPath:

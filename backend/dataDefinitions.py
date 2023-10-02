@@ -104,3 +104,49 @@ class layLayer:
     visible: bool = True  # visible
     gdsLayer: int = 0  # gds edLayer
     datatype: int = 0  # gds datatype
+
+@dataclass
+class editModes:
+    selectItem: bool
+    deleteItem: bool
+    moveItem: bool
+    copyItem: bool
+    rotateItem: bool
+    changeOrigin: bool
+
+    def setMode(self, atrribute):
+        for attr_name in self.__annotations__.keys():
+            setattr(self, attr_name, False)
+        setattr(self, atrribute, True)
+
+@dataclass
+class symbolModes(editModes):
+    drawPin: bool
+    drawArc: bool
+    drawRect: bool
+    drawLine: bool
+    addLabel: bool
+    drawCircle: bool
+    drawPolygon: bool
+    stretchItem: bool
+
+@dataclass
+class schematicModes(editModes):
+    drawPin: bool
+    drawWire: bool
+    drawText: bool
+    addInstance: bool
+
+@dataclass
+class layoutModes(editModes):
+    drawPath: bool
+    drawPin: bool
+    drawArc: bool
+    drawPolygon: bool
+    addLabel: bool
+    addVia: bool
+    drawRect: bool
+    drawLine: bool
+    drawCircle: bool
+    stretchItem: bool
+    addInstance: bool
