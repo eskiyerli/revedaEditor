@@ -1,3 +1,28 @@
+#    “Commons Clause” License Condition v1.0
+#   #
+#    The Software is provided to you by the Licensor under the License, as defined
+#    below, subject to the following condition.
+#
+#    Without limiting other conditions in the License, the grant of rights under the
+#    License will not include, and the License does not grant to you, the right to
+#    Sell the Software.
+#
+#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
+#    granted to you under the License to provide to third parties, for a fee or other
+#    consideration (including without limitation fees for hosting or consulting/
+#    support services related to the Software), a product or service whose value
+#    derives, entirely or substantially, from the functionality of the Software. Any
+#    license notice or attribution required by the License must also include this
+#    Commons Clause License Condition notice.
+#
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
+#    Software: Revolution EDA
+#    License: Mozilla Public License 2.0
+#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
+#
+
 #   “Commons Clause” License Condition v1.0
 #  #
 #   The Software is provided to you by the Licensor under the License, as defined
@@ -24,7 +49,11 @@
 
 import json
 
-from PySide6.QtCore import (QPoint, )  # QtCore
+from PySide6.QtCore import (
+    QPoint,
+    QLineF,
+    QRectF,
+)  # QtCore
 
 import revedaEditor.common.net as net
 import revedaEditor.common.shape as shp
@@ -39,9 +68,9 @@ def createSymbolItems(item, gridTuple):
     Create symbol items from json file.
     """
     if item["type"] == "rect":
-        return createRectItem(item,gridTuple)
+        return createRectItem(item, gridTuple)
     elif item["type"] == "circle":
-        return createCircleItem(item,gridTuple)
+        return createCircleItem(item, gridTuple)
     elif item["type"] == "arc":
         return createArcItem(item, gridTuple)
     elif item["type"] == "line":
@@ -61,7 +90,9 @@ def createRectItem(item, gridTuple):
     rect = shp.rectangle(start, end, gridTuple)  # note that we are using grid
     # values for
     # scene
-    rect.setPos(QPoint(item["loc"][0], item["loc"][1]), )
+    rect.setPos(
+        QPoint(item["loc"][0], item["loc"][1]),
+    )
     rect.angle = item["ang"]
     return rect
 
@@ -72,7 +103,9 @@ def createCircleItem(item, gridTuple):
     circle = shp.circle(centre, end, gridTuple)  # note that we are using grid
     # values for
     # scene
-    circle.setPos(QPoint(item["loc"][0], item["loc"][1]), )
+    circle.setPos(
+        QPoint(item["loc"][0], item["loc"][1]),
+    )
     circle.angle = item["ang"]
     return circle
 
@@ -108,8 +141,16 @@ def createPinItem(item, gridTuple):
 
 def createLabelItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
-    label = shp.label(start,  item["def"], item["lt"], item["ht"],
-                      item["al"], item["or"], item["use"], gridTuple)
+    label = shp.label(
+        start,
+        item["def"],
+        item["lt"],
+        item["ht"],
+        item["al"],
+        item["or"],
+        item["use"],
+        gridTuple,
+    )
     label.setPos(QPoint(item["loc"][0], item["loc"][1]))
     label.angle = item["ang"]
     label.labelName = item["nam"]
@@ -119,10 +160,18 @@ def createLabelItem(item, gridTuple):
     return label
 
 
-def createTextItem(item,gridTuple):
+def createTextItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
-    text = shp.text(start, item['tc'], item['ff'], item['fs'],
-                    item['th'], item['ta'], item['to'], gridTuple)
+    text = shp.text(
+        start,
+        item["tc"],
+        item["ff"],
+        item["fs"],
+        item["th"],
+        item["ta"],
+        item["to"],
+        gridTuple,
+    )
     text.setPos(QPoint(item["loc"][0], item["loc"][1]))
     return text
 
@@ -170,14 +219,13 @@ def createSchematicItems(item, libraryDict, viewName: str, gridTuple: (int, int)
                         symbolAttributes[shape["nam"]] = shape["def"]
             except json.decoder.JSONDecodeError:
                 print("Error: Invalid Symbol file")
-        symbolInstance = shp.symbolShape(itemShapes,
-                                         symbolAttributes, gridTuple)
+        symbolInstance = shp.symbolShape(itemShapes, symbolAttributes, gridTuple)
         symbolInstance.libraryName = item["lib"]
         symbolInstance.cellName = item["cell"]
         symbolInstance.counter = instCounter
         symbolInstance.instanceName = item["nam"]
         symbolInstance.angle = item.get("ang", 0)
-        symbolInstance.netlistIgnore = bool(item.get("ign",0))
+        symbolInstance.netlistIgnore = bool(item.get("ign", 0))
         symbolInstance.viewName = viewName
         symbolInstance.attributes = symbolAttributes
         for labelItem in symbolInstance.labels.values():
@@ -223,9 +271,9 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     Create layout items from json file.
     """
     match item["type"]:
-        case "layoutInstance":
+        case "Inst":
             return createLayoutInstance(gridTuple, item, libraryDict)
-        case 'pcell':
+        case "pcell":
             libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
             if libraryPath is None:
                 print(f'{item["lib"]} cannot be found.')
@@ -234,16 +282,18 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
             viewName = item["view"]
             instCounter = item["ic"]
             # open pcell json file with reference to pcell class name
-            file = libraryPath.joinpath(cell, f'{viewName}.json')
+            file = libraryPath.joinpath(cell, f"{viewName}.json")
             with open(file, "r") as temp:
                 try:
                     items = json.load(temp)
                     if items[0]["cellView"] != "pcell":
                         print("Not a pcell cell")
                     else:
-                        pcellInstanceStr = f'pcells.' \
-                                           f'{items[1]["reference"]}(**item.__dict__' \
-                                           f'{gridTuple})'
+                        pcellInstanceStr = (
+                            f"pcells."
+                            f'{items[1]["reference"]}(**item.__dict__'
+                            f"{gridTuple})"
+                        )
                         pcellInstance = eval(pcellInstanceStr)
                         pcellInstance.libraryName = item["lib"]
                         pcellInstance.cellName = item["cell"]
@@ -254,10 +304,12 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
                         return pcellInstance
                 except json.decoder.JSONDecodeError:
                     print("Error: Invalid PCell file")
-
-        case "layoutRect":
+        case "Rect":
             return createRectShape(item, gridTuple)
-
+        case "Path":
+            return createPathShape(item, gridTuple)
+        case "Label":
+            return createLabelShape(item, gridTuple)
 
 def createLayoutInstance(gridTuple, item, libraryDict):
     libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
@@ -267,16 +319,21 @@ def createLayoutInstance(gridTuple, item, libraryDict):
     cell = item["cell"]
     viewName = item["view"]
     instCounter = item["ic"]
-    file = libraryPath.joinpath(cell, f'{viewName}.json')
+    file = libraryPath.joinpath(cell, f"{viewName}.json")
     itemShapes = list()
     with open(file, "r") as temp:
         try:
             shapes = json.load(temp)
             for shape in shapes[1:]:
-                if shape["type"] == "layoutInstance":
-                    itemShapes.append(createLayoutInstance(gridTuple, shape, libraryDict))
-                elif shape['type'] == 'layoutRect':
-                    itemShapes.append(createRectShape(shape, gridTuple))
+                match shape["type"]:
+                    case "Inst":
+                        itemShapes.append(
+                            createLayoutInstance(gridTuple, shape, libraryDict)
+                        )
+                    case "Rect":
+                        itemShapes.append(createRectShape(shape, gridTuple))
+                    case "Path":
+                        itemShapes.append(createPathShape(shape, gridTuple))
 
         except json.decoder.JSONDecodeError:
             print("Error: Invalid Layout file")
@@ -290,12 +347,45 @@ def createLayoutInstance(gridTuple, item, libraryDict):
     return layoutInstance
 
 
-def createRectShape(item, gridTuple:tuple[int,int]):
-        start = QPoint(item["rect"][0], item["rect"][1])
-        end = QPoint(item["rect"][2], item["rect"][3])
-        layoutLayer = laylyr.pdkDrawingLayers[item["lnum"]]
-        rect = lshp.layoutInstance(start, end, layoutLayer, gridTuple)
-        rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
-        rect.angle = item["ang"]
-        return rect
+def createRectShape(item, gridTuple: tuple[int, int]):
+    start = QPoint(item["tl"][0], item["tl"][1])
+    end = QPoint(item["br"][0], item["br"][1])
+    layoutLayer = laylyr.pdkDrawingLayers[item["ln"]]
+    rect = lshp.layoutRect(start, end, layoutLayer, gridTuple)
+    # rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
+    rect.angle = item["ang"]
+    return rect
 
+
+def createPathShape(item, gridTuple: tuple[int, int]):
+    path = lshp.layoutPath(
+        QLineF(
+            QPoint(item["dfl1"][0], item["dfl1"][1]),
+            QPoint(item["dfl2"][0], item["dfl2"][1]),
+        ),
+        laylyr.pdkDrawingLayers[item["ln"]],
+        gridTuple,
+        item["w"],
+        item["se"],
+        item["ee"],
+        item["md"],
+    )
+    path.name = item["nam"]
+    path.angle = item["ang"]
+    print(f'angle: {path.angle}')
+    return path
+
+def createLabelShape(item, gridTuple: tuple[int, int]):
+    layoutLayer = laylyr.pdkTextLayers[item["ln"]]
+    label = lshp.layoutLabel(
+        QPoint(item["st"][0], item["st"][1]),
+        item["lt"],
+        item["ff"],
+        item["fs"],
+        item["fh"],
+        item["la"],
+        item["lo"],
+        layoutLayer,
+        gridTuple
+    )
+    return label
