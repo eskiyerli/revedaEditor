@@ -1,3 +1,4 @@
+
 #    “Commons Clause” License Condition v1.0
 #   #
 #    The Software is provided to you by the Licensor under the License, as defined
@@ -15,10 +16,14 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-#
+# 
+
 import json
 import inspect
 import pdk.layoutLayers as laylyr
@@ -29,36 +34,73 @@ class layoutEncoder(json.JSONEncoder):
     def default(self, item):
         match type(item):
             case lshp.layoutInstance:
-                itemDict = {"type": "layoutInstance", "lib": item.libraryName, "cell":
-                            item.cellName,
-                            "view": item.viewName, "nam": item.instanceName,
-                            "ic": item.counter,
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "Inst",
+                    "lib": item.libraryName,
+                    "cell": item.cellName,
+                    "view": item.viewName,
+                    "nam": item.instanceName,
+                    "ic": item.counter,
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
             case lshp.layoutRect:
-                itemDict = {"type": "layoutRect", "rect": item.rect.getCoords(),
-                            "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
-                            "end": (item.mapToScene(item.end) - item.scene().origin).toTuple(),
-                            "ang": item.angle,
-                            "lnum": laylyr.pdkDrawingLayers.index(item.layer)}
+                itemDict = {
+                    "type": "Rect",
+                    "tl" : item.mapToScene(item.rect.topLeft()).toTuple(),
+                    "br" : item.mapToScene(item.rect.bottomRight()).toTuple(),
+                    "ang": item.angle,
+                    "ln": laylyr.pdkAllLayers.index(item.layer),
+                }
             case lshp.layoutPath:
-                itemDict = {"type": "layoutPath"}
-            case default: # now check super class types:
-                match item.__class__.__bases__[0]:
-                    case lshp.pcell:
-                        init_args = inspect.signature(item.__class__.__init__).parameters
-                        args_used = [param for param in init_args if (param != 'self' and
-                                                                    param != 'gridTuple')]
-
-                        argDict = {arg: getattr(item, arg) for arg in args_used}
-                        # print(argDict)
-                        itemDict = {"type": "pcell", "lib": item.libraryName, "cell": item.cellName,
-                                    "view": item.viewName, "nam": item.instanceName, "ic": item.counter,
-                                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                                    "ang": item.angle, "params": argDict}
-
+                itemDict = {
+                    "type": "Path",
+                    "dfl1": item.mapToScene(item.draftLine.p1()).toTuple(),
+                    "dfl2": item.mapToScene(item.draftLine.p2()).toTuple(),
+                    "ln": laylyr.pdkDrawingLayers.index(item.layer),
+                    "w": item.width,
+                    "se": item.startExtend,
+                    "ee": item.endExtend,
+                    "md": item.mode,
+                    "nam": item.name,
+                    "ang": item.angle,
+                }
+            case lshp.layoutLabel:
+                itemDict = {
+                    "type": "Label",
+                    "st": item.mapToScene(item.start).toTuple(),
+                    "lt": item.labelText,
+                    "ff": item.fontFamily,
+                    "fs": item.fontStyle,
+                    "fh": item.fontHeight,
+                    "la": item.labelAlign,
+                    "lo": item.labelOrient,
+                    "ln": laylyr.pdkTextLayers.index(item.layer)
+                }
+            # case default:  # now check super class types:
+            #     match item.__class__.__bases__[0]:
+            #         case lshp.pcell:
+            #             init_args = inspect.signature(
+            #                 item.__class__.__init__
+            #             ).parameters
+            #             args_used = [
+            #                 param
+            #                 for param in init_args
+            #                 if (param != "self" and param != "gridTuple")
+            #             ]
+            #
+            #             argDict = {arg: getattr(item, arg) for arg in args_used}
+            #             # print(argDict)
+            #             itemDict = {
+            #                 "type": "pcell",
+            #                 "lib": item.libraryName,
+            #                 "cell": item.cellName,
+            #                 "view": item.viewName,
+            #                 "nam": item.instanceName,
+            #                 "ic": item.counter,
+            #                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
+            #                 "ang": item.angle,
+            #                 "params": argDict,
+            #             }
 
         return itemDict
-
-
-
