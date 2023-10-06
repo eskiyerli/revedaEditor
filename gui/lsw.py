@@ -69,7 +69,6 @@ class layerDataModel(QStandardItemModel):
 
         for row, layer in enumerate(self._data):
             self.insertRow(row)
-
             bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(5,5).toImage())
             brush = QBrush(bitmap)
             brush.setColor(QColor(layer.bcolor))
@@ -92,8 +91,6 @@ class layerDataModel(QStandardItemModel):
         [self._data.append((layer.name,layer.visible,layer.selectable,layer.btexture,
                             layer.bcolor))  for layer in layerlist]
 
-
-
 class layerViewTable(QTableView):
     dataSelected = Signal(str)
     def __init__(self, parent=None, model:layerDataModel=None):
@@ -112,13 +109,11 @@ class layerViewTable(QTableView):
         if selected.indexes():
             # Get the first selected index
             index = selected.indexes()[1]
-
             # Get the row and column of the selected index
             row = index.row()
             column = index.column()
-
+            print(row,column)
             # Get the data from the model at the selected index
             model = index.model()
             layerName = model.data(index)
             self.dataSelected.emit(layerName)
-

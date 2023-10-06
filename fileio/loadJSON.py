@@ -1,28 +1,3 @@
-#    “Commons Clause” License Condition v1.0
-#   #
-#    The Software is provided to you by the Licensor under the License, as defined
-#    below, subject to the following condition.
-#
-#    Without limiting other conditions in the License, the grant of rights under the
-#    License will not include, and the License does not grant to you, the right to
-#    Sell the Software.
-#
-#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
-#    derives, entirely or substantially, from the functionality of the Software. Any
-#    license notice or attribution required by the License must also include this
-#    Commons Clause License Condition notice.
-#
-#   Add-ons and extensions developed for this software may be distributed
-#   under their own separate licenses.
-#
-#    Software: Revolution EDA
-#    License: Mozilla Public License 2.0
-#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-#
-
 #   “Commons Clause” License Condition v1.0
 #  #
 #   The Software is provided to you by the Licensor under the License, as defined
@@ -48,7 +23,7 @@
 # import pathlib
 
 import json
-
+import pdk.process as fabproc
 from PySide6.QtCore import (
     QPoint,
     QLineF,
@@ -310,6 +285,13 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
             return createPathShape(item, gridTuple)
         case "Label":
             return createLabelShape(item, gridTuple)
+        case "Pin":
+            return createPinShape(item, gridTuple)
+        case "Polygon":
+            return createPolygonShape(item, gridTuple)
+        case "Via":
+            return createViaArrayShape(item, gridTuple)
+
 
 def createLayoutInstance(gridTuple, item, libraryDict):
     libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
@@ -372,12 +354,12 @@ def createPathShape(item, gridTuple: tuple[int, int]):
     )
     path.name = item["nam"]
     path.angle = item["ang"]
-    print(f'angle: {path.angle}')
     return path
+
 
 def createLabelShape(item, gridTuple: tuple[int, int]):
     layoutLayer = laylyr.pdkTextLayers[item["ln"]]
-    label = lshp.layoutLabel(
+    return lshp.layoutLabel(
         QPoint(item["st"][0], item["st"][1]),
         item["lt"],
         item["ff"],
@@ -386,6 +368,44 @@ def createLabelShape(item, gridTuple: tuple[int, int]):
         item["la"],
         item["lo"],
         layoutLayer,
-        gridTuple
+        gridTuple,
     )
-    return label
+
+
+def createPinShape(item, gridTuple: tuple[int, int]):
+    layoutLayer = laylyr.pdkPinLayers[item["ln"]]
+    return lshp.layoutPin(
+        QPoint(item["tl"][0], item["tl"][1]),
+        QPoint(item["br"][0], item["br"][1]),
+        item["pn"],
+        item["pd"],
+        item["pt"],
+        layoutLayer,
+        gridTuple,
+    )
+
+
+def createPolygonShape(item, gridTuple: tuple[int, int]):
+    layoutLayer = laylyr.pdkDrawingLayers[item["ln"]]
+    pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
+    return lshp.layoutPolygon(pointsList, layoutLayer, gridTuple)
+
+
+def createViaArrayShape(item, gridTuple: tuple[int, int]):
+    viaDefTuple = fabproc.processVias[fabproc.processViaNames.index(item["via"]["vdt"])]
+    print(f"viaDefTuple: {viaDefTuple}")
+    via = lshp.layoutVia(
+        QPoint(item["via"]["st"][0], item["via"]["st"][1]),
+        viaDefTuple,
+        item["via"]["w"],
+        item["via"]["h"],
+        gridTuple,
+    )
+    return lshp.layoutViaArray(
+        QPoint(item["st"][0], item["st"][1]),
+        via,
+        item["sp"],
+        item["xn"],
+        item["yn"],
+        gridTuple,
+    )

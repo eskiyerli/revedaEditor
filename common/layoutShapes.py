@@ -1618,6 +1618,7 @@ class layoutPolygon(layoutShape):
         self._points = value
         self._polygon = QPolygonF(self._points)
 
+
     def addPoint(self, point: QPoint):
         self.prepareGeometryChange()
         self._points.append(point)

@@ -1405,7 +1405,10 @@ class layoutEditor(editorWindow):
 
     def createPathClick(self, s):
         dlg = ldlg.createPathDialogue(self)
-        dlg.pathLayerCB.addItems([item.name for item in laylyr.pdkDrawingLayers])
+        # paths are created on drawing layers
+        dlg.pathLayerCB.addItems(
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
+        )
         dlg.pathWidth.setText("1.0")
         dlg.startExtendEdit.setText("0.5")
         dlg.endExtendEdit.setText("0.5")
@@ -1429,7 +1432,7 @@ class layoutEditor(editorWindow):
             else:
                 pathWidth = fabproc.dbu * 1.0
             pathName = dlg.pathNameEdit.text()
-            pathLayerName = dlg.pathLayerCB.currentText()
+            pathLayerName = dlg.pathLayerCB.currentText().split()[0]
             pathLayer = [
                 item for item in laylyr.pdkDrawingLayers if item.name == pathLayerName
             ][0]
@@ -1441,16 +1444,20 @@ class layoutEditor(editorWindow):
 
     def createPinClick(self):
         dlg = ldlg.createLayoutPinDialog(self)
-        pinLayersNames = [item.name for item in laylyr.pdkPinLayers]
-        textLayersNames = [item.name for item in laylyr.pdkTextLayers]
+        pinLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkPinLayers]
+        textLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkTextLayers]
         dlg.pinLayerCB.addItems(pinLayersNames)
         dlg.labelLayerCB.addItems(textLayersNames)
 
         if self.centralW.scene.newPinTuple is not None:
-            dlg.pinLayerCB.setCurrentText(self.centralW.scene.newPinTuple.pinLayer.name)
+            dlg.pinLayerCB.setCurrentText(
+                f"{self.centralW.scene.newPinTuple.pinLayer.name} "
+                f"[{self.centralW.scene.newPinTuple.pinLayer.purpose}]"
+            )
         if self.centralW.scene.newLabelTuple is not None:
             dlg.labelLayerCB.setCurrentText(
-                self.centralW.scene.newLabelTuple.labelLayer.name
+                f"{self.centralW.scene.newLabelTuple.labelLayer.name} ["
+                f"{self.centralW.scene.newLabelTuple.labelLayer.purpose}]"
             )
             dlg.familyCB.setCurrentText(self.centralW.scene.newLabelTuple.fontFamily)
             dlg.fontStyleCB.setCurrentText(self.centralW.scene.newLabelTuple.fontStyle)
@@ -1468,11 +1475,11 @@ class layoutEditor(editorWindow):
             pinName = dlg.pinName.text()
             pinDir = dlg.pinDir.currentText()
             pinType = dlg.pinType.currentText()
-            pinLayerName = dlg.pinLayerCB.currentText()
+            pinLayerName = dlg.pinLayerCB.currentText().split()[0]
             pinLayer = [
                 item for item in laylyr.pdkPinLayers if item.name == pinLayerName
             ][0]
-            labelLayerName = dlg.labelLayerCB.currentText()
+            labelLayerName = dlg.labelLayerCB.currentText().split()[0]
             labelLayer = [
                 item for item in laylyr.pdkTextLayers if item.name == labelLayerName
             ][0]
@@ -1496,12 +1503,12 @@ class layoutEditor(editorWindow):
 
     def createLabelClick(self):
         dlg = ldlg.createLayoutLabelDialog(self)
-        textLayersNames = [item.name for item in laylyr.pdkTextLayers]
+        textLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkTextLayers]
         dlg.labelLayerCB.addItems(textLayersNames)
         if dlg.exec() == QDialog.Accepted:
             self.centralW.scene.editModes.setMode("addLabel")
             labelName = dlg.labelName.text()
-            labelLayerName = dlg.labelLayerCB.currentText()
+            labelLayerName = dlg.labelLayerCB.currentText().split()[0]
             labelLayer = [
                 item for item in laylyr.pdkTextLayers if item.name == labelLayerName
             ][0]
@@ -1527,11 +1534,13 @@ class layoutEditor(editorWindow):
             self.centralW.scene.editModes.setMode("addVia")
             self.centralW.scene.addVia = True
             if dlg.singleViaRB.isChecked():
-                selViaDefTuple = [
-                    viaDefTuple
-                    for viaDefTuple in fabproc.processVias
-                    if viaDefTuple.name == dlg.singleViaNamesCB.currentText()
-                ][0]
+                # selViaDefTuple = [
+                #     viaDefTuple
+                #     for viaDefTuple in fabproc.processVias
+                #     if viaDefTuple.name == dlg.singleViaNamesCB.currentText()
+                # ][0]
+                selViaDefTuple = fabproc.processVias[fabproc.processViaNames.index(
+                    dlg.singleViaNamesCB.currentText())]
 
                 singleViaTuple = ddef.singleViaTuple(
                     selViaDefTuple,
@@ -4057,7 +4066,7 @@ class layout_scene(editor_scene):
     def __init__(self, parent):
         super().__init__(parent)
         self.selectEdLayer = laylyr.pdkDrawingLayers[0]
-        self.layoutShapes = ["Rect", "Path", "Label"]
+        self.layoutShapes = ["Rect", "Path", "Label", "Via", "Pin", "Polygon"]
         # draw modes
         self.editModes = ddef.layoutModes(
             selectItem=True,
@@ -4095,6 +4104,7 @@ class layout_scene(editor_scene):
         self.singleVia = None
         self.arrayVia = None
         self.polygonGuideLine = None
+
 
     @property
     def drawMode(self):
@@ -4439,13 +4449,14 @@ class layout_scene(editor_scene):
             None
         """
         # Only save the top-level items
-        items = [item for item in self.items() if not item.childItems()]
+        layoutShapes = (item for item in self.items())
+        topLevelItems = [item for item in layoutShapes if item.parentItem() is None]
 
-        items.insert(0, {"cellView": "layout"})
+        topLevelItems.insert(0, {"cellView": "layout"})
         with open(fileName, "w") as file:
             try:
                 # Serialize items to JSON using layoutEncoder class
-                json.dump(items, file, cls=layenc.layoutEncoder, indent=4)
+                json.dump(topLevelItems, file, cls=layenc.layoutEncoder, indent=4)
             except Exception as e:
                 self.logger.error(f"Cannot save layout: {e}")
 
@@ -4454,7 +4465,9 @@ class layout_scene(editor_scene):
             items = json.load(file)
             for item in items[1:]:
                 if item["type"] in self.layoutShapes:
-                    itemShape = lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
+                    itemShape = lj.createLayoutItems(
+                        item, self.libraryDict, self.gridTuple
+                    )
                     self.addItem(itemShape)
 
     def keyPressEvent(self, key_event):
@@ -4606,8 +4619,9 @@ class layout_scene(editor_scene):
                 dlg.horizontalButton.setChecked(True)
             case 4:
                 dlg.verticalButton.setChecked(True)
-        dlg.pathLayerCB.addItems([item.name for item in laylyr.pdkDrawingLayers])
-        dlg.pathLayerCB.setCurrentText(item.layer.name)
+        dlg.pathLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
+                                  laylyr.pdkDrawingLayers])
+        dlg.pathLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
         dlg.pathWidth.setText(str(item.width / fabproc.dbu))
         dlg.pathNameEdit.setText(item.name)
         roundingFactor = len(str(fabproc.dbu)) - 1
@@ -4648,8 +4662,9 @@ class layout_scene(editor_scene):
     def layoutLabelProperties(self, item):
         dlg = ldlg.layoutLabelProperties(self.editorWindow)
         dlg.labelName.setText(item.labelText)
-        dlg.labelLayerCB.addItems([item.name for item in laylyr.pdkTextLayers])
-        dlg.labelLayerCB.setCurrentText(item.layer.name)
+        dlg.labelLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
+                                   laylyr.pdkTextLayers])
+        dlg.labelLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
         dlg.familyCB.setCurrentText(item.fontFamily)
         dlg.fontStyleCB.setCurrentText(item.fontStyle)
         dlg.labelHeightCB.setCurrentText(str(int(item.fontHeight)))
@@ -4680,8 +4695,9 @@ class layout_scene(editor_scene):
         dlg.pinName.setText(item.pinName)
         dlg.pinDir.setCurrentText(item.pinDir)
         dlg.pinType.setCurrentText(item.pinType)
-        dlg.pinLayerCB.addItems([item.name for item in laylyr.pdkPinLayers])
-        dlg.pinLayerCB.setCurrentText(item.layer.name)
+        dlg.pinLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
+                                 laylyr.pdkPinLayers])
+        dlg.pinLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
         dlg.pinBottomLeftX.setText(str(item.mapToScene(item.start).x() / fabproc.dbu))
         dlg.pinBottomLeftY.setText(str(item.mapToScene(item.start).y() / fabproc.dbu))
         dlg.pinTopRightX.setText(str(item.mapToScene(item.end).x() / fabproc.dbu))
@@ -4714,18 +4730,28 @@ class layout_scene(editor_scene):
 
     @staticmethod
     def rotateVector(mouseLoc: QPoint, vector: layp.layoutPath, transform: QTransform):
+        """
+        Rotate the vector based on the mouse location and transform.
+
+        Args:
+            mouseLoc (QPoint): The current mouse location.
+            vector (layp.layoutPath): The vector to rotate.
+            transform (QTransform): The transform to apply to the vector.
+        """
         start = vector.start
         xmove = mouseLoc.x() - start.x()
         ymove = mouseLoc.y() - start.y()
-        match (xmove >= 0, ymove >= 0):
-            case (True, True):
-                vector.end = QPoint(start.x(), start.y() + ymove)
-            case (True, False):
-                vector.end = QPoint(start.x() + xmove, start.y())
-            case (False, False):
-                vector.end = QPoint(start.x(), start.y() + ymove)
-            case (False, True):
-                vector.end = QPoint(start.x() + xmove, start.y())
+
+        # Determine the new end point of the vector based on the mouse movement
+        if xmove >= 0 and ymove >= 0:
+            vector.end = QPoint(start.x(), start.y() + ymove)
+        elif xmove >= 0 and ymove < 0:
+            vector.end = QPoint(start.x() + xmove, start.y())
+        elif xmove < 0 and ymove < 0:
+            vector.end = QPoint(start.x(), start.y() + ymove)
+        elif xmove < 0 and ymove >= 0:
+            vector.end = QPoint(start.x() + xmove, start.y())
+
         vector.setTransform(transform)
 
 

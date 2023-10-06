@@ -47,8 +47,8 @@ class layoutEncoder(json.JSONEncoder):
             case lshp.layoutRect:
                 itemDict = {
                     "type": "Rect",
-                    "tl" : item.mapToScene(item.rect.topLeft()).toTuple(),
-                    "br" : item.mapToScene(item.rect.bottomRight()).toTuple(),
+                    "tl": item.mapToScene(item.rect.topLeft()).toTuple(),
+                    "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
                     "ang": item.angle,
                     "ln": laylyr.pdkAllLayers.index(item.layer),
                 }
@@ -77,30 +77,63 @@ class layoutEncoder(json.JSONEncoder):
                     "lo": item.labelOrient,
                     "ln": laylyr.pdkTextLayers.index(item.layer)
                 }
-            # case default:  # now check super class types:
-            #     match item.__class__.__bases__[0]:
-            #         case lshp.pcell:
-            #             init_args = inspect.signature(
-            #                 item.__class__.__init__
-            #             ).parameters
-            #             args_used = [
-            #                 param
-            #                 for param in init_args
-            #                 if (param != "self" and param != "gridTuple")
-            #             ]
-            #
-            #             argDict = {arg: getattr(item, arg) for arg in args_used}
-            #             # print(argDict)
-            #             itemDict = {
-            #                 "type": "pcell",
-            #                 "lib": item.libraryName,
-            #                 "cell": item.cellName,
-            #                 "view": item.viewName,
-            #                 "nam": item.instanceName,
-            #                 "ic": item.counter,
-            #                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
-            #                 "ang": item.angle,
-            #                 "params": argDict,
-            #             }
+            case lshp.layoutViaArray:
+                viaDict = {
+                    "st": item.via.mapToScene(item.via.start).toTuple(),
+                    "vdt": item.via.viaDefTuple.name,
+                    "w": item.via.width,
+                    "h": item.via.height,
+                }
+                itemDict = {
+                    "type": "Via",
+                    "st": item.mapToScene(item.start).toTuple(),
+                    "via": viaDict,
+                    "sp": item.spacing,
+                    "xn": item.xnum,
+                    "yn": item.ynum,
+                }
+
+            case lshp.layoutPin:
+                itemDict = {
+                    "type": "Pin",
+                    "tl": item.mapToScene(item.rect.topLeft()).toTuple(),
+                    "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
+                    "pn": item.pinName,
+                    "pd": item.pinDir,
+                    "pt": item.pinType,
+                    "ln": laylyr.pdkPinLayers.index(item.layer),
+                }
+            case lshp.layoutPolygon:
+                pointsList = [item.mapToScene(point).toTuple() for point in item.points]
+                itemDict = {
+                    "type": "Polygon",
+                    "ps": pointsList,
+                    "ln": laylyr.pdkAllLayers.index(item.layer),
+                }
+            case default:  # now check super class types:
+                match item.__class__.__bases__[0]:
+                    case lshp.pcell:
+                        init_args = inspect.signature(
+                            item.__class__.__init__
+                        ).parameters
+                        args_used = [
+                            param
+                            for param in init_args
+                            if (param != "self" and param != "gridTuple")
+                        ]
+
+                        argDict = {arg: getattr(item, arg) for arg in args_used}
+                        # print(argDict)
+                        itemDict = {
+                            "type": "pcell",
+                            "lib": item.libraryName,
+                            "cell": item.cellName,
+                            "view": item.viewName,
+                            "nam": item.instanceName,
+                            "ic": item.counter,
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle,
+                            "params": argDict,
+                        }
 
         return itemDict
