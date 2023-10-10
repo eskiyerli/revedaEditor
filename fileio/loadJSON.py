@@ -307,16 +307,7 @@ def createLayoutInstance(gridTuple, item, libraryDict):
         try:
             shapes = json.load(temp)
             for shape in shapes[1:]:
-                match shape["type"]:
-                    case "Inst":
-                        itemShapes.append(
-                            createLayoutInstance(gridTuple, shape, libraryDict)
-                        )
-                    case "Rect":
-                        itemShapes.append(createRectShape(shape, gridTuple))
-                    case "Path":
-                        itemShapes.append(createPathShape(shape, gridTuple))
-
+                itemShapes.append(createLayoutItems(shape, libraryDict, gridTuple))
         except json.decoder.JSONDecodeError:
             print("Error: Invalid Layout file")
     layoutInstance = lshp.layoutInstance(itemShapes, gridTuple)
@@ -327,7 +318,6 @@ def createLayoutInstance(gridTuple, item, libraryDict):
     layoutInstance.setPos(item["loc"][0], item["loc"][1])
     layoutInstance.viewName = viewName
     return layoutInstance
-
 
 def createRectShape(item, gridTuple: tuple[int, int]):
     start = QPoint(item["tl"][0], item["tl"][1])
@@ -393,7 +383,6 @@ def createPolygonShape(item, gridTuple: tuple[int, int]):
 
 def createViaArrayShape(item, gridTuple: tuple[int, int]):
     viaDefTuple = fabproc.processVias[fabproc.processViaNames.index(item["via"]["vdt"])]
-    print(f"viaDefTuple: {viaDefTuple}")
     via = lshp.layoutVia(
         QPoint(item["via"]["st"][0], item["via"]["st"][1]),
         viaDefTuple,

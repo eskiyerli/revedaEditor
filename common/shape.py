@@ -1453,10 +1453,8 @@ class symbolShape(shape):
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
-        self.borderRect = self._drawings[0].sceneBoundingRect()
-        if self._drawings[1:]:
-            for draw in self._drawings[1:]:
-                self.borderRect = self.borderRect.united(draw.sceneBoundingRect())
+        self.borderRect = self.childrenBoundingRect().normalized().adjusted(
+            -1, -1, 1, 1)
         self.dashLines = dict()
 
     def __repr__(self):

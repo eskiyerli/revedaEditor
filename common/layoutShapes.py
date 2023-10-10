@@ -459,6 +459,7 @@ class layoutInstance(layoutShape):
         self._instanceName = ""
         self._drawings = list()
         self._counter = 0
+        self._selectedPen = QPen(QColor("yellow"), 1, Qt.DashLine)
         for item in self._shapes:
             item.setFlag(QGraphicsItem.ItemIsSelectable, False)
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
@@ -467,19 +468,18 @@ class layoutInstance(layoutShape):
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
-        self._borderRect = self._drawings[0].sceneBoundingRect()
-        if self._drawings[1:]:
-            for drawing in self._drawings[1:]:
-                self._borderRect = self._borderRect.united(drawing.sceneBoundingRect())
+        self._start = self.childrenBoundingRect().topLeft()
 
     def __repr__(self):
         return f"layoutInstance({self._shapes}, {self._gridTuple})"
 
     def boundingRect(self):
-        return self.childrenBoundingRect()
+        return self.childrenBoundingRect().normalized().adjusted(-2, -2, 2, 2)
 
     def paint(self, painter, option, widget):
-        super().paint(painter, option, widget)
+        if self.isSelected():
+            painter.setPen(self._selectedPen)
+            painter.drawRect(self.childrenBoundingRect())
 
     @property
     def libraryName(self):
@@ -532,6 +532,10 @@ class layoutInstance(layoutShape):
         self._shapes = value
         for shape in self._shapes:
             shape.setParentItem(self)
+
+    @property
+    def start(self):
+        return self._start.toPoint()
 
     def addShape(self, shape: QGraphicsItem):
         self._drawings.append(shape)
@@ -1412,7 +1416,7 @@ class layoutViaArray(layoutShape):
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
         self._selectedPen = QPen(QColor("yellow"), 1, Qt.DashLine)
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     def _placeVias(self, via, xnum, ynum):
         for childVia in self.childItems():
@@ -1432,24 +1436,12 @@ class layoutViaArray(layoutShape):
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
             item.setParentItem(self)
 
-    def _calcRect(self):
-        return (
-            QRectF(
-                self._start.x(),
-                self._start.y(),
-                self._via.width + (self._xnum - 1) * (self._spacing + self._via.width),
-                self._via.height
-                + (self._ynum - 1) * (self._spacing + self._via.height),
-            )
-            .normalized()
-            .adjusted(-2, -2, 2, 2)
-        )
 
     def __repr__(self):
         return f"layoutViaArray({self._via}, {self._xnum}, {self._ynum}, {self._gridTuple})"
 
     def boundingRect(self) -> QRectF:
-        return self._rect
+        return self.childrenBoundingRect()
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1478,7 +1470,7 @@ class layoutViaArray(layoutShape):
     def xnum(self, value: int):
         self.prepareGeometryChange()
         self._xnum = value
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def ynum(self) -> int:
@@ -1488,7 +1480,7 @@ class layoutViaArray(layoutShape):
     def ynum(self, value: int):
         self.prepareGeometryChange()
         self._ynum = value
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def via(self):
@@ -1509,7 +1501,7 @@ class layoutViaArray(layoutShape):
         self._via.width = value
         for childVia in self.childItems():
             childVia.width = value
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def height(self):
@@ -1521,7 +1513,7 @@ class layoutViaArray(layoutShape):
         self._via.height = value
         for childVia in self.childItems():
             childVia.height = value
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def spacing(self) -> float:
@@ -1532,7 +1524,7 @@ class layoutViaArray(layoutShape):
         self.prepareGeometryChange()
         self._spacing = value
         self._placeVias(self._via, self._xnum, self._ynum)
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def xnum(self) -> int:
@@ -1542,7 +1534,7 @@ class layoutViaArray(layoutShape):
     def xnum(self, value: int):
         self._xnum = value
         self._placeVias(self._via, self._xnum, self._ynum)
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def ynum(self) -> int:
@@ -1552,7 +1544,7 @@ class layoutViaArray(layoutShape):
     def ynum(self, value: int):
         self._ynum = value
         self._placeVias(self._via, self._xnum, self._ynum)
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
     @property
     def viaDefTuple(self):
@@ -1564,7 +1556,7 @@ class layoutViaArray(layoutShape):
         self.prepareGeometryChange()
         for childVia in self.childItems():
             childVia.viaDefTuple = value
-        self._rect = self._calcRect()
+        self._rect = self.childrenBoundingRect()
 
 
 class layoutPolygon(layoutShape):
@@ -1586,7 +1578,7 @@ class layoutPolygon(layoutShape):
             painter.setPen(self._selectedPen)
             painter.setBrush(self._selectedBrush)
             if self._selectedCorner is not None:
-                painter.drawCircle(self._selectedCorner, 5)
+                painter.drawEllipse(self._selectedCorner, 5, 5)
         else:
             painter.setPen(self._pen)
             painter.setBrush(self._brush)

@@ -1444,8 +1444,12 @@ class layoutEditor(editorWindow):
 
     def createPinClick(self):
         dlg = ldlg.createLayoutPinDialog(self)
-        pinLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkPinLayers]
-        textLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkTextLayers]
+        pinLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkPinLayers
+        ]
+        textLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+        ]
         dlg.pinLayerCB.addItems(pinLayersNames)
         dlg.labelLayerCB.addItems(textLayersNames)
 
@@ -1503,7 +1507,9 @@ class layoutEditor(editorWindow):
 
     def createLabelClick(self):
         dlg = ldlg.createLayoutLabelDialog(self)
-        textLayersNames = [f'{item.name} [{item.purpose}]' for item in laylyr.pdkTextLayers]
+        textLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+        ]
         dlg.labelLayerCB.addItems(textLayersNames)
         if dlg.exec() == QDialog.Accepted:
             self.centralW.scene.editModes.setMode("addLabel")
@@ -1539,8 +1545,9 @@ class layoutEditor(editorWindow):
                 #     for viaDefTuple in fabproc.processVias
                 #     if viaDefTuple.name == dlg.singleViaNamesCB.currentText()
                 # ][0]
-                selViaDefTuple = fabproc.processVias[fabproc.processViaNames.index(
-                    dlg.singleViaNamesCB.currentText())]
+                selViaDefTuple = fabproc.processVias[
+                    fabproc.processViaNames.index(dlg.singleViaNamesCB.currentText())
+                ]
 
                 singleViaTuple = ddef.singleViaTuple(
                     selViaDefTuple,
@@ -1554,7 +1561,7 @@ class layoutEditor(editorWindow):
                 selViaDefTuple = [
                     viaDefTuple
                     for viaDefTuple in fabproc.processVias
-                    if viaDefTuple.name == dlg.singleViaNamesCB.currentText()
+                    if viaDefTuple.name == dlg.arrayViaNamesCB.currentText()
                 ][0]
 
                 singleViaTuple = ddef.singleViaTuple(
@@ -1573,6 +1580,7 @@ class layoutEditor(editorWindow):
 
     def createPolygonClick(self):
         self.centralW.scene.editModes.setMode("drawPolygon")
+        print(self.centralW.scene.editModes)
 
     def stretchClick(self, s):
         self.centralW.scene.editModes.setMode("stretchItem")
@@ -2547,7 +2555,6 @@ class symbol_scene(editor_scene):
         except Exception as e:
             print(e)
 
-            self.editModes.setMode("selectItem")
 
     def lineDraw(self, start: QPoint, current: QPoint):
         line = shp.line(start, current, self.gridTuple)
@@ -4066,10 +4073,11 @@ class layout_scene(editor_scene):
     def __init__(self, parent):
         super().__init__(parent)
         self.selectEdLayer = laylyr.pdkDrawingLayers[0]
-        self.layoutShapes = ["Rect", "Path", "Label", "Via", "Pin", "Polygon"]
+        self.layoutShapes = ["Inst", "Rect", "Path", "Label", "Via", "Pin",
+                             "Polygon"]
         # draw modes
         self.editModes = ddef.layoutModes(
-            selectItem=True,
+            selectItem=False,
             deleteItem=False,
             moveItem=False,
             copyItem=False,
@@ -4087,14 +4095,16 @@ class layout_scene(editor_scene):
             stretchItem=False,
             addInstance=False,
         )
+        self.editModes.setMode("selectItem")
+        self.newInstance = None
         self.layoutInstanceTuple = None
 
         self.itemCounter = 0
         self.newPath = None
         self.newPathTuple = None
         self.draftLine = None
-        # self.m45Rotate = QTransform()
-        # self.m45Rotate.rotate(-45)
+        self.m45Rotate = QTransform()
+        self.m45Rotate.rotate(-45)
         self.newPin = None
         self.newPinTuple = None
         self.newLabelTuple = None
@@ -4104,7 +4114,6 @@ class layout_scene(editor_scene):
         self.singleVia = None
         self.arrayVia = None
         self.polygonGuideLine = None
-
 
     @property
     def drawMode(self):
@@ -4130,14 +4139,31 @@ class layout_scene(editor_scene):
     # 8. select item/s
     # 9. rotate item/s
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
+        """
+        Handle the mouse press event.
+
+        Args:
+            mouse_event: The mouse event object.
+
+        Returns:
+            None
+        """
+        # Store the mouse press location
         self.mousePressLoc = mouse_event.scenePos().toPoint()
+        # Call the base class mouse press event
+        super().mousePressEvent(mouse_event)
         try:
+            # Get the keyboard modifiers
             modifiers = QGuiApplication.keyboardModifiers()
+
+            # Get the bounding rectangle of the view
             self.viewRect = self.parent.view.mapToScene(
                 self.parent.view.viewport().rect()
             ).boundingRect()
+
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.drawRect:
+                    # Create a new rectangle
                     self.newRect = lshp.layoutRect(
                         self.mousePressLoc,
                         self.mousePressLoc,
@@ -4146,6 +4172,7 @@ class layout_scene(editor_scene):
                     )
                     self.addUndoStack(self.newRect)
                 elif self.editModes.drawPath:
+                    # Create a new path
                     self.newPath = lshp.layoutPath(
                         QLineF(self.mousePressLoc, self.mousePressLoc),
                         self.newPathTuple.layer,
@@ -4158,6 +4185,7 @@ class layout_scene(editor_scene):
                     self.newPath.name = self.newPathTuple.name
                     self.addUndoStack(self.newPath)
                 elif self.editModes.drawPin and self.newLabel is None:
+                    # Create a new pin
                     self.newPin = lshp.layoutPin(
                         self.mousePressLoc,
                         self.mousePressLoc,
@@ -4175,12 +4203,14 @@ class layout_scene(editor_scene):
                     self.editModes.setMode("selectItem")
                 elif self.editModes.drawPolygon:
                     if self.newPolygon is None:
+                        # Create a new polygon
                         self.newPolygon = lshp.layoutPolygon(
                             [self.mousePressLoc, self.mousePressLoc],
                             self.selectEdLayer,
                             self.gridTuple,
                         )
                         self.addUndoStack(self.newPolygon)
+                        # Create a guide line for the polygon
                         self.polygonGuideLine = QGraphicsLineItem(
                             QLineF(
                                 self.newPolygon.points[-2], self.newPolygon.points[-1]
@@ -4190,46 +4220,68 @@ class layout_scene(editor_scene):
                             QPen(QColor(255, 255, 0), 1, Qt.DashLine)
                         )
                         self.addUndoStack(self.polygonGuideLine)
+
                     else:
                         self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.selectItem:
+                    # Select scene items
                     self.selectSceneItems(modifiers)
-                if self.editModes.rotateItem:
+                elif self.editModes.rotateItem:
                     self.editorWindow.messageLine.setText("Rotate item")
                     if self.selectedItems():
+                        # Rotate selected items
                         self.rotateSelectedItems(self.mousePressLoc)
                 elif self.editModes.changeOrigin:
                     self.origin = self.mousePressLoc
                     self.editModes.setMode("selectItem")
         except Exception as e:
             self.logger.error(f"mouse press error: {e}")
-        super().mousePressEvent(mouse_event)
+
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        self.mouseMoveLoc = mouse_event.scenePos().toPoint()
-        modifiers = QGuiApplication.keyboardModifiers()
+        """
+        Handle the mouse move event.
 
+        Args:
+            mouse_event (QGraphicsSceneMouseEvent): The mouse event object.
+
+        Returns:
+            None
+        """
+
+        # Get the current mouse position
+        self.mouseMoveLoc = mouse_event.scenePos().toPoint()
+        # Call the parent class's mouseMoveEvent method
+        super().mouseMoveEvent(mouse_event)
+        # Get the keyboard modifiers
+        modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
+            # Handle drawing rectangle mode
             if self.editModes.drawRect:
                 self.editorWindow.messageLine.setText(
                     "Release mouse on the bottom left point"
                 )
                 self.newRect.end = self.mouseMoveLoc
+            # Handle drawing path mode
             elif self.editModes.drawPath:
+
                 self.newPath.draftLine = QLineF(
                     self.newPath.draftLine.p1(), self.mouseMoveLoc
                 )
+            # Handle drawing pin mode
             elif self.editModes.drawPin and self.newPin is not None:
                 self.newPin.end = self.mouseMoveLoc
-
+            # Handle selecting item mode with shift modifier
             elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                 self.selectionRectItem.setRect(
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
         else:
+            # Handle drawing pin mode with no new pin
             if self.editModes.drawPin and self.newPin is None:
                 if self.newLabel is not None:
                     self.newLabel.start = self.mouseMoveLoc
+            # Handle adding label mode
             elif self.editModes.addLabel:
                 if self.newLabel is not None:  # already defined a new label
                     self.newLabel.start = self.mouseMoveLoc
@@ -4239,6 +4291,7 @@ class layout_scene(editor_scene):
                         self.mouseMoveLoc, *self.newLabelTuple, self.gridTuple
                     )
                     self.addUndoStack(self.newLabel)
+            # Handle adding via mode with array via tuple
             elif self.editModes.addVia and self.arrayViaTuple is not None:
                 if self.arrayVia is None:
                     singleVia = lshp.layoutVia(
@@ -4258,17 +4311,25 @@ class layout_scene(editor_scene):
                 else:
                     self.arrayVia.setPos(self.mouseMoveLoc - self.arrayVia.start)
                     self.arrayVia.setSelected(True)
-            elif self.editModes.drawPolygon and self.newPolygon is not None:
+            # Handle drawing polygon mode
+            elif self.editModes.drawPolygon and  self.newPolygon is not None:
                 self.polygonGuideLine.setLine(
-                    QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
-                )
-                self.newPolygon.tempLastPoint = self.mouseMoveLoc
+                        QLineF(self.newPolygon.points[-1], self.mouseMoveLoc))
+                pass
+                # print(self.polygonGuideLine.line().p2())
+                # self.newPolygon.tempLastPoint = self.mouseMoveLoc
+            # Handle adding instance mode with layout instance tuple
+            elif self.editModes.addInstance and self.layoutInstanceTuple is not None:
+                if self.newInstance is None:
+                    self.newInstance = self.instLayout()
+                    self.addUndoStack(self.newInstance)
+                self.newInstance.setPos(self.mouseMoveLoc - self.newInstance.start)
 
-        super().mouseMoveEvent(mouse_event)
-        cursorPositionX = (self.mouseMoveLoc - self.origin).x()
-        cursorPositionY = (self.mouseMoveLoc - self.origin).y()
-        cursorPositionX /= fabproc.dbu
-        cursorPositionY /= fabproc.dbu
+        # Calculate the cursor position in real units
+        cursorPositionX = (self.mouseMoveLoc - self.origin).x() / fabproc.dbu
+        cursorPositionY = (self.mouseMoveLoc - self.origin).y() / fabproc.dbu
+
+        # Show the cursor position in the status line
         self.statusLine.showMessage(
             f"Cursor Position: ({cursorPositionX}, {cursorPositionY})"
         )
@@ -4282,10 +4343,7 @@ class layout_scene(editor_scene):
                 if self.editModes.drawRect:
                     self.newRect.setSelected(False)
                     self.newRect = None
-                    self.editModes.drawRect = False
-                elif (
-                    self.editModes.drawPin
-                ):  # finish pin editing and start label editing
+                elif self.editModes.drawPin:  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc, *self.newLabelTuple, self.gridTuple
@@ -4296,19 +4354,22 @@ class layout_scene(editor_scene):
                     elif self.newPin is None and self.newLabel is not None:
                         # finish label editing
                         self.newLabel = None
+                elif self.editModes.addInstance:
+                    self.newInstance = None
+                    self.newInstance = None
                 elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
                     )
                     self.removeItem(self.selectionRectItem)
                     self.selectionRectItem = None
+
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
 
     def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(event)
         self.mouseDoubleClickLoc = event.scenePos().toPoint()
-        modifiers = QGuiApplication.keyboardModifiers()
         try:
             if event.button() == Qt.LeftButton:
                 if self.editModes.drawPolygon:
@@ -4335,7 +4396,7 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"Cannot draw instance: {e}")
 
-    def instLayout(self, pos: QPoint):
+    def instLayout(self):
         """
         Read a layout file and create layoutShape objects from it.
         """
@@ -4355,7 +4416,6 @@ class layout_scene(editor_scene):
                                     )
                                 )
                             layoutInstance = lshp.layoutInstance(shapes, self.gridTuple)
-                            layoutInstance.setPos(pos)
                             layoutInstance.libraryName = (
                                 self.layoutInstanceTuple.libraryItem.libraryName
                             )
@@ -4449,9 +4509,7 @@ class layout_scene(editor_scene):
             None
         """
         # Only save the top-level items
-        layoutShapes = (item for item in self.items())
-        topLevelItems = [item for item in layoutShapes if item.parentItem() is None]
-
+        topLevelItems = [item for item in self.items() if item.parentItem() is None]
         topLevelItems.insert(0, {"cellView": "layout"})
         with open(fileName, "w") as file:
             try:
@@ -4619,9 +4677,10 @@ class layout_scene(editor_scene):
                 dlg.horizontalButton.setChecked(True)
             case 4:
                 dlg.verticalButton.setChecked(True)
-        dlg.pathLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
-                                  laylyr.pdkDrawingLayers])
-        dlg.pathLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
+        dlg.pathLayerCB.addItems(
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
+        )
+        dlg.pathLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.pathWidth.setText(str(item.width / fabproc.dbu))
         dlg.pathNameEdit.setText(item.name)
         roundingFactor = len(str(fabproc.dbu)) - 1
@@ -4662,9 +4721,10 @@ class layout_scene(editor_scene):
     def layoutLabelProperties(self, item):
         dlg = ldlg.layoutLabelProperties(self.editorWindow)
         dlg.labelName.setText(item.labelText)
-        dlg.labelLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
-                                   laylyr.pdkTextLayers])
-        dlg.labelLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
+        dlg.labelLayerCB.addItems(
+            [f"{layer.name} [{layer.purpose}]" for layer in laylyr.pdkTextLayers]
+        )
+        dlg.labelLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.familyCB.setCurrentText(item.fontFamily)
         dlg.fontStyleCB.setCurrentText(item.fontStyle)
         dlg.labelHeightCB.setCurrentText(str(int(item.fontHeight)))
@@ -4695,9 +4755,10 @@ class layout_scene(editor_scene):
         dlg.pinName.setText(item.pinName)
         dlg.pinDir.setCurrentText(item.pinDir)
         dlg.pinType.setCurrentText(item.pinType)
-        dlg.pinLayerCB.addItems([f'{item.name} [{item.layer.purpose}]' for item in
-                                 laylyr.pdkPinLayers])
-        dlg.pinLayerCB.setCurrentText(f'{item.layer.name} [{item.layer.purpose}]')
+        dlg.pinLayerCB.addItems(
+            [f"{item.name} [{item.layer.purpose}]" for item in laylyr.pdkPinLayers]
+        )
+        dlg.pinLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.pinBottomLeftX.setText(str(item.mapToScene(item.start).x() / fabproc.dbu))
         dlg.pinBottomLeftY.setText(str(item.mapToScene(item.start).y() / fabproc.dbu))
         dlg.pinTopRightX.setText(str(item.mapToScene(item.end).x() / fabproc.dbu))
