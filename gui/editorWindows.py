@@ -910,7 +910,7 @@ class editorWindow(QMainWindow):
         super().__init__()
         self.centralW = None
         self.viewItem = viewItem
-        self.file = self.viewItem.data(Qt.UserRole + 2)
+        self.file = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
         self.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
@@ -1580,7 +1580,6 @@ class layoutEditor(editorWindow):
 
     def createPolygonClick(self):
         self.centralW.scene.editModes.setMode("drawPolygon")
-        print(self.centralW.scene.editModes)
 
     def stretchClick(self, s):
         self.centralW.scene.editModes.setMode("stretchItem")
@@ -2554,7 +2553,6 @@ class symbol_scene(editor_scene):
                     self.selectionRectItem = None
         except Exception as e:
             print(e)
-
 
     def lineDraw(self, start: QPoint, current: QPoint):
         line = shp.line(start, current, self.gridTuple)
@@ -4073,8 +4071,7 @@ class layout_scene(editor_scene):
     def __init__(self, parent):
         super().__init__(parent)
         self.selectEdLayer = laylyr.pdkDrawingLayers[0]
-        self.layoutShapes = ["Inst", "Rect", "Path", "Label", "Via", "Pin",
-                             "Polygon"]
+        self.layoutShapes = ["Inst", "Rect", "Path", "Label", "Via", "Pin", "Polygon"]
         # draw modes
         self.editModes = ddef.layoutModes(
             selectItem=False,
@@ -4237,7 +4234,6 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse press error: {e}")
 
-
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         """
         Handle the mouse move event.
@@ -4262,12 +4258,6 @@ class layout_scene(editor_scene):
                     "Release mouse on the bottom left point"
                 )
                 self.newRect.end = self.mouseMoveLoc
-            # Handle drawing path mode
-            elif self.editModes.drawPath:
-
-                self.newPath.draftLine = QLineF(
-                    self.newPath.draftLine.p1(), self.mouseMoveLoc
-                )
             # Handle drawing pin mode
             elif self.editModes.drawPin and self.newPin is not None:
                 self.newPin.end = self.mouseMoveLoc
@@ -4281,6 +4271,11 @@ class layout_scene(editor_scene):
             if self.editModes.drawPin and self.newPin is None:
                 if self.newLabel is not None:
                     self.newLabel.start = self.mouseMoveLoc
+            # Handle drawing path mode
+            elif self.editModes.drawPath and self.newPath is not None:
+                self.newPath.draftLine = QLineF(
+                    self.newPath.draftLine.p1(), self.mouseMoveLoc
+                )
             # Handle adding label mode
             elif self.editModes.addLabel:
                 if self.newLabel is not None:  # already defined a new label
@@ -4312,9 +4307,10 @@ class layout_scene(editor_scene):
                     self.arrayVia.setPos(self.mouseMoveLoc - self.arrayVia.start)
                     self.arrayVia.setSelected(True)
             # Handle drawing polygon mode
-            elif self.editModes.drawPolygon and  self.newPolygon is not None:
+            elif self.editModes.drawPolygon and self.newPolygon is not None:
                 self.polygonGuideLine.setLine(
-                        QLineF(self.newPolygon.points[-1], self.mouseMoveLoc))
+                    QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
+                )
                 pass
                 # print(self.polygonGuideLine.line().p2())
                 # self.newPolygon.tempLastPoint = self.mouseMoveLoc
@@ -4343,7 +4339,9 @@ class layout_scene(editor_scene):
                 if self.editModes.drawRect:
                     self.newRect.setSelected(False)
                     self.newRect = None
-                elif self.editModes.drawPin:  # finish pin editing and start label editing
+                elif (
+                    self.editModes.drawPin
+                ):  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc, *self.newLabelTuple, self.gridTuple
@@ -4356,7 +4354,7 @@ class layout_scene(editor_scene):
                         self.newLabel = None
                 elif self.editModes.addInstance:
                     self.newInstance = None
-                    self.newInstance = None
+
                 elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
@@ -4379,6 +4377,11 @@ class layout_scene(editor_scene):
                     self.newPolygon = None
                     self.removeItem(self.polygonGuideLine)
                     self.polygonGuideLine = None
+                elif self.editModes.drawPath:
+                    if self.newPath.draftLine.length() < self.gridTuple[0]:
+                        self.removeItem(self.newPath)
+                    self.newPath = None
+                    self.editModes.setMode("selectItem")
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
 
@@ -4470,27 +4473,9 @@ class layout_scene(editor_scene):
                     except Exception as e:
                         self.logger.error(f"Cannot read pcell: {e}")
 
-    def layRectDraw(self, start: QPoint, end: QPoint, inputLayer: ddef.layLayer):
-        """
-        Draws a rectangle on the scene
-        """
-        rect = lshp.layoutRect(start, end, inputLayer, self.gridTuple)
-        # self.addItem(rect)
-        undoCommand = us.addShapeUndo(self, rect)
-        self.undoStack.push(undoCommand)
-        return rect
-
     def addUndoStack(self, item):
         undoCommand = us.addShapeUndo(self, item)
         self.undoStack.push(undoCommand)
-
-    # def finishItemEdit(self, item: lshp.layoutShape):
-    #     try:
-    #         self.resetSceneMode()  # reset drawing mode
-    #         item = None # remove reference to item
-    #         item.setSelected(False)
-    #     except Exception as e:
-    #         self.logger.error(f"{type(item)} drawing error")
 
     def findScenelayoutCellSet(self) -> set[lshp.layoutInstance]:
         """
@@ -4498,35 +4483,54 @@ class layout_scene(editor_scene):
         """
         return {item for item in self.items() if isinstance(item, lshp.layoutInstance)}
 
-    def saveLayoutCell(self, fileName: str) -> None:
+    def saveLayoutCell(self, filePathObj: pathlib.Path) -> None:
         """
         Save the layout cell items to a file.
 
         Args:
-            fileName (str): The name of the file to save the layout to.
+            fileName (pathlib.Path): filepath object for layout file.
 
         Returns:
             None
         """
-        # Only save the top-level items
-        topLevelItems = [item for item in self.items() if item.parentItem() is None]
-        topLevelItems.insert(0, {"cellView": "layout"})
-        with open(fileName, "w") as file:
-            try:
+        try:
+            # Only save the top-level items
+
+            topLevelItems = [item for item in self.items() if item.parentItem() is None]
+            topLevelItems.insert(0, {"cellView": "layout"})
+            with filePathObj.open("w") as file:
                 # Serialize items to JSON using layoutEncoder class
                 json.dump(topLevelItems, file, cls=layenc.layoutEncoder, indent=4)
-            except Exception as e:
-                self.logger.error(f"Cannot save layout: {e}")
+        except Exception as e:
+            self.logger.error(f"Cannot save layout: {e}")
 
-    def loadLayoutCell(self, fileName: str) -> None:
-        with open(fileName, "r") as file:
-            items = json.load(file)
-            for item in items[1:]:
-                if item["type"] in self.layoutShapes:
-                    itemShape = lj.createLayoutItems(
-                        item, self.libraryDict, self.gridTuple
-                    )
-                    self.addItem(itemShape)
+    def loadLayoutCell(self, filePathObj: pathlib.Path) -> None:
+        """
+        Load the layout cell from the given file path.
+
+        Args:
+            filePathObj (pathlib.Path): The file path object.
+
+        Returns:
+            None
+        """
+        try:
+            with filePathObj.open("r") as file:
+                decodedData = json.load(file)
+
+            # Create layout items for each item in decoded data
+            layoutItems = [
+                lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
+                for item in decodedData[1:]
+                if item.get("type")
+            ]
+
+            # Add shapes undo command to the undo stack
+            undoCommand = us.addShapesUndo(self, layoutItems)
+            self.undoStack.push(undoCommand)
+
+        except Exception as e:
+            self.logger.error(f"Cannot load layout: {e}")
 
     def keyPressEvent(self, key_event):
         super().keyPressEvent(key_event)
@@ -4835,9 +4839,9 @@ class editor_view(QGraphicsView):
         self.init_UI()
 
     def init_UI(self):
-        # self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
-        self.setOptimizationFlag(QGraphicsView.DontSavePainterState, True)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
+        # self.setOptimizationFlag(QGraphicsView.DontSavePainterState, True)
         self.setCacheMode(QGraphicsView.CacheBackground)
         self.standardCursor = QCursor(Qt.CrossCursor)
         self.setCursor(self.standardCursor)  # set cursor to standard arrow
@@ -5084,7 +5088,6 @@ class xyceNetlist:
         for viewName in netlistableViews:
             if viewName in viewDict:
                 viewTuple = ddef.viewTuple(item.libraryName, item.cellName, viewName)
-                # print(viewTuple)
                 if viewDict[viewName].viewType == "schematic":
                     cirFile.write(self.createXyceSymbolLine(item))
 

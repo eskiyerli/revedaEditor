@@ -160,85 +160,85 @@ def createSchematicItems(item, libraryDict, viewName: str, gridTuple: (int, int)
     """
     Create schematic items from json file.
     """
-    if item["type"] == "symbolShape":
-        libraryPath = libraryDict.get(item["lib"])
-        if libraryPath is None:
-            print(f'{item["lib"]} cannot be found.')
-            return None
-        cell = item["cell"]
-        instCounter = item["ic"]
-        itemShapes = list()
-        symbolAttributes = dict()
-        labelDict = item["ld"]
-        # find the symbol file
-        file = libraryPath.joinpath(cell, viewName + ".json")
-        # load json file and create shapes
-        with open(file, "r") as temp:
-            try:
-                shapes = json.load(temp)
-                for shape in shapes[1:]:
-                    if shape["type"] == "rect":
-                        itemShapes.append(createRectItem(shape, gridTuple))
-                    elif shape["type"] == "circle":
-                        itemShapes.append(createCircleItem(shape, gridTuple))
-                    elif shape["type"] == "arc":
-                        itemShapes.append(createArcItem(shape, gridTuple))
-                    elif shape["type"] == "line":
-                        itemShapes.append(createLineItem(shape, gridTuple))
-                    elif shape["type"] == "pin":
-                        itemShapes.append(createPinItem(shape, gridTuple))
-                    elif shape["type"] == "label":
-                        itemShapes.append(createLabelItem(shape, gridTuple))
-                    # just recreate attributes dictionary
-                    elif shape["type"] == "attr":
-                        symbolAttributes[shape["nam"]] = shape["def"]
-            except json.decoder.JSONDecodeError:
-                print("Error: Invalid Symbol file")
-        symbolInstance = shp.symbolShape(itemShapes, symbolAttributes, gridTuple)
-        symbolInstance.libraryName = item["lib"]
-        symbolInstance.cellName = item["cell"]
-        symbolInstance.counter = instCounter
-        symbolInstance.instanceName = item["nam"]
-        symbolInstance.angle = item.get("ang", 0)
-        symbolInstance.netlistIgnore = bool(item.get("ign", 0))
-        symbolInstance.viewName = viewName
-        symbolInstance.attributes = symbolAttributes
-        for labelItem in symbolInstance.labels.values():
-            if labelItem.labelName in labelDict.keys():
-                labelItem.labelValue = labelDict[labelItem.labelName][0]
-                labelItem.labelVisible = labelDict[labelItem.labelName][1]
-        symbolInstance.setPos(item["loc"][0], item["loc"][1])
-        return symbolInstance
+
+    libraryPath = libraryDict.get(item["lib"])
+    if libraryPath is None:
+        print(f'{item["lib"]} cannot be found.')
+        return None
+    cell = item["cell"]
+    instCounter = item["ic"]
+    itemShapes = list()
+    symbolAttributes = dict()
+    labelDict = item["ld"]
+    # find the symbol file
+    file = libraryPath.joinpath(cell, viewName + ".json")
+    # load json file and create shapes
+    with open(file, "r") as temp:
+        try:
+            shapes = json.load(temp)
+            for shape in shapes[1:]:
+                if shape["type"] == "rect":
+                    itemShapes.append(createRectItem(shape, gridTuple))
+                elif shape["type"] == "circle":
+                    itemShapes.append(createCircleItem(shape, gridTuple))
+                elif shape["type"] == "arc":
+                    itemShapes.append(createArcItem(shape, gridTuple))
+                elif shape["type"] == "line":
+                    itemShapes.append(createLineItem(shape, gridTuple))
+                elif shape["type"] == "pin":
+                    itemShapes.append(createPinItem(shape, gridTuple))
+                elif shape["type"] == "label":
+                    itemShapes.append(createLabelItem(shape, gridTuple))
+                # just recreate attributes dictionary
+                elif shape["type"] == "attr":
+                    symbolAttributes[shape["nam"]] = shape["def"]
+        except json.decoder.JSONDecodeError:
+            print("Error: Invalid Symbol file")
+    symbolInstance = shp.symbolShape(itemShapes, symbolAttributes, gridTuple)
+    symbolInstance.libraryName = item["lib"]
+    symbolInstance.cellName = item["cell"]
+    symbolInstance.counter = instCounter
+    symbolInstance.instanceName = item["nam"]
+    symbolInstance.angle = item.get("ang", 0)
+    symbolInstance.netlistIgnore = bool(item.get("ign", 0))
+    symbolInstance.viewName = viewName
+    symbolInstance.attributes = symbolAttributes
+    for labelItem in symbolInstance.labels.values():
+        if labelItem.labelName in labelDict.keys():
+            labelItem.labelValue = labelDict[labelItem.labelName][0]
+            labelItem.labelVisible = labelDict[labelItem.labelName][1]
+    symbolInstance.setPos(item["loc"][0], item["loc"][1])
+    return symbolInstance
 
 
 def createSchematicNets(item):
     """
     Create schematic items from json file.
     """
-    if item["type"] == "schematicNet":
-        start = QPoint(item["st"][0], item["st"][1])
-        end = QPoint(item["end"][0], item["end"][1])
-        position = QPoint(item["loc"][0], item["loc"][1])
-        netItem = net.schematicNet(start, end)
-        netItem.name = item["nam"]
-        netItem.nameSet = item["ns"]
-        netItem.setPos(position)
-        return netItem
+
+    start = QPoint(item["st"][0], item["st"][1])
+    end = QPoint(item["end"][0], item["end"][1])
+    position = QPoint(item["loc"][0], item["loc"][1])
+    netItem = net.schematicNet(start, end)
+    netItem.name = item["nam"]
+    netItem.nameSet = item["ns"]
+    netItem.setPos(position)
+    return netItem
 
 
 def createSchematicPins(item, gridTuple):
     """
     Create schematic items from json file.
     """
-    if item["type"] == "schematicPin":
-        start = QPoint(item["st"][0], item["st"][1])
-        pinName = item["pn"]
-        pinDir = item["pd"]
-        pinType = item["pt"]
-        pinItem = shp.schematicPin(start, pinName, pinDir, pinType, gridTuple)
-        pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
-        pinItem.angle = item["ang"]
-        return pinItem
+
+    start = QPoint(item["st"][0], item["st"][1])
+    pinName = item["pn"]
+    pinDir = item["pd"]
+    pinType = item["pt"]
+    pinItem = shp.schematicPin(start, pinName, pinDir, pinType, gridTuple)
+    pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
+    pinItem.angle = item["ang"]
+    return pinItem
 
 
 def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
@@ -248,37 +248,37 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     match item["type"]:
         case "Inst":
             return createLayoutInstance(gridTuple, item, libraryDict)
-        case "pcell":
-            libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
-            if libraryPath is None:
-                print(f'{item["lib"]} cannot be found.')
-                return None
-            cell = item["cell"]
-            viewName = item["view"]
-            instCounter = item["ic"]
-            # open pcell json file with reference to pcell class name
-            file = libraryPath.joinpath(cell, f"{viewName}.json")
-            with open(file, "r") as temp:
-                try:
-                    items = json.load(temp)
-                    if items[0]["cellView"] != "pcell":
-                        print("Not a pcell cell")
-                    else:
-                        pcellInstanceStr = (
-                            f"pcells."
-                            f'{items[1]["reference"]}(**item.__dict__'
-                            f"{gridTuple})"
-                        )
-                        pcellInstance = eval(pcellInstanceStr)
-                        pcellInstance.libraryName = item["lib"]
-                        pcellInstance.cellName = item["cell"]
-                        pcellInstance.counter = instCounter
-                        pcellInstance.instanceName = item["nam"]
-                        pcellInstance.setPos(item["loc"][0], item["loc"][1])
-                        pcellInstance.viewName = viewName
-                        return pcellInstance
-                except json.decoder.JSONDecodeError:
-                    print("Error: Invalid PCell file")
+        # case "pcell":
+        #     libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
+        #     if libraryPath is None:
+        #         print(f'{item["lib"]} cannot be found.')
+        #         return None
+        #     cell = item["cell"]
+        #     viewName = item["view"]
+        #     instCounter = item["ic"]
+        #     # open pcell json file with reference to pcell class name
+        #     file = libraryPath.joinpath(cell, f"{viewName}.json")
+        #     with open(file, "r") as temp:
+        #         try:
+        #             items = json.load(temp)
+        #             if items[0]["cellView"] != "pcell":
+        #                 print("Not a pcell cell")
+        #             else:
+        #                 pcellInstanceStr = (
+        #                     f"pcells."
+        #                     f'{items[1]["reference"]}(**item.__dict__'
+        #                     f"{gridTuple})"
+        #                 )
+        #                 pcellInstance = eval(pcellInstanceStr)
+        #                 pcellInstance.libraryName = item["lib"]
+        #                 pcellInstance.cellName = item["cell"]
+        #                 pcellInstance.counter = instCounter
+        #                 pcellInstance.instanceName = item["nam"]
+        #                 pcellInstance.setPos(item["loc"][0], item["loc"][1])
+        #                 pcellInstance.viewName = viewName
+        #                 return pcellInstance
+        #         except json.decoder.JSONDecodeError:
+        #             print("Error: Invalid PCell file")
         case "Rect":
             return createRectShape(item, gridTuple)
         case "Path":

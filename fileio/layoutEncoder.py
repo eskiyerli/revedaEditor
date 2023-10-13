@@ -32,21 +32,110 @@ import revedaEditor.common.layoutShapes as lshp
 
 class layoutEncoder(json.JSONEncoder):
     def default(self, item):
-        pass
-        # match type(item):
-        #     case lshp.layoutRect:
-        #         itemDict = {"type": "Rect"}
-        #     case lshp.layoutPath:
-        #         itemDict = {"type": "Path"}
-        #     case lshp.layoutViaArray:
-        #         itemDict = {"type": "Via"}
-        #     case lshp.layoutPin:
-        #         itemDict = {"type": "Pin"}
-        #     case lshp.layoutLabel:
-        #         itemDict = {"type": "Label"}
-        #     case lshp.layoutInstance:
-        #         itemDict = {"type": "Inst"}
-        # return itemDict
+        match type(item):
+            case lshp.layoutInstance:
+                itemDict = {
+                    "type": "Inst",
+                    "lib": item.libraryName,
+                    "cell": item.cellName,
+                    "view": item.viewName,
+                    "nam": item.instanceName,
+                    "ic": item.counter,
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
+            case lshp.layoutRect:
+                itemDict = {
+                    "type": "Rect",
+                    "tl": item.mapToScene(item.rect.topLeft()).toTuple(),
+                    "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
+                    "ang": item.angle,
+                    "ln": laylyr.pdkAllLayers.index(item.layer),
+                }
+            case lshp.layoutPath:
+                itemDict = {
+                    "type": "Path",
+                    "dfl1": item.mapToScene(item.draftLine.p1()).toTuple(),
+                    "dfl2": item.mapToScene(item.draftLine.p2()).toTuple(),
+                    "ln": laylyr.pdkDrawingLayers.index(item.layer),
+                    "w": item.width,
+                    "se": item.startExtend,
+                    "ee": item.endExtend,
+                    "md": item.mode,
+                    "nam": item.name,
+                    "ang": item.angle,
+                }
+            case lshp.layoutViaArray:
+                viaDict = {
+                    "st": item.via.mapToScene(item.via.start).toTuple(),
+                    "vdt": item.via.viaDefTuple.name,
+                    "w": item.via.width,
+                    "h": item.via.height,
+                }
+                itemDict = {
+                    "type": "Via",
+                    "st": item.mapToScene(item.start).toTuple(),
+                    "via": viaDict,
+                    "sp": item.spacing,
+                    "xn": item.xnum,
+                    "yn": item.ynum,
+                }
+            case lshp.layoutPin:
+                itemDict = {
+                    "type": "Pin",
+                    "tl": item.mapToScene(item.rect.topLeft()).toTuple(),
+                    "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
+                    "pn": item.pinName,
+                    "pd": item.pinDir,
+                    "pt": item.pinType,
+                    "ln": laylyr.pdkPinLayers.index(item.layer),
+                }
+            case lshp.layoutLabel:
+                itemDict = {
+                    "type": "Label",
+                    "st": item.mapToScene(item.start).toTuple(),
+                    "lt": item.labelText,
+                    "ff": item.fontFamily,
+                    "fs": item.fontStyle,
+                    "fh": item.fontHeight,
+                    "la": item.labelAlign,
+                    "lo": item.labelOrient,
+                    "ln": laylyr.pdkTextLayers.index(item.layer)
+                }
+
+            case lshp.layoutPolygon:
+                pointsList = [item.mapToScene(point).toTuple() for point in item.points]
+                itemDict = {
+                    "type": "Polygon",
+                    "ps": pointsList,
+                    "ln": laylyr.pdkAllLayers.index(item.layer),
+                }
+            case default:  # now check super class types:
+                match item.__class__.__bases__[0]:
+                    case lshp.pcell:
+                        init_args = inspect.signature(
+                            item.__class__.__init__
+                        ).parameters
+                        args_used = [
+                            param
+                            for param in init_args
+                            if (param != "self" and param != "gridTuple")
+                        ]
+
+                        argDict = {arg: getattr(item, arg) for arg in args_used}
+                        # print(argDict)
+                        itemDict = {
+                            "type": "pcell",
+                            "lib": item.libraryName,
+                            "cell": item.cellName,
+                            "view": item.viewName,
+                            "nam": item.instanceName,
+                            "ic": item.counter,
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle,
+                            "params": argDict,
+                        }
+        return itemDict
 
         # match type(item):
         #     case lshp.layoutInstance:
@@ -60,14 +149,7 @@ class layoutEncoder(json.JSONEncoder):
         #             "loc": (item.scenePos() - item.scene().origin).toTuple(),
         #             "ang": item.angle,
         #         }
-        #     case lshp.layoutRect:
-        #         itemDict = {
-        #             "type": "Rect",
-        #             "tl": item.mapToScene(item.rect.topLeft()).toTuple(),
-        #             "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
-        #             "ang": item.angle,
-        #             "ln": laylyr.pdkAllLayers.index(item.layer),
-        #         }
+
         #     case lshp.layoutPath:
         #         itemDict = {
         #             "type": "Path",
