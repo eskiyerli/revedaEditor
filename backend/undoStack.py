@@ -72,13 +72,23 @@ class addShapesUndo(QUndoCommand):
         super().__init__()
         self._scene = scene
         self._shapes = shapes
-        self.setText("Draw Shape")
+        self.setText("Add Shapes")
 
     def undo(self):
         [self._scene.removeItem(item) for item in self._shapes]
 
     def redo(self):
         [self._scene.addItem(item) for item in self._shapes]
+
+class loadShapesUndo(addShapesUndo):
+    """
+    A hack to load the file but disallow the undo
+    """
+    def __init__(self, scene:QGraphicsScene, shapes:list[QGraphicsItem]):
+        super().__init__(scene, shapes)
+
+    def undo(self):
+        pass
 
 class deleteShapeUndo(QUndoCommand):
     def __init__(self, scene:QGraphicsScene, shape:QGraphicsItem):

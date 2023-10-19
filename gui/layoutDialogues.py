@@ -15,37 +15,12 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
-#   Add-ons and extensions developed for this software may be distributed
-#   under their own separate licenses.
-#
-#    Software: Revolution EDA
-#    License: Mozilla Public License 2.0
-#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-#
-
-#    “Commons Clause” License Condition v1.0
-#   #
-#    The Software is provided to you by the Licensor under the License, as defined
-#    below, subject to the following condition.
-#
-#    Without limiting other conditions in the License, the grant of rights under the
-#    License will not include, and the License does not grant to you, the right to
-#    Sell the Software.
-#
-#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
-#    derives, entirely or substantially, from the functionality of the Software. Any
-#    license notice or attribution required by the License must also include this
-#    Commons Clause License Condition notice.
-#
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 import importlib
-import inspect
+
 
 from PySide6.QtGui import (QStandardItem, QFontDatabase, QDoubleValidator, QValidator,)
 from PySide6.QtWidgets import (
@@ -70,7 +45,7 @@ import pdk.process as fabproc
 
 
 class pcellInstanceDialog(QDialog):
-    def __init__(self, parent, item: lshp.pcell):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("PCell Instance Options")
@@ -80,33 +55,19 @@ class pcellInstanceDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         vLayout = QVBoxLayout()
         instanceParamsGroup = QGroupBox("Instance Parameters")
-        instanceParamsLayout = QFormLayout()
-        instanceParamsGroup.setLayout(instanceParamsLayout)
-        if item.__class__.__bases__[0] == lshp.pcell:
-            self.pcellLibName = edf.shortLineEdit()
-            self.pcellLibName.setReadOnly(True)
-            self.pcellLibName.setText(item.libraryName)
-            instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
-            self.pcellCellName = edf.shortLineEdit()
-            self.pcellCellName.setReadOnly(True)
-            self.pcellCellName.setText(item.cellName)
-            instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
-            self.pcellName = edf.shortLineEdit()
-            self.pcellName.setReadOnly(True)
-            self.pcellName.setText(item.viewName)
-            instanceParamsLayout.addRow("PCell Name:", self.pcellName)
-            initArgs = inspect.signature(item.__class__.__init__).parameters
-            argsUsed = [
-                param
-                for param in initArgs
-                if (param != "self" and param != "gridTuple")
-            ]
-            argDict = {arg: getattr(item, arg) for arg in argsUsed}
-            self.lineEditDict = {
-                key: edf.shortLineEdit(value) for key, value in argDict.items()
-            }
-            for key, value in self.lineEditDict.items():
-                instanceParamsLayout.addRow(key, value)
+        self.instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(self.instanceParamsLayout)
+
+        self.pcellLibName = edf.shortLineEdit()
+        self.pcellLibName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
+        self.pcellCellName = edf.shortLineEdit()
+        self.pcellCellName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
+        self.pcellName = edf.shortLineEdit()
+        self.pcellName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell Name:", self.pcellName)
+
         vLayout.addWidget(instanceParamsGroup)
 
         vLayout.addWidget(self.buttonBox)

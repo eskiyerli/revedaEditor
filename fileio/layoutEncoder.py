@@ -112,7 +112,7 @@ class layoutEncoder(json.JSONEncoder):
                 }
             case default:  # now check super class types:
                 match item.__class__.__bases__[0]:
-                    case lshp.pcell:
+                    case lshp.layoutPcell:
                         init_args = inspect.signature(
                             item.__class__.__init__
                         ).parameters
@@ -125,7 +125,7 @@ class layoutEncoder(json.JSONEncoder):
                         argDict = {arg: getattr(item, arg) for arg in args_used}
                         # print(argDict)
                         itemDict = {
-                            "type": "pcell",
+                            "type": "Pcell",
                             "lib": item.libraryName,
                             "cell": item.cellName,
                             "view": item.viewName,

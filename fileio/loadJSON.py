@@ -24,6 +24,7 @@
 
 import json
 import pdk.process as fabproc
+import pdk.pcells as pcell
 from PySide6.QtCore import (
     QPoint,
     QLineF,
@@ -248,37 +249,34 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
     match item["type"]:
         case "Inst":
             return createLayoutInstance(gridTuple, item, libraryDict)
-        # case "pcell":
-        #     libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
-        #     if libraryPath is None:
-        #         print(f'{item["lib"]} cannot be found.')
-        #         return None
-        #     cell = item["cell"]
-        #     viewName = item["view"]
-        #     instCounter = item["ic"]
-        #     # open pcell json file with reference to pcell class name
-        #     file = libraryPath.joinpath(cell, f"{viewName}.json")
-        #     with open(file, "r") as temp:
-        #         try:
-        #             items = json.load(temp)
-        #             if items[0]["cellView"] != "pcell":
-        #                 print("Not a pcell cell")
-        #             else:
-        #                 pcellInstanceStr = (
-        #                     f"pcells."
-        #                     f'{items[1]["reference"]}(**item.__dict__'
-        #                     f"{gridTuple})"
-        #                 )
-        #                 pcellInstance = eval(pcellInstanceStr)
-        #                 pcellInstance.libraryName = item["lib"]
-        #                 pcellInstance.cellName = item["cell"]
-        #                 pcellInstance.counter = instCounter
-        #                 pcellInstance.instanceName = item["nam"]
-        #                 pcellInstance.setPos(item["loc"][0], item["loc"][1])
-        #                 pcellInstance.viewName = viewName
-        #                 return pcellInstance
-        #         except json.decoder.JSONDecodeError:
-        #             print("Error: Invalid PCell file")
+        case "Pcell":
+            libraryPath = pathlib.Path(libraryDict.get(item["lib"]))
+            if libraryPath is None:
+                print(f'{item["lib"]} cannot be found.')
+                return None
+            cell = item["cell"]
+            viewName = item["view"]
+            # open pcell json file with reference to pcell class name
+            file = libraryPath.joinpath(cell, f"{viewName}.json")
+            with file.open("r") as temp: # open pcell view item
+                try:
+                    pcellDef = json.load(temp)
+                    if pcellDef[0]["cellView"] != "pcell":
+                        print("Not a pcell cell")
+                    else:
+                        print(f'pcell.{pcellDef[1]["reference"]}({gridTuple})')
+                        pcellInstance = eval(f'pcell.{pcellDef[1]["reference"]}({gridTuple})')
+                        pcellInstance(**item["params"])
+                        pcellInstance.libraryName = item["lib"]
+                        pcellInstance.cellName = item["cell"]
+                        pcellInstance.viewName = item["view"]
+                        pcellInstance.counter = item["ic"]
+                        pcellInstance.instanceName = item["nam"]
+                        pcellInstance.setPos(QPoint(item["loc"][0], item["loc"][1]))
+                        # pcellInstance(**item["params"])
+                        return pcellInstance
+                except json.decoder.JSONDecodeError:
+                    print("Error: Invalid PCell file")
         case "Rect":
             return createRectShape(item, gridTuple)
         case "Path":

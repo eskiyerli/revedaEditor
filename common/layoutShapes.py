@@ -423,7 +423,7 @@ class layoutRect(layoutShape):
 
 
 class layoutInstance(layoutShape):
-    def __init__(self, shapes: list, gridTuple: tuple[int, int]):
+    def __init__(self, shapes: list[layoutShape], gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
         assert shapes is not None  # must not be an empty list
         self._shapes = shapes  # list of shapes in the symbol
@@ -517,15 +517,7 @@ class layoutInstance(layoutShape):
         shape.setParentItem(self)
 
 
-class layoutCell(layoutInstance):
-    def __init__(self, shapes: list, gridTuple):
-        super().__init__(shapes, gridTuple)
-
-    def __repr__(self):
-        return f"layoutCell({self._shapes}, {self._gridTuple})"
-
-
-class pcell(layoutInstance):
+class layoutPcell(layoutInstance):
     def __init__(self, shapes: list, gridTuple: tuple[int, int]):
         super().__init__(shapes, gridTuple)
 
