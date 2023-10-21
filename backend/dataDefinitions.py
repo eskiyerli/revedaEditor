@@ -114,6 +114,7 @@ class editModes:
     copyItem: bool
     rotateItem: bool
     changeOrigin: bool
+    panView: bool
 
     def setMode(self, attribute):
         for key in self.__dict__.keys():
