@@ -53,7 +53,7 @@ import pathlib
 import shutil
 from copy import deepcopy
 import inspect
-
+from quantiphy import Quantity
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
 #     import revedasim.simMainWindow as smw
@@ -61,7 +61,6 @@ import inspect
 # import numpy as np
 from PySide6.QtCore import (
     QEvent,
-    QMargins,
     QPoint,
     QPointF,
     QProcess,
@@ -1350,6 +1349,7 @@ class layoutEditor(editorWindow):
         self.setWindowIcon(QIcon(":/icons/edLayer-shape.png"))
         self.layoutViews = ["layout", "pcell"]
         self.layoutChooser = None
+        self.gdsExportDir = pathlib.Path.cwd()
         self._addActions()
         self._layoutActions()
 
@@ -1630,18 +1630,48 @@ class layoutEditor(editorWindow):
             )
 
     def exportGDSClick(self):
-        dlg = fd.gdsExportDialogue(self)
+        """
+        This function handles the export of the GDS file.
+        It opens a dialogue window to get export settings from the user.
+        The exported GDS file is saved in the specified directory.
+        After export, the cell is saved and reloaded to update item positions.
+        The layout is then loaded and exported to GDS format.
+        """
 
+        # Open export dialogue window
+        dlg = fd.gdsExportDialogue(self)
+        dlg.unitEdit.setText("1 um")
+        dlg.precisionEdit.setText("1 nm")
+        dlg.exportPathEdit.setText(str(self.gdsExportDir))
+
+        # Get export settings from user
         if dlg.exec() == QDialog.Accepted:
-            exportPathObj = pathlib.Path(dlg.exportPathEdit.text().strip())
-            layoutItems = self.centralW.scene.items()
-            gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, exportPathObj)
+            self.gdsExportDir = pathlib.Path(dlg.exportPathEdit.text().strip())
+            gdsExportPath = self.gdsExportDir / f"{self.cellName}.gds"
+
+            # Save and reload the cell to update item positions
+            self.checkSaveCell()
+            self.centralW.scene.clear()
+            self.loadLayout()
+
+            # Get layout items to export
+            layoutItems = [item for item in self.centralW.scene.items() if item.parentItem()
+                           is None]
+
+            # Create GDS exporter object
+            gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, gdsExportPath)
+
+            # Set unit and precision for export
+            gdsExportObj.unit = Quantity(dlg.unitEdit.text().strip()).real
+            gdsExportObj.precision = Quantity(dlg.precisionEdit.text().strip()).real
+
+            # Start GDS export in a separate thread
             if gdsExportObj:
                 gdsExportRunner = startThread(gdsExportObj.gds_export())
                 self.appMainW.threadPool.start(gdsExportRunner)
-                # netlistObj.writeNetlist()
-                self.logger.info("GDS Export is finished.")
 
+                # Log completion of GDS export
+                self.logger.info("GDS Export is finished.")
 
     def closeEvent(self, event):
         self.checkSaveCell()
@@ -4410,7 +4440,7 @@ class layout_scene(editor_scene):
             # Handle adding instance mode with layout instance tuple
             elif self.editModes.addInstance and self.layoutInstanceTuple is not None:
                 if self.newInstance is None:
-                    self.newInstance = self.instLayout()
+                    self.newInstance = self.addLayoutInstance()
                     # if new instance is a pcell, start a dialogue for pcell parameters
                     if isinstance(self.newInstance, lshp.layoutPcell):
                         dlg = ldlg.pcellInstanceDialog(self.editorWindow)
@@ -4423,7 +4453,7 @@ class layout_scene(editor_scene):
                         if dlg.exec() == QDialog.Accepted:
                             instanceValuesDict = {}
                             for key, value in lineEditDict.items():
-                                instanceValuesDict[key] = value.text()
+                                instanceValuesDict[key] = float(value.text())
                             self.newInstance(*instanceValuesDict.values())
                     self.addUndoStack(self.newInstance)
                 self.newInstance.setPos(self.mouseMoveLoc - self.newInstance.start)
@@ -4494,21 +4524,20 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
 
-    def drawInstance(self, pos: QPoint):
-        """
-        Add an instance of a symbol to the scene.
-        """
-        try:
-            instance = self.instLayout(pos)
-            self.addItem(instance)
-            self.itemCounter += 1
-            undoCommand = us.addShapeUndo(self, instance)
-            self.undoStack.push(undoCommand)
-            return instance
-        except Exception as e:
-            self.logger.error(f"Cannot draw instance: {e}")
+    # def drawInstance(self, pos: QPoint):
+    #     """
+    #     Add an instance of a symbol to the scene.
+    #     """
+    #     try:
+    #         instance = self.instLayout(pos)
+    #         self.itemCounter += 1
+    #         undoCommand = us.addShapeUndo(self, instance)
+    #         self.undoStack.push(undoCommand)
+    #         return instance
+    #     except Exception as e:
+    #         self.logger.error(f"Cannot draw instance: {e}")
 
-    def instLayout(self):
+    def addLayoutInstance(self):
         """
         Read a layout file and create layoutShape objects from it.
         """
@@ -4527,13 +4556,7 @@ class layout_scene(editor_scene):
                                 for item in decodedData[1:]
                                 if item.get("type") in self.layoutShapes
                             ]
-                            # shapes = []
-                            # for item in items[1:]:
-                            #     shapes.append(
-                            #         lj.createLayoutItems(
-                            #             item, self.libraryDict, self.gridTuple
-                            #         )
-                            #     )
+
                             layoutInstance = lshp.layoutInstance(
                                 instanceShapes, self.gridTuple
                             )
@@ -4663,6 +4686,8 @@ class layout_scene(editor_scene):
             if self.selectedItems() is not None:
                 for item in self.selectedItems():
                     match type(item):
+                        case lshp.layoutInstance:
+                            self.layoutInstanceProperties(item)
                         case lshp.layoutRect:
                             self.layoutRectProperties(item)
                         case lshp.layoutPin:
@@ -4928,14 +4953,15 @@ class layout_scene(editor_scene):
             for row in range(4,rowCount): # first 4 rows are already processed.
                 labelText = dlg.instanceParamsLayout.itemAt(row,
                                                 QFormLayout.LabelRole).widget().text()
-                paramValue = dlg.instanceParamsLayout.itemAt(row,
-                                                        QFormLayout.FieldRole).widget().text()
+                paramValue = float(dlg.instanceParamsLayout.itemAt(row,
+                                                        QFormLayout.FieldRole).widget().text())
                 instParamDict[labelText] = paramValue
 
             item(**instParamDict)
 
 
-
+    def layoutInstanceProperties(self, item):
+        pass
 
     def extractPcellInstanceParameters(self, instance:lshp.layoutPcell) -> dict:
         initArgs = inspect.signature(

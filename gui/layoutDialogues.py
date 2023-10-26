@@ -24,6 +24,8 @@
 #
 
 import importlib
+from typing import Optional
+import PySide6.QtCore
 
 
 from PySide6.QtGui import (QStandardItem, QFontDatabase, QDoubleValidator, QValidator,)
@@ -652,3 +654,16 @@ class layoutPolygonProperties(QDialog):
                 self.polygonGroupLayout.removeWidget(widget)
                 widget.deleteLater()
             self.adjustSize()
+
+class layoutInstancePropertiesDialog(QDialog):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+
+        self.setWindowTitle("Layout Instance Properties")
+        self.setMinimumWidth(300)
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.mainLayout = QVBoxLayout()
+        

@@ -41,7 +41,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
-    QGraphicsSimpleTextItem,
     QGraphicsSceneMouseEvent,
     QGraphicsSceneHoverEvent,
 )
@@ -425,25 +424,34 @@ class layoutRect(layoutShape):
 class layoutInstance(layoutShape):
     def __init__(self, shapes: list[layoutShape], gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
-        assert shapes is not None  # must not be an empty list
+        # assert shapes is not None  # must not be an empty list
         self._shapes = shapes  # list of shapes in the symbol
         self._draft = False
         self._libraryName = ""
         self._cellName = ""
         self._viewName = ""
         self._instanceName = ""
-        self._drawings = list()
         self._counter = 0
         self._selectedPen = QPen(QColor("yellow"), 1, Qt.DashLine)
-        for item in self._shapes:
-            item.setFlag(QGraphicsItem.ItemIsSelectable, False)
-            item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
-            item.setParentItem(self)
-            self._drawings.append(item)
+        self.setShapes()
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
         self._start = self.childrenBoundingRect().topLeft()
+
+    def setShapes(self):
+        for item in self._shapes:
+            item.setFlag(QGraphicsItem.ItemIsSelectable, False)
+            item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
+            item.setParentItem(self)
+
+    def removeShapes(self):
+        self.prepareGeometryChange()
+        scene = self.scene()
+        for item in self._shapes:
+            item.setParentItem(None)
+            del item
+        self._shapes = list()
 
     def __repr__(self):
         return f"layoutInstance({self._shapes}, {self._gridTuple})"
@@ -503,17 +511,17 @@ class layoutInstance(layoutShape):
         return self._shapes
 
     @shapes.setter
-    def shapes(self, value: list):
+    def shapes(self, value: list[layoutShape]):
+        self.removeShapes()
         self._shapes = value
-        for shape in self._shapes:
-            shape.setParentItem(self)
+        self.setShapes()
 
     @property
     def start(self):
         return self._start.toPoint()
 
-    def addShape(self, shape: QGraphicsItem):
-        self._drawings.append(shape)
+    def addShape(self, shape: layoutShape):
+        self._shapes.append(shape)
         shape.setParentItem(self)
 
 
