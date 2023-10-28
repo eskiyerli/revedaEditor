@@ -24,8 +24,7 @@
 #
 
 import importlib
-from typing import Optional
-import PySide6.QtCore
+import inspect
 
 
 from PySide6.QtGui import (QStandardItem, QFontDatabase, QDoubleValidator, QValidator,)
@@ -665,5 +664,32 @@ class layoutInstancePropertiesDialog(QDialog):
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.mainLayout = QVBoxLayout()
+        vLayout = QVBoxLayout()
+        instanceParamsGroup = QGroupBox("Instance Parameters")
+        self.instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(self.instanceParamsLayout)
+        self.instanceLibName = edf.shortLineEdit()
+        self.instanceLibName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance Library:", self.instanceLibName)
+        self.instanceCellName = edf.shortLineEdit()
+        self.instanceCellName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance Cell:", self.instanceCellName)
+        self.instanceViewName = edf.shortLineEdit()
+        self.instanceViewName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance View:", self.instanceViewName)
+        self.instanceNameEdit = edf.shortLineEdit()
+        self.instanceParamsLayout.addRow("Instance Name:", self.instanceNameEdit)
+        vLayout.addWidget(instanceParamsGroup)
+
+        self.locationGroup = QGroupBox("Location")
+        self.locationLayout = QFormLayout()
+        self.locationGroup.setLayout(self.locationLayout)
+        self.xEdit = edf.shortLineEdit()
+        self.yEdit = edf.shortLineEdit()
+        self.locationLayout.addRow("Location X:", self.xEdit)
+        self.locationLayout.addRow("Location Y:", self.yEdit)
+        vLayout.addWidget(self.locationGroup)
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
+        self.show()
         

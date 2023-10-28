@@ -784,3 +784,23 @@ class selectConfigDialogue(QDialog):
         vLayout.addWidget(self.buttonBox)
         self.setLayout(vLayout)
         self.show()
+
+class moveByDialogue(QDialog):
+    def __init__(self,parent):
+        super().__init__(parent=parent)
+        self.setWindowTitle("Move By")
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.mainLayout = QVBoxLayout()
+        coordsGroup = QGroupBox("Move By")
+        coordsLayout = QFormLayout()
+        self.xEdit = edf.shortLineEdit()
+        self.yEdit = edf.shortLineEdit()
+        coordsLayout.addRow("Move By in X:", self.xEdit)
+        coordsLayout.addRow("Move By in Y:", self.yEdit)
+        coordsGroup.setLayout(coordsLayout)
+        self.mainLayout.addWidget(coordsGroup)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+

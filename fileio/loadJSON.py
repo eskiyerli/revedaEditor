@@ -39,7 +39,7 @@ import pdk.layoutLayers as laylyr
 import pathlib
 
 
-def createSymbolItems(item, gridTuple):
+def createSymbolItems(item:dict, gridTuple):
     """
     Create symbol items from json file.
     """
@@ -157,7 +157,7 @@ def createSymbolAttribute(item):
         return se.symbolAttribute(item["nam"], item["def"])
 
 
-def createSchematicItems(item, libraryDict, viewName: str, gridTuple: (int, int)):
+def createSchematicItems(item:dict, libraryDict, viewName: str, gridTuple: (int, int)):
     """
     Create schematic items from json file.
     """
@@ -242,7 +242,7 @@ def createSchematicPins(item, gridTuple):
     return pinItem
 
 
-def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
+def createLayoutItems(item:dict, libraryDict: dict, gridTuple: (int, int)):
     """
     Create layout items from json file.
     """
@@ -264,7 +264,6 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
                     if pcellDef[0]["cellView"] != "pcell":
                         print("Not a pcell cell")
                     else:
-                        print(f'pcell.{pcellDef[1]["reference"]}({gridTuple})')
                         pcellInstance = eval(f'pcell.{pcellDef[1]["reference"]}({gridTuple})')
                         pcellInstance(**item["params"])
                         pcellInstance.libraryName = item["lib"]
@@ -273,7 +272,6 @@ def createLayoutItems(item, libraryDict: dict, gridTuple: (int, int)):
                         pcellInstance.counter = item["ic"]
                         pcellInstance.instanceName = item["nam"]
                         pcellInstance.setPos(QPoint(item["loc"][0], item["loc"][1]))
-                        # pcellInstance(**item["params"])
                         return pcellInstance
                 except json.decoder.JSONDecodeError:
                     print("Error: Invalid PCell file")

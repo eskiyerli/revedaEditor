@@ -65,6 +65,7 @@ class layoutShape(QGraphicsItem):
     def __repr__(self):
         return f"layoutShape({self._gridTuple})"
 
+
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
@@ -178,6 +179,7 @@ class layoutShape(QGraphicsItem):
 
     def contextMenuEvent(self, event):
         self.scene().itemContextMenu.exec_(event.screenPos())
+
 
     @staticmethod
     def snapToBase(number, base):
@@ -530,7 +532,7 @@ class layoutPcell(layoutInstance):
         super().__init__(shapes, gridTuple)
 
     def __repr__(self):
-        return f"pcell({self._shapes}, {self._gridTuple}"
+        return f"layoutPcell({self._shapes}, {self._gridTuple}"
 
 
 class layoutLine(layoutShape):
@@ -583,6 +585,7 @@ class layoutPath(layoutShape):
         mode: int = 0,
     ):
         super().__init__(gridTuple)
+        self.start = None
         self._draftLine = draftLine
         self._startExtend = startExtend
         self._endExtend = endExtend
@@ -597,8 +600,7 @@ class layoutPath(layoutShape):
         self._definePensBrushes()
         self._rect = QRectF(0, 0, 0, 0)
         self._angle = 0
-        angle = self._draftLine.angle()
-        self._rectCorners(angle)
+        self._rectCorners( self._draftLine.angle())
 
 
     def _definePensBrushes(self):

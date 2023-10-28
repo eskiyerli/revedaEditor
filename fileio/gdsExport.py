@@ -24,10 +24,8 @@
 #
 
 import gdstk
-import pdk.layoutLayers as laylyr
 import revedaEditor.common.layoutShapes as lshp
 import pathlib
-from quantiphy import Quantity
 
 
 class gdsExporter:
@@ -106,7 +104,7 @@ class gdsExporter:
             case default:  # now check super class types:
                 match item.__class__.__bases__[0]:
                     case lshp.layoutPcell:
-                        print(item.__dict__)
+                        print(item.shapes)
 
         @property
         def unit(self):
