@@ -15,12 +15,17 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
+
 import importlib
 import inspect
+
 
 from PySide6.QtGui import (QStandardItem, QFontDatabase, QDoubleValidator, QValidator,)
 from PySide6.QtWidgets import (
@@ -45,7 +50,7 @@ import pdk.process as fabproc
 
 
 class pcellInstanceDialog(QDialog):
-    def __init__(self, parent, item: lshp.pcell):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("PCell Instance Options")
@@ -54,42 +59,44 @@ class pcellInstanceDialog(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         vLayout = QVBoxLayout()
+
         instanceParamsGroup = QGroupBox("Instance Parameters")
-        instanceParamsLayout = QFormLayout()
-        instanceParamsGroup.setLayout(instanceParamsLayout)
-        if item.__class__.__bases__[0] == lshp.pcell:
-            self.pcellLibName = edf.shortLineEdit()
-            self.pcellLibName.setReadOnly(True)
-            self.pcellLibName.setText(item.libraryName)
-            instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
-            self.pcellCellName = edf.shortLineEdit()
-            self.pcellCellName.setReadOnly(True)
-            self.pcellCellName.setText(item.cellName)
-            instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
-            self.pcellName = edf.shortLineEdit()
-            self.pcellName.setReadOnly(True)
-            self.pcellName.setText(item.viewName)
-            instanceParamsLayout.addRow("PCell Name:", self.pcellName)
-            initArgs = inspect.signature(item.__class__.__init__).parameters
-            argsUsed = [
-                param
-                for param in initArgs
-                if (param != "self" and param != "gridTuple")
-            ]
-            argDict = {arg: getattr(item, arg) for arg in argsUsed}
-            self.lineEditDict = {
-                key: edf.shortLineEdit(value) for key, value in argDict.items()
-            }
-            for key, value in self.lineEditDict.items():
-                instanceParamsLayout.addRow(key, value)
+        self.instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(self.instanceParamsLayout)
+        self.pcellLibName = edf.shortLineEdit()
+        self.pcellLibName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell Library:", self.pcellLibName)
+        self.pcellCellName = edf.shortLineEdit()
+        self.pcellCellName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell Cell:", self.pcellCellName)
+        self.pcellViewName = edf.shortLineEdit()
+        self.pcellViewName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("PCell View:", self.pcellViewName)
         vLayout.addWidget(instanceParamsGroup)
 
+        self.locationGroup = QGroupBox("Location")
+        self.locationLayout = QFormLayout()
+        self.locationGroup.setLayout(self.locationLayout)
+        self.xEdit = edf.shortLineEdit()
+        self.yEdit = edf.shortLineEdit()
+        self.locationLayout.addRow("Location X:", self.xEdit)
+        self.locationLayout.addRow("Location Y:", self.yEdit)
+        vLayout.addWidget(self.locationGroup)
+        self.locationGroup.hide()
         vLayout.addWidget(self.buttonBox)
         self.setLayout(vLayout)
         self.show()
 
 
-class pcellSettingDialogue(QDialog):
+class pcellInstancePropertiesDialog(pcellInstanceDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("PCell Instance Properties")
+        self.instanceNameEdit = edf.shortLineEdit()
+        self.instanceParamsLayout.addRow("Instance Name:", self.instanceNameEdit)
+        self.locationGroup.show()
+
+class pcellLinkDialogue(QDialog):
     def __init__(self, parent, viewItem: QStandardItem, module: str):
         super().__init__(parent)
         # self.logger = parent.logger
@@ -646,3 +653,43 @@ class layoutPolygonProperties(QDialog):
                 self.polygonGroupLayout.removeWidget(widget)
                 widget.deleteLater()
             self.adjustSize()
+
+class layoutInstancePropertiesDialog(QDialog):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+
+        self.setWindowTitle("Layout Instance Properties")
+        self.setMinimumWidth(300)
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        vLayout = QVBoxLayout()
+        instanceParamsGroup = QGroupBox("Instance Parameters")
+        self.instanceParamsLayout = QFormLayout()
+        instanceParamsGroup.setLayout(self.instanceParamsLayout)
+        self.instanceLibName = edf.shortLineEdit()
+        self.instanceLibName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance Library:", self.instanceLibName)
+        self.instanceCellName = edf.shortLineEdit()
+        self.instanceCellName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance Cell:", self.instanceCellName)
+        self.instanceViewName = edf.shortLineEdit()
+        self.instanceViewName.setReadOnly(True)
+        self.instanceParamsLayout.addRow("Instance View:", self.instanceViewName)
+        self.instanceNameEdit = edf.shortLineEdit()
+        self.instanceParamsLayout.addRow("Instance Name:", self.instanceNameEdit)
+        vLayout.addWidget(instanceParamsGroup)
+
+        self.locationGroup = QGroupBox("Location")
+        self.locationLayout = QFormLayout()
+        self.locationGroup.setLayout(self.locationLayout)
+        self.xEdit = edf.shortLineEdit()
+        self.yEdit = edf.shortLineEdit()
+        self.locationLayout.addRow("Location X:", self.xEdit)
+        self.locationLayout.addRow("Location Y:", self.yEdit)
+        vLayout.addWidget(self.locationGroup)
+        vLayout.addWidget(self.buttonBox)
+        self.setLayout(vLayout)
+        self.show()
+        

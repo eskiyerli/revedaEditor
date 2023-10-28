@@ -123,7 +123,7 @@ class shape(QGraphicsItem):
         """
         Do not propagate event if shape needs to keep still.
         """
-        if self.scene() and (self.scene().changeOrigin or self.scene().drawMode):
+        if self.scene() and (self.scene().editModes.changeOrigin or self.scene().drawMode):
             return False
         else:
             super().sceneEvent(event)
@@ -1428,10 +1428,8 @@ class symbolShape(shape):
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
-        self.borderRect = self._drawings[0].sceneBoundingRect()
-        if self._drawings[1:]:
-            for draw in self._drawings[1:]:
-                self.borderRect = self.borderRect.united(draw.sceneBoundingRect())
+        self.borderRect = self.childrenBoundingRect().normalized().adjusted(
+            -1, -1, 1, 1)
         self.dashLines = dict()
 
     def __repr__(self):
@@ -1456,7 +1454,7 @@ class symbolShape(shape):
 
     def sceneEvent(self, event):
         try:  # if net is being drawn, do not accept any event.
-            if self.scene().drawWire:
+            if self.scene().editModes.drawWire:
                 return False
             else:
                 super().sceneEvent(event)
@@ -1663,7 +1661,7 @@ class schematicPin(shape):
                                                                                   5, 5)
 
     def sceneEvent(self, event):
-        if self.scene().drawWire:
+        if self.scene().editModes.drawWire:
             return False
         else:
             super().sceneEvent(event)

@@ -40,22 +40,42 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
 import unittest
-import revedaEditor.common.layoutShapes as lshp
-class TestLayoutPin(unittest.TestCase):
+import revedaEditor.common.net as net
+import revedaEditor.common.shape as shp
+class TestDefault(unittest.TestCase):
 
-    def test_repr(self):
-        # Testing the __repr__ method of the LayoutPin class
-        layout_pin = lshp.layoutPin(start=0, end=1, pin_name="Pin1", pin_dir="input",
-                               pin_type="power", inp_ed_layer="M1", grid_tuple=(0, 0))
-        expected_repr = "layoutPin(0, 1, Pin1, input, power, M1, (0, 0))"
-        self.assertEqual(layout_pin.__repr__(), expected_repr)
+    def test_symbolShape(self):
+        # Testing for symbolShape object
+        item = shp.symbolShape()
+        itemDict = self.default(item)
+        self.assertEqual(itemDict["type"], "symbolShape")
 
+    def test_schematicNet(self):
+        # Testing for schematicNet object
+        item = net.schematicNet()
+        itemDict = self.default(item)
+        self.assertEqual(itemDict["type"], "schematicNet")
+
+    def test_schematicPin(self):
+        # Testing for schematicPin object
+        item = shp.schematicPin()
+        itemDict = self.default(item)
+        self.assertEqual(itemDict["type"], "schematicPin")
+
+    def test_text(self):
+        # Testing for text object
+        item = shp.text()
+        itemDict = self.default(item)
+        self.assertEqual(itemDict["type"], "text")
 
 if __name__ == '__main__':
     unittest.main()

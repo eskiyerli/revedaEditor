@@ -1,4 +1,4 @@
-#
+
 #    “Commons Clause” License Condition v1.0
 #   #
 #    The Software is provided to you by the Licensor under the License, as defined
@@ -19,6 +19,7 @@
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
+
 from collections import namedtuple
 from dataclasses import dataclass
 
@@ -104,3 +105,50 @@ class layLayer:
     visible: bool = True  # visible
     gdsLayer: int = 0  # gds edLayer
     datatype: int = 0  # gds datatype
+
+@dataclass
+class editModes:
+    selectItem: bool
+    deleteItem: bool
+    moveItem: bool
+    copyItem: bool
+    rotateItem: bool
+    changeOrigin: bool
+    panView: bool
+
+    def setMode(self, attribute):
+        for key in self.__dict__.keys():
+            self.__dict__[key] = False
+        self.__dict__[attribute] = True
+
+@dataclass
+class symbolModes(editModes):
+    drawPin: bool
+    drawArc: bool
+    drawRect: bool
+    drawLine: bool
+    addLabel: bool
+    drawCircle: bool
+    drawPolygon: bool
+    stretchItem: bool
+
+@dataclass
+class schematicModes(editModes):
+    drawPin: bool
+    drawWire: bool
+    drawText: bool
+    addInstance: bool
+
+@dataclass
+class layoutModes(editModes):
+    drawPath: bool
+    drawPin: bool
+    drawArc: bool
+    drawPolygon: bool
+    addLabel: bool
+    addVia: bool
+    drawRect: bool
+    drawLine: bool
+    drawCircle: bool
+    stretchItem: bool
+    addInstance: bool

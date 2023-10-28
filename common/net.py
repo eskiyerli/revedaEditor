@@ -95,7 +95,7 @@ class schematicNet(QGraphicsLineItem):
         painter.drawLine(line)
 
     def sceneEvent(self, event):
-        if self.scene().drawWire:
+        if self.scene().editModes.drawWire:
             return False
         else:
             super().sceneEvent(event)
