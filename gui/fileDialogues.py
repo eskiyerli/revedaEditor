@@ -391,8 +391,8 @@ class gdsExportDialogue(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.setWindowTitle(f'Export Netlist for {parent.cellName}-{parent.viewName}')
-        self.setMinimumSize(500, 100)
+        self.setWindowTitle(f'Export GDS for {parent.cellName}-{parent.viewName}')
+        self.setMinimumWidth(500)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)

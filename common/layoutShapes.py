@@ -426,19 +426,28 @@ class layoutRect(layoutShape):
 class layoutInstance(layoutShape):
     def __init__(self, shapes: list[layoutShape], gridTuple: tuple[int, int]):
         super().__init__(gridTuple)
-        # assert shapes is not None  # must not be an empty list
-        self._shapes = shapes  # list of shapes in the symbol
+        # List of shapes in the symbol
+        self._shapes = shapes
+        # Flag to indicate if the symbol is in draft mode
         self._draft = False
-        self._libraryName = ""
-        self._cellName = ""
-        self._viewName = ""
+        # Name of the library
+        self._libraryName: str = ""
+        # Name of the cell
+        self._cellName: str = ""
+        # Name of the view
+        self._viewName: str = ""
+        # Name of the instance
         self._instanceName = ""
-        self._counter = 0
+        # Pen used for selection
         self._selectedPen = QPen(QColor("yellow"), 1, Qt.DashLine)
+        # Set the shapes for the symbol
         self.setShapes()
+        # Enable child event filtering for filters and handles
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
+        # Enable flag to indicate that the item contains children in shape
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        # Set the top left position of the symbol
         self._start = self.childrenBoundingRect().topLeft()
 
     def setShapes(self):
@@ -449,7 +458,6 @@ class layoutInstance(layoutShape):
 
     def removeShapes(self):
         self.prepareGeometryChange()
-        scene = self.scene()
         for item in self._shapes:
             item.setParentItem(None)
             del item
@@ -490,14 +498,6 @@ class layoutInstance(layoutShape):
     def viewName(self, value: str):
         self._viewName = value
 
-    @property
-    def counter(self):
-        return self._counter
-
-    @counter.setter
-    def counter(self, value: int):
-        assert isinstance(value, int)
-        self._counter = value
 
     @property
     def instanceName(self):
