@@ -23,28 +23,7 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-#   “Commons Clause” License Condition v1.0
-#  #
-#   The Software is provided to you by the Licensor under the License, as defined
-#   below, subject to the following condition.
-#  #
-#   Without limiting other conditions in the License, the grant of rights under the
-#   License will not include, and the License does not grant to you, the right to
-#   Sell the Software.
-#  #
-#   For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#   granted to you under the License to provide to third parties, for a fee or other
-#   consideration (including without limitation fees for hosting or consulting/
-#   support services related to the Software), a product or service whose value
-#   derives, entirely or substantially, from the functionality of the Software. Any
-#   license notice or attribution required by the License must also include this
-#   Commons Clause License Condition notice.
-#  #
-#   Software: Revolution EDA
-#   License: Mozilla Public License 2.0
-#   Licensor: Revolution Semiconductor (Registered in the Netherlands)
-
-# properties dialogues for various symbol items
+# properties dialogues for various editor functions
 
 import pathlib
 import inspect
@@ -64,7 +43,6 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QGridLayout,
     QTextEdit,
-    QMenu,
 )
 
 import revedaEditor.common.net as net
@@ -788,7 +766,8 @@ class selectConfigDialogue(QDialog):
 class moveByDialogue(QDialog):
     def __init__(self,parent):
         super().__init__(parent=parent)
-        self.setWindowTitle("Move By")
+        self.setWindowTitle("Move By...")
+        self.setMinimumWidth(250)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -803,4 +782,3 @@ class moveByDialogue(QDialog):
         self.mainLayout.addWidget(coordsGroup)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
-

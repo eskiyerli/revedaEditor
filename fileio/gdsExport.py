@@ -26,6 +26,7 @@
 import gdstk
 import revedaEditor.common.layoutShapes as lshp
 import pathlib
+import inspect
 
 
 class gdsExporter:
@@ -52,11 +53,12 @@ class gdsExporter:
         match type(item):
             case lshp.layoutInstance:  # recursive search under a layout cell
                 if item.cellName not in self._cellNamesSet:
-                    library.new_cell(item.cellName)
-                    self._cellNamesSet.add(item.cellName)
+                    cellGDSName = f'{item.libraryName}_{item.cellName}_{item.viewName}'
+                    library.new_cell(cellGDSName)
+                    self._cellNamesSet.add(cellGDSName)
                     for shape in item.shapes:
-                        self.createCells(library, shape, library[item.cellName])
-                ref = gdstk.Reference(library[item.cellName], item.pos().toPoint(
+                        self.createCells(library, shape, library[cellGDSName])
+                ref = gdstk.Reference(library[cellGDSName], item.pos().toPoint(
                 ).toTuple(), rotation=item.angle)
                 parentCell.add(ref)
             case lshp.layoutRect:
@@ -101,23 +103,50 @@ class gdsExporter:
                                            columns= item.xnum, rows= item.ynum, spacing= (
                                             item.spacing+item.width, item.spacing+item.height))
                 parentCell.add(viaArray)
-            case default:  # now check super class types:
+            case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
                     case lshp.layoutPcell:
-                        print(item.shapes)
+                        pcellParamDict = gdsExporter.extractPcellInstanceParameters(item)
+                        pcellNameSuffix = '_'.join([f"{key}_{value}" for key, value in
+                                               pcellParamDict.items()]).replace('.','p')
+                        pcellName = (f'{item.libraryName}_{type(item).__name__}'
+                                     f'_{pcellNameSuffix}')
+                        if pcellName not in self._cellNamesSet:
+                            library.new_cell(pcellName)
+                            self._cellNamesSet.add(pcellName)
+                            for shape in item.shapes:
+                                self.createCells(library, shape, library[pcellName])
+                        ref = gdstk.Reference(library[pcellName], item.pos().toPoint(
+                        ).toTuple(), rotation=item.angle)
+                        parentCell.add(ref)
 
-        @property
-        def unit(self):
-            return self._unit
+    @staticmethod
+    def extractPcellInstanceParameters(instance: lshp.layoutPcell) -> dict:
+        initArgs = inspect.signature(
+            instance.__class__.__init__
+        ).parameters
+        argsUsed = [
+            param
+            for param in initArgs
+            if (param != "self" and param != "gridTuple")
+        ]
+        argDict = {
+            arg: getattr(instance, arg) for arg in argsUsed
+        }
+        return argDict
 
-        @unit.setter
-        def unit(self, value):
-            self._unit = value
+    @property
+    def unit(self):
+        return self._unit
 
-        @property
-        def precision(self):
-            return self._precision
+    @unit.setter
+    def unit(self, value):
+        self._unit = value
 
-        @precision.setter
-        def precision(self, value):
-            self._precision = value
+    @property
+    def precision(self):
+        return self._precision
+
+    @precision.setter
+    def precision(self, value):
+        self._precision = value

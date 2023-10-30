@@ -32,6 +32,8 @@ import pathlib
 import shutil
 from copy import deepcopy
 import inspect
+from quantiphy import Quantity
+
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -40,7 +42,6 @@ import inspect
 # import numpy as np
 from PySide6.QtCore import (
     QEvent,
-    QMargins,
     QPoint,
     QPointF,
     QProcess,
@@ -60,6 +61,7 @@ from PySide6.QtGui import (
     QIcon,
     QImage,
     QKeySequence,
+    QKeyEvent,
     QPainter,
     QStandardItem,
     QStandardItemModel,
@@ -95,8 +97,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QGraphicsLineItem,
 )
-
-import revedaEditor.resources.resources
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.schBackEnd as scb
@@ -104,6 +104,7 @@ import revedaEditor.backend.undoStack as us
 import revedaEditor.common.net as net
 import revedaEditor.common.layoutShapes as layp
 
+# import pdk.symLayers as symlyr
 import pdk.schLayers as schlyr
 import pdk.layoutLayers as laylyr
 import pdk.process as fabproc
@@ -118,7 +119,9 @@ import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.lsw as lsw
+import revedaEditor.resources.resources
 import revedaEditor.fileio.gdsExport as gdse
+import pdk.pcells as pcells
 
 
 
@@ -1144,6 +1147,9 @@ class editorWindow(QMainWindow):
         self.menuEdit.addAction(self.moveOriginAction)
         self.menuEdit.addAction(self.stretchAction)
         self.menuEdit.addAction(self.rotateAction)
+        self.selectMenu = self.menuEdit.addMenu("Select")
+        self.selectMenu.addAction(self.selectAllAction)
+        self.selectMenu.addAction(self.deselectAllAction)
         self.menuTools.addAction(self.readOnlyCellAction)
         self.menuCheck.addAction(self.viewCheckAction)
 
@@ -1157,6 +1163,7 @@ class editorWindow(QMainWindow):
         self.redrawAction.triggered.connect(self.redraw)
         self.zoomInAction.triggered.connect(self.zoomIn)
         self.zoomOutAction.triggered.connect(self.zoomOut)
+        self.panAction.triggered.connect(self.panView)
         self.dispConfigAction.triggered.connect(self.dispConfigEdit)
         self.selectConfigAction.triggered.connect(self.selectConfigEdit)
         self.moveOriginAction.triggered.connect(self.moveOrigin)
@@ -1166,7 +1173,7 @@ class editorWindow(QMainWindow):
         self.copyAction.triggered.connect(self.copyClick)
         self.undoAction.triggered.connect(self.undoClick)
         self.redoAction.triggered.connect(self.redoClick)
-        self.moveAction.triggered.connect(self.moveClick)
+        self.moveByAction.triggered.connect(self.moveByClick)
         self.rotateAction.triggered.connect(self.rotateItemClick)
 
     def _createShortcuts(self):
@@ -1186,6 +1193,9 @@ class editorWindow(QMainWindow):
         self.centralW.scene.itemContextMenu.addAction(self.rotateAction)
         self.centralW.scene.itemContextMenu.addAction(self.deleteAction)
         self.centralW.scene.itemContextMenu.addAction(self.objPropAction)
+        self.centralW.scene.itemContextMenu.addAction(self.selectAllAction)
+        self.centralW.scene.itemContextMenu.addAction(self.deselectAllAction)
+        
 
     def dispConfigEdit(self):
         dcd = pdlg.displayConfigDialog(self)
@@ -1263,12 +1273,24 @@ class editorWindow(QMainWindow):
     def moveClick(self):
         self.centralW.scene.editModes.setMode("moveItem")
 
+    def moveByClick(self):
+        self.centralW.scene.editModes.setMode("moveItem")
+        self.centralW.scene.moveBySelectedItems()
+
+    def rotateClick(self):
+        self.centralW.scene.editModes.setMode("rotateItem")
+
+    def panView(self):
+        self.centralW.scene.editModes.setMode("panView")
+        self.messageLine.setText("Click on the view to pan it")
+
+
+    def fitToWindow(self):
+        self.centralW.scene.fitItemsInView()
+
     def copyClick(self, s):
         self.centralW.scene.editModes.setMode("copyItem")
         self.centralW.scene.copySelectedItems()
-
-    def fitToWindow(self):
-        self.centralW.view.fitToView()
 
     def zoomIn(self):
         self.centralW.view.scale(1.25, 1.25)
@@ -1312,6 +1334,7 @@ class layoutEditor(editorWindow):
         self.setWindowIcon(QIcon(":/icons/edLayer-shape.png"))
         self.layoutViews = ["layout", "pcell"]
         self.layoutChooser = None
+        self.gdsExportDir = pathlib.Path.cwd()
         self._addActions()
         self._layoutContextMenu()
 
@@ -1343,6 +1366,10 @@ class layoutEditor(editorWindow):
 
     def _layoutContextMenu(self):
         super()._editorContextMenu()
+        self.centralW.scene.itemContextMenu.addAction(self.goDownAction)
+
+    def _createToolBars(self):
+        super()._createToolBars()
 
     def _createTriggers(self):
         super()._createTriggers()
@@ -1358,6 +1385,7 @@ class layoutEditor(editorWindow):
         self.deleteAction.triggered.connect(self.deleteClick)
         self.objPropAction.triggered.connect(self.objPropClick)
         self.stretchAction.triggered.connect(self.stretchClick)
+        self.goDownAction.triggered.connect(self.goDownClick)
 
     def _createShortcuts(self):
         super()._createShortcuts()
@@ -1548,6 +1576,9 @@ class layoutEditor(editorWindow):
     def objPropClick(self, s):
         self.centralW.scene.viewObjProperties()
 
+    def goDownClick(self):
+        self.centralW.scene.goDownHier()
+
     def checkSaveCell(self):
         self.centralW.scene.saveLayoutCell(self.file)
 
@@ -1575,17 +1606,26 @@ class layoutEditor(editorWindow):
 
     def exportGDSClick(self):
         dlg = fd.gdsExportDialogue(self)
+        dlg.unitEdit.setText("1 um")
+        dlg.precisionEdit.setText("1 nm")
+        dlg.exportPathEdit.setText(str(self.gdsExportDir))
 
         if dlg.exec() == QDialog.Accepted:
-            exportPathObj = pathlib.Path(dlg.exportPathEdit.text().strip())
-            layoutItems = self.centralW.scene.items()
-            gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, exportPathObj)
-            gdsExportObj.gds_export()
-
-    def closeEvent(self, event):
-        self.checkSaveCell()
-        event.accept()
-        super().closeEvent(event)
+            self.gdsExportDir = pathlib.Path(dlg.exportPathEdit.text().strip())
+            gdsExportPath = self.gdsExportDir / f"{self.cellName}.gds"
+            self.checkSaveCell() # save and reload the cell to get the positions right
+            self.centralW.scene.clear()
+            self.loadLayout()
+            layoutItems = [item for item in self.centralW.scene.items() if item.parentItem()
+                           is None]
+            gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, gdsExportPath)
+            gdsExportObj.unit = Quantity(dlg.unitEdit.text().strip()).real
+            gdsExportObj.precision = Quantity(dlg.precisionEdit.text().strip()).real
+            if gdsExportObj:
+                gdsExportRunner = startThread(gdsExportObj.gds_export())
+                self.appMainW.threadPool.start(gdsExportRunner)
+                # netlistObj.writeNetlist()
+                self.logger.info("GDS Export is finished.")
 
 
 class schematicEditor(editorWindow):
@@ -1650,9 +1690,7 @@ class schematicEditor(editorWindow):
         self.propertyMenu = self.menuEdit.addMenu("Properties")
         self.propertyMenu.addAction(self.objPropAction)
 
-        self.selectMenu = self.menuEdit.addMenu("Select")
-        self.selectMenu.addAction(self.selectAllAction)
-        self.selectMenu.addAction(self.deselectAllAction)
+
 
         # hierarchy submenu
         self.hierMenu = self.menuEdit.addMenu("Hierarchy")
@@ -1965,9 +2003,6 @@ class symbolEditor(editorWindow):
         super()._addActions()
         self.menuEdit.addAction(self.stretchAction)
         self.menuEdit.addAction(self.viewPropAction)
-        self.selectMenu = self.menuEdit.addMenu("Select")
-        self.selectMenu.addAction(self.selectAllAction)
-        self.selectMenu.addAction(self.deselectAllAction)
         self.menuCreate.addAction(self.createLineAction)
         self.menuCreate.addAction(self.createRectAction)
         self.menuCreate.addAction(self.createPolyAction)
@@ -2205,6 +2240,13 @@ class editor_scene(QGraphicsScene):
         self.itemsAtMousePress = list()
         self.installEventFilter(self)
 
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.LeftButton:
+            self.mousePressLoc = event.scenePos().toPoint()
+            if self.editModes.panView:
+                self.centerViewOnPoint(self.mousePressLoc)
+
     def snapToBase(self, number, base):
         """
         Restrict a number to the multiples of base
@@ -2267,7 +2309,8 @@ class editor_scene(QGraphicsScene):
                 QRectF(self.mousePressLoc, self.mousePressLoc)
             )
             self.selectionRectItem.setPen(schlyr.draftPen)
-            self.addItem(self.selectionRectItem)
+            self.undoStack.push(us.addShapeUndo(self, self.selectionRectItem))
+            # self.addItem(self.selectionRectItem)
         else:
             self.editorWindow.messageLine.setText("Select an item")
             itemsAtMousePress = self.items(self.mousePressLoc)
@@ -2313,6 +2356,67 @@ class editor_scene(QGraphicsScene):
                         item.stretch = True
             except AttributeError:
                 self.messageLine.setText("Nothing selected")
+    
+
+
+    def fitItemsInView(self) -> None:
+
+        self.setSceneRect(self.itemsBoundingRect().adjusted(-40,-40, 40, 40))
+        self.views()[0].fitInView(self.sceneRect(), Qt.KeepAspectRatio)
+        self.views()[0].viewport().update()
+
+    def moveSceneLeft(self) -> None:
+        currentSceneRect = self.sceneRect()
+        halfWidth = currentSceneRect.width() / 2.0
+        newSceneRect = QRectF(
+            currentSceneRect.left() - halfWidth,
+            currentSceneRect.top(),
+            currentSceneRect.width(),
+            currentSceneRect.height(),
+        )
+        self.setSceneRect(newSceneRect)
+
+    def moveSceneRight(self) -> None:
+        currentSceneRect = self.sceneRect()
+        halfWidth = currentSceneRect.width() / 2.0
+        newSceneRect = QRectF(
+            currentSceneRect.left() + halfWidth,
+            currentSceneRect.top(),
+            currentSceneRect.width(),
+            currentSceneRect.height(),
+        )
+        self.setSceneRect(newSceneRect)
+
+    def moveSceneUp(self) -> None:
+        currentSceneRect = self.sceneRect()
+        halfWidth = currentSceneRect.width() / 2.0
+        newSceneRect = QRectF(
+            currentSceneRect.left(),
+            currentSceneRect.top() - halfWidth,
+            currentSceneRect.width(),
+            currentSceneRect.height(),
+        )
+        self.setSceneRect(newSceneRect)
+
+    def moveSceneDown(self) -> None:
+        currentSceneRect = self.sceneRect()
+        halfWidth = currentSceneRect.width() / 2.0
+        newSceneRect = QRectF(
+            currentSceneRect.left(),
+            currentSceneRect.top() + halfWidth,
+            currentSceneRect.width(),
+            currentSceneRect.height(),
+        )
+        self.setSceneRect(newSceneRect)
+
+    def centerViewOnPoint(self, point: QPoint) -> None:
+        view = self.views()[0]
+        view_widget = view.viewport()
+        width = view_widget.width()
+        height = view_widget.height()
+        self.setSceneRect(point.x() - width / 2, point.y() - height / 2, width, height)
+
+    
 
 
 class symbol_scene(editor_scene):
@@ -2564,12 +2668,6 @@ class symbol_scene(editor_scene):
         self.undoStack.push(undoCommand)
         return label
 
-    def keyPressEvent(self, key_event):
-        super().keyPressEvent(key_event)
-        if key_event.key() == Qt.Key_Escape:
-            self.editorWindow.messageLine.setText("Select Mode")
-            self.editModes.setMode("selectItem")
-
     def copySelectedItems(self):
         if hasattr(self, "selectedItems"):
             for item in self.selectedItems():
@@ -2586,6 +2684,18 @@ class symbol_scene(editor_scene):
                         item.pos().y() + 2 * self.gridTuple[1],
                     )
                 )
+
+    def moveBySelectedItems(self):
+        if self.selectedItems():
+            dlg = pdlg.moveByDialogue(self.editorWindow)
+            dlg.xEdit.setText('0')
+            dlg.yEdit.setText('0')
+            if dlg.exec() == QDialog.Accepted:
+                for item in self.selectedItems():
+                    item.moveBy(self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]), 
+                                self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]))
+            self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+            self.editModes.setMode("selectItem")
 
     def itemProperties(self):
         """
@@ -3365,12 +3475,6 @@ class schematic_scene(editor_scene):
         else:
             return set()
 
-    def keyPressEvent(self, key_event):
-        super().keyPressEvent(key_event)
-        if key_event.key() == Qt.Key_Escape:
-            self.editModes.setMode("selectItem")
-            self.editorWindow.messageLine.setText("Select Mode")
-
     def addWires(self, start: QPoint) -> list[net.schematicNet]:
         """
         Add a net or nets to the scene.
@@ -3909,7 +4013,8 @@ class schematic_scene(editor_scene):
                     viewNames = [
                         cellItem.child(i).text()
                         for i in range(cellItem.rowCount())
-                        if cellItem.child(i).text() != item.viewName
+                        # if cellItem.child(i).text() != item.viewName
+                        if 'schematic' in cellItem.child(i).text() or 'symbol' in cellItem.child(i).text()
                     ]
                     dlg.viewListCB.addItems(viewNames)
                     if dlg.exec() == QDialog.Accepted:
@@ -3941,6 +4046,17 @@ class schematic_scene(editor_scene):
         else:
             self.logger.warning("No symbol selected")
 
+    def moveBySelectedItems(self):
+        if self.selectedItems():
+            dlg = pdlg.moveByDialogue(self.editorWindow)
+            dlg.xEdit.setText('0')
+            dlg.yEdit.setText('0')
+            if dlg.exec() == QDialog.Accepted:
+                for item in self.selectedItems():
+                    item.moveBy(self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]), 
+                                self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]))
+                self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+                self.editModes.setMode("selectItem")
 
 class layout_scene(editor_scene):
     def __init__(self, parent):
@@ -4194,9 +4310,6 @@ class layout_scene(editor_scene):
                 self.polygonGuideLine.setLine(
                     QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
                 )
-                pass
-                # print(self.polygonGuideLine.line().p2())
-                # self.newPolygon.tempLastPoint = self.mouseMoveLoc
             # Handle adding instance mode with layout instance tuple
             elif self.editModes.addInstance and self.layoutInstanceTuple is not None:
                 if self.newInstance is None:
@@ -4206,7 +4319,7 @@ class layout_scene(editor_scene):
                         dlg = ldlg.pcellInstanceDialog(self.editorWindow)
                         dlg.pcellLibName.setText(self.newInstance.libraryName)
                         dlg.pcellCellName.setText(self.newInstance.cellName)
-                        dlg.pcellName.setText(self.newInstance.viewName)
+                        dlg.pcellViewName.setText(self.newInstance.viewName)
                         initArgs = inspect.signature(
                             self.newInstance.__class__.__init__
                         ).parameters
@@ -4322,13 +4435,6 @@ class layout_scene(editor_scene):
                                 for item in decodedData[1:]
                                 if item.get("type") in self.layoutShapes
                             ]
-                            # shapes = []
-                            # for item in items[1:]:
-                            #     shapes.append(
-                            #         lj.createLayoutItems(
-                            #             item, self.libraryDict, self.gridTuple
-                            #         )
-                            #     )
                             layoutInstance = lshp.layoutInstance(
                                 instanceShapes, self.gridTuple
                             )
@@ -4341,6 +4447,7 @@ class layout_scene(editor_scene):
                             layoutInstance.viewName = (
                                 self.layoutInstanceTuple.viewItem.viewName
                             )
+                            self.itemCounter += 1
                             layoutInstance.counter = self.itemCounter
                             layoutInstance.instanceName = f"I{layoutInstance.counter}"
                             # For each instance assign a counter number from the scene
@@ -4370,6 +4477,7 @@ class layout_scene(editor_scene):
                             pcellInstance.viewName = (
                                 self.layoutInstanceTuple.viewItem.viewName
                             )
+                            self.itemCounter += 1
                             pcellInstance.counter = self.itemCounter
                             # This needs to become more sophisticated.
                             pcellInstance.instanceName = f"I{pcellInstance.counter}"
@@ -4437,12 +4545,6 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
-    def keyPressEvent(self, key_event):
-        super().keyPressEvent(key_event)
-        match key_event.key():
-            case Qt.Key_Escape:
-                self.editModes.setMode("selectItem")
-
     def deleteSelectedItems(self):
         for item in self.selectedItems():
             if isinstance(item, lshp.layoutPin) and item.label is not None:
@@ -4470,6 +4572,12 @@ class layout_scene(editor_scene):
                             self.layoutViaProperties(item)
                         case lshp.layoutPolygon:
                             self.layoutPolygonProperties(item)
+                        case lshp.layoutInstance:
+                            self.layoutInstanceProperties(item)
+                        case _ :
+                            if item.__class__.__bases__[0]  == lshp.layoutPcell:
+                                self.layoutPCellProperties(item)
+                                    
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
 
@@ -4695,10 +4803,76 @@ class layout_scene(editor_scene):
                 self.gridTuple,
             )
             item.layer.name = dlg.pinLayerCB.currentText()
+        
+    def layoutInstanceProperties(self, item):
+        dlg = ldlg.layoutInstancePropertiesDialog(self.editorWindow)
+        dlg.instanceLibName.setText(item.libraryName)
+        dlg.instanceCellName.setText(item.cellName)
+        dlg.instanceViewName.setText(item.viewName)
+        dlg.instanceNameEdit.setText(item.instanceName)
+        dlg.xEdit.setText(str(item.scenePos().x()/fabproc.dbu))
+        dlg.yEdit.setText(str(item.scenePos().y()/fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.libraryName = dlg.instanceLibName.text().strip()
+            item.cellName = dlg.instanceCellName.text().strip()
+            item.viewName = dlg.instanceViewName.text().strip()
+            item.instanceName = dlg.instanceNameEdit.text().strip()
+            item.setPos(QPoint(self.snapToBase(float(dlg.xEdit.text())*fabproc.dbu, self.gridTuple[0]), 
+                               self.snapToBase(float(dlg.yEdit.text())*fabproc.dbu, self.gridTuple[1])))
+            
+
+    def layoutPCellProperties(self, item: lshp.layoutPcell):
+        dlg = ldlg.pcellInstancePropertiesDialog(self.editorWindow)
+        dlg.pcellLibName.setText(item.libraryName)
+        dlg.pcellCellName.setText(item.cellName)
+        dlg.pcellViewName.setText(item.viewName)
+        dlg.instanceNameEdit.setText(item.instanceName)
+        lineEditDict = self.extractPcellInstanceParameters(item)
+        for key, value in lineEditDict.items():
+            dlg.instanceParamsLayout.addRow(key, value)
+        dlg.xEdit.setText(str(item.scenePos().x()/fabproc.dbu))
+        dlg.yEdit.setText(str(item.scenePos().y()/fabproc.dbu))
+        if dlg.exec() == QDialog.Accepted:
+            item.libraryName = dlg.pcellLibName.text()
+            item.cellName = dlg.pcellCellName.text()
+            item.viewName = dlg.pcellViewName.text()
+            item.instanceName = dlg.instanceNameEdit.text()
+            rowCount = dlg.instanceParamsLayout.rowCount()
+            instParamDict = {}
+            for row in range(4,rowCount): # first 4 rows are already processed.
+                labelText = dlg.instanceParamsLayout.itemAt(row,
+                                                QFormLayout.LabelRole).widget().text()
+                paramValue = dlg.instanceParamsLayout.itemAt(row,
+                                                        QFormLayout.FieldRole).widget().text()
+                instParamDict[labelText] = paramValue
+
+            item(**instParamDict)
+
+
+    def extractPcellInstanceParameters(self, instance:lshp.layoutPcell) -> dict:
+        initArgs = inspect.signature(
+            instance.__class__.__init__
+        ).parameters
+        argsUsed = [
+            param
+            for param in initArgs
+            if (param != "self" and param != "gridTuple")
+        ]
+        argDict = {
+            arg: getattr(instance, arg) for arg in argsUsed
+        }
+        lineEditDict = {
+            key: edf.shortLineEdit(value)
+            for key, value in argDict.items()
+        }
+        return lineEditDict
 
     def copySelectedItems(self):
+        """
+        Copy the selected items and create new instances with incremented names.
+        """
         for item in self.selectedItems():
-
+            # Create a deep copy of the item using JSON serialization
             itemCopyDict = json.loads(json.dumps(item, cls=layenc.layoutEncoder))
             shape = lj.createLayoutItems(itemCopyDict, self.libraryDict,
                                      self.gridTuple)
@@ -4715,6 +4889,50 @@ class layout_scene(editor_scene):
                 )
             )
 
+    def moveBySelectedItems(self):
+        if self.selectedItems():
+            dlg = pdlg.moveByDialogue(self.editorWindow)
+            dlg.xEdit.setText('0.0')
+            dlg.yEdit.setText('0.0')
+            if dlg.exec() == QDialog.Accepted:
+                for item in self.selectedItems():
+                    item.moveBy(self.snapToBase(float(dlg.xEdit.text())*fabproc.dbu, self.gridTuple[0]), 
+                                self.snapToBase(float(dlg.yEdit.text())*fabproc.dbu, self.gridTuple[1]))
+                self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+                self.editModes.setMode("selectItem")
+
+    def goDownHier(self):
+        if self.selectedItems():
+            for item in self.selectedItems():
+                if isinstance(item, lshp.layoutInstance):
+                    dlg = fd.goDownHierDialogue(self.editorWindow)
+                    libItem = libm.getLibItem(
+                        self.editorWindow.libraryView.libraryModel, item.libraryName
+                    )
+                    cellItem = libm.getCellItem(libItem, item.cellName)
+                    viewNames = [
+                        cellItem.child(i).text()
+                        for i in range(cellItem.rowCount())
+                        # if cellItem.child(i).text() != item.viewName
+                        if 'layout' in cellItem.child(i).text()
+                    ]
+                    dlg.viewListCB.addItems(viewNames)
+                    if dlg.exec() == QDialog.Accepted:
+                        libItem = libm.getLibItem(
+                            self.editorWindow.libraryView.libraryModel, item.libraryName
+                        )
+                        cellItem = libm.getCellItem(libItem, item.cellName)
+                        viewItem = libm.getViewItem(cellItem, dlg.viewListCB.currentText())
+                        openViewT = self.editorWindow.libraryView.libBrowsW.openCellView(
+                            viewItem, cellItem, libItem
+                        )
+                        if self.editorWindow.appMainW.openViews[openViewT]:
+                            childWindow = self.editorWindow.appMainW.openViews[openViewT]
+                            childWindow.parentView = self.editorWindow
+                            # childWindow.schematicToolbar.addAction(childWindow.goUpAction)
+                            if dlg.buttonId == 2:
+                                childWindow.centralW.scene.readOnly = True
+                
     @staticmethod
     def rotateVector(mouseLoc: QPoint, vector: layp.layoutPath, transform: QTransform):
         """
@@ -4747,7 +4965,7 @@ class editor_view(QGraphicsView):
     The qgraphicsview for qgraphicsscene. It is used for both schematic and layout editors.
     """
 
-    def __init__(self, scene: QGraphicsScene, parent: QWidget):
+    def __init__(self, scene, parent):
         super().__init__(scene, parent)
         self.parent = parent
         self.editor = self.parent.parent
@@ -4806,8 +5024,12 @@ class editor_view(QGraphicsView):
         painter.fillRect(rect, QColor("black"))
         if self.gridbackg:
             painter.setPen(QColor("gray"))
-            grid_x_start = math.ceil(rectCoord[0] / self.gridTuple[0]) * self.gridTuple[0]
-            grid_y_start = math.ceil(rectCoord[1] / self.gridTuple[1]) * self.gridTuple[1]
+            grid_x_start = (
+                math.ceil(rectCoord[0] / self.gridTuple[0]) * self.gridTuple[0]
+            )
+            grid_y_start = (
+                math.ceil(rectCoord[1] / self.gridTuple[1]) * self.gridTuple[1]
+            )
             num_x_points = math.floor(rectCoord[2] / self.gridTuple[0])
             num_y_points = math.floor(rectCoord[3] / self.gridTuple[1])
             for i in range(int(num_x_points)):
@@ -4833,21 +5055,23 @@ class editor_view(QGraphicsView):
         else:
             super().drawBackground(painter, rect)
 
-    def keyPressEvent(self, key_event):
-        if key_event.key() == Qt.Key_F:
-            self.fitToView()
-        elif key_event.key() == Qt.Key_Left:
-            self.move_view_left()
-        elif key_event.key() == Qt.Key_Right:
-            self.move_view_right()
-        else:
-            super().keyPressEvent(key_event)
-
-    def fitToView(self):
-        sceneRect = self.scene.itemsBoundingRect().marginsAdded(QMargins(40, 40, 40, 40))
-        print(sceneRect)
-        self.fitInView(sceneRect)
-        self.show()
+    def keyPressEvent(self, event: QKeyEvent):
+        match event.key():
+            case Qt.Key_F:
+                self.scene.fitItemsInView()
+            case Qt.Key_Left:
+                self.scene.moveSceneLeft()
+            case Qt.Key_Right:
+                self.scene.moveSceneRight()
+            case Qt.Key_Up:
+                self.scene.moveSceneUp()
+            case Qt.Key_Down:
+                self.scene.moveSceneDown()
+            case Qt.Key_Escape:
+                self.scene.editModes.setMode("selectItem")
+                self.editor.messageLine.setText("Select Mode")
+            case _:
+                super().keyPressEvent(event)
 
     def printView(self, printer):
         """
@@ -4872,10 +5096,14 @@ class editor_view(QGraphicsView):
         self.render(painter)
         painter.end()
 
-
     def move_view_left(self) -> None:
         viewRect = self.scene.sceneRect()
-        newRect = QRectF(viewRect.left()-viewRect.width()*0.5, viewRect.top(), viewRect.width(), viewRect.height())
+        newRect = QRectF(
+            viewRect.left() - viewRect.width() * 0.5,
+            viewRect.top(),
+            viewRect.width(),
+            viewRect.height(),
+        )
         self.scene.setSceneRect(newRect)
 
     def move_view_right(self) -> None:
@@ -4890,11 +5118,12 @@ class editor_view(QGraphicsView):
             viewRect.left() + viewRect.width() * 0.5,
             viewRect.top(),
             viewRect.width(),
-            viewRect.height()
-    )
+            viewRect.height(),
+        )
 
         # Set the new scene rectangle
         self.scene.setSceneRect(newRect)
+
 
 class symbol_view(editor_view):
     def __init__(self, scene, parent):
