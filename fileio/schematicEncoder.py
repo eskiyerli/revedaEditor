@@ -31,58 +31,57 @@ import revedaEditor.common.shape as shp
 
 class schematicEncoder(json.JSONEncoder):
     def default(self, item):
-        def default(self, item):
-            if isinstance(item, shp.symbolShape):
-                # get label values and visibility
-                itemLabelDict = {
-                    label.labelName: [label.labelValue, label.labelVisible]
-                    for label in item.labels.values()
-                }
-                itemDict = {
-                    "type": "symbolShape",
-                    "lib": item.libraryName,
-                    "cell": item.cellName,
-                    "view": item.viewName,
-                    "nam": item.instanceName,
-                    "ic": item.counter,
-                    "ld": itemLabelDict,
-                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                    "ang": item.angle,
-                    "ign": int(item.netlistIgnore),
-                }
-                return itemDict
-            elif isinstance(item, net.schematicNet):
-                itemDict = {
-                    "type": "schematicNet",
-                    "st": item.start.toTuple(),
-                    "end": item.end.toTuple(),
-                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                    "nam": item.name,
-                    "ns": item.nameSet,
-                }
-                return itemDict
-            elif isinstance(item, shp.schematicPin):
-                itemDict = {
-                    "type": "schematicPin",
-                    "st": item.start.toTuple(),
-                    "pn": item.pinName,
-                    "pd": item.pinDir,
-                    "pt": item.pinType,
-                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                    "ang": item.angle,
-                }
-                return itemDict
-            elif isinstance(item, shp.text):
-                itemDict = {
-                    "type": "text",
-                    "st": item.start.toTuple(),
-                    "tc": item.textContent,
-                    "ff": item.fontFamily,
-                    "fs": item.fontStyle,
-                    "th": item.textHeight,
-                    "ta": item.textAlignment,
-                    "to": item.textOrient,
-                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                    "ang": item.angle,
-                }
-                return itemDict
+        if isinstance(item, shp.schematicSymbol):
+            # get label values and visibility
+            itemLabelDict = {
+                label.labelName: [label.labelValue, label.labelVisible]
+                for label in item.labels.values()
+            }
+            itemDict = {
+                "type": "symbolShape",
+                "lib": item.libraryName,
+                "cell": item.cellName,
+                "view": item.viewName,
+                "nam": item.instanceName,
+                "ic": item.counter,
+                "ld": itemLabelDict,
+                "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "ang": item.angle,
+                "ign": int(item.netlistIgnore),
+            }
+            return itemDict
+        elif isinstance(item, net.schematicNet):
+            itemDict = {
+                "type": "schematicNet",
+                "st": item.start.toTuple(),
+                "end": item.end.toTuple(),
+                "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "nam": item.name,
+                "ns": item.nameSet,
+            }
+            return itemDict
+        elif isinstance(item, shp.schematicPin):
+            itemDict = {
+                "type": "schematicPin",
+                "st": item.start.toTuple(),
+                "pn": item.pinName,
+                "pd": item.pinDir,
+                "pt": item.pinType,
+                "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "ang": item.angle,
+            }
+            return itemDict
+        elif isinstance(item, shp.text):
+            itemDict = {
+                "type": "text",
+                "st": item.start.toTuple(),
+                "tc": item.textContent,
+                "ff": item.fontFamily,
+                "fs": item.fontStyle,
+                "th": item.textHeight,
+                "ta": item.textAlignment,
+                "to": item.textOrient,
+                "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "ang": item.angle,
+            }
+            return itemDict

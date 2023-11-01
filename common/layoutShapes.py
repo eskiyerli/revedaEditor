@@ -831,7 +831,7 @@ class layoutPath(layoutShape):
                 self.draftLine.setP1(eventPos)
             elif self._stretchSide == "p2":
                 self.draftLine.setP2(eventPos)
-            self._rectCorners()
+            self._rectCorners(self.angle)
         else:
             super().mouseMoveEvent(event)
 

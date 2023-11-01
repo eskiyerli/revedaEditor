@@ -55,7 +55,7 @@ class TestDefault(unittest.TestCase):
 
     def test_symbolShape(self):
         # Testing for symbolShape object
-        item = shp.symbolShape()
+        item = shp.schematicSymbol()
         itemDict = self.default(item)
         self.assertEqual(itemDict["type"], "symbolShape")
 

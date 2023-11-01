@@ -63,7 +63,7 @@ def createRectItem(item, gridTuple):
     """
     start = QPoint(item["rect"][0], item["rect"][1])
     end = QPoint(item["rect"][2], item["rect"][3])
-    rect = shp.rectangle(start, end, gridTuple)  # note that we are using grid
+    rect = shp.symbolRectangle(start, end, gridTuple)  # note that we are using grid
     # values for
     # scene
     rect.setPos(
@@ -76,7 +76,7 @@ def createRectItem(item, gridTuple):
 def createCircleItem(item, gridTuple):
     centre = QPoint(item["cen"][0], item["cen"][1])
     end = QPoint(item["end"][0], item["end"][1])
-    circle = shp.circle(centre, end, gridTuple)  # note that we are using grid
+    circle = shp.symbolCircle(centre, end, gridTuple)  # note that we are using grid
     # values for
     # scene
     circle.setPos(
@@ -90,7 +90,7 @@ def createArcItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
     end = QPoint(item["end"][0], item["end"][1])
 
-    arc = shp.arc(start, end, gridTuple)  # note that we are using grid values
+    arc = shp.symbolArc(start, end, gridTuple)  # note that we are using grid values
     # for scene
     arc.setPos(QPoint(item["loc"][0], item["loc"][1]))
     arc.angle = item["ang"]
@@ -101,7 +101,7 @@ def createLineItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
     end = QPoint(item["end"][0], item["end"][1])
 
-    line = shp.line(start, end, gridTuple)
+    line = shp.symbolLine(start, end, gridTuple)
     line.setPos(QPoint(item["loc"][0], item["loc"][1]))
     line.angle = item["ang"]
     return line
@@ -109,7 +109,7 @@ def createLineItem(item, gridTuple):
 
 def createPinItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
-    pin = shp.pin(start, item["nam"], item["pd"], item["pt"], gridTuple)
+    pin = shp.symbolPin(start, item["nam"], item["pd"], item["pt"], gridTuple)
     pin.setPos(QPoint(item["loc"][0], item["loc"][1]))
     pin.angle = item["ang"]
     return pin
@@ -117,7 +117,7 @@ def createPinItem(item, gridTuple):
 
 def createLabelItem(item, gridTuple):
     start = QPoint(item["st"][0], item["st"][1])
-    label = shp.label(
+    label = shp.symbolLabel(
         start,
         item["def"],
         item["lt"],
@@ -157,89 +157,93 @@ def createSymbolAttribute(item):
         return se.symbolAttribute(item["nam"], item["def"])
 
 
-def createSchematicItems(item:dict, libraryDict, viewName: str, gridTuple: (int, int)):
+def createSchematicItems(item:dict, libraryDict,  gridTuple: (int, int)):
     """
     Create schematic items from json file.
     """
-
-    libraryPath = libraryDict.get(item["lib"])
-    if libraryPath is None:
-        print(f'{item["lib"]} cannot be found.')
-        return None
-    cell = item["cell"]
-    instCounter = item["ic"]
-    itemShapes = list()
-    symbolAttributes = dict()
-    labelDict = item["ld"]
-    # find the symbol file
-    file = libraryPath.joinpath(cell, viewName + ".json")
-    # load json file and create shapes
-    with open(file, "r") as temp:
-        try:
-            shapes = json.load(temp)
-            for shape in shapes[1:]:
-                if shape["type"] == "rect":
-                    itemShapes.append(createRectItem(shape, gridTuple))
-                elif shape["type"] == "circle":
-                    itemShapes.append(createCircleItem(shape, gridTuple))
-                elif shape["type"] == "arc":
-                    itemShapes.append(createArcItem(shape, gridTuple))
-                elif shape["type"] == "line":
-                    itemShapes.append(createLineItem(shape, gridTuple))
-                elif shape["type"] == "pin":
-                    itemShapes.append(createPinItem(shape, gridTuple))
-                elif shape["type"] == "label":
-                    itemShapes.append(createLabelItem(shape, gridTuple))
-                # just recreate attributes dictionary
-                elif shape["type"] == "attr":
-                    symbolAttributes[shape["nam"]] = shape["def"]
-        except json.decoder.JSONDecodeError:
-            print("Error: Invalid Symbol file")
-    symbolInstance = shp.symbolShape(itemShapes, symbolAttributes, gridTuple)
-    symbolInstance.libraryName = item["lib"]
-    symbolInstance.cellName = item["cell"]
-    symbolInstance.counter = instCounter
-    symbolInstance.instanceName = item["nam"]
-    symbolInstance.angle = item.get("ang", 0)
-    symbolInstance.netlistIgnore = bool(item.get("ign", 0))
-    symbolInstance.viewName = viewName
-    symbolInstance.attributes = symbolAttributes
-    for labelItem in symbolInstance.labels.values():
-        if labelItem.labelName in labelDict.keys():
-            labelItem.labelValue = labelDict[labelItem.labelName][0]
-            labelItem.labelVisible = labelDict[labelItem.labelName][1]
-    symbolInstance.setPos(item["loc"][0], item["loc"][1])
-    return symbolInstance
-
-
-def createSchematicNets(item):
-    """
-    Create schematic items from json file.
-    """
-
-    start = QPoint(item["st"][0], item["st"][1])
-    end = QPoint(item["end"][0], item["end"][1])
-    position = QPoint(item["loc"][0], item["loc"][1])
-    netItem = net.schematicNet(start, end)
-    netItem.name = item["nam"]
-    netItem.nameSet = item["ns"]
-    netItem.setPos(position)
-    return netItem
-
-
-def createSchematicPins(item, gridTuple):
-    """
-    Create schematic items from json file.
-    """
-
-    start = QPoint(item["st"][0], item["st"][1])
-    pinName = item["pn"]
-    pinDir = item["pd"]
-    pinType = item["pt"]
-    pinItem = shp.schematicPin(start, pinName, pinDir, pinType, gridTuple)
-    pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
-    pinItem.angle = item["ang"]
-    return pinItem
+    match item["type"]:
+        case "symbolShape":
+            libraryPath = libraryDict.get(item["lib"])
+            if libraryPath is None:
+                print(f'{item["lib"]} cannot be found.')
+                return None
+            cell = item["cell"]
+            instCounter = item["ic"]
+            itemShapes = list()
+            symbolAttributes = dict()
+            labelDict = item["ld"]
+            # find the symbol file
+            file = libraryPath.joinpath(cell, f'{item["view"]}.json')
+            # load json file and create shapes
+            with open(file, "r") as temp:
+                try:
+                    shapes = json.load(temp)
+                    for shape in shapes[1:]:
+                        if shape["type"] == "rect":
+                            itemShapes.append(createRectItem(shape, gridTuple))
+                        elif shape["type"] == "circle":
+                            itemShapes.append(createCircleItem(shape, gridTuple))
+                        elif shape["type"] == "arc":
+                            itemShapes.append(createArcItem(shape, gridTuple))
+                        elif shape["type"] == "line":
+                            itemShapes.append(createLineItem(shape, gridTuple))
+                        elif shape["type"] == "pin":
+                            itemShapes.append(createPinItem(shape, gridTuple))
+                        elif shape["type"] == "label":
+                            itemShapes.append(createLabelItem(shape, gridTuple))
+                        # just recreate attributes dictionary
+                        elif shape["type"] == "attr":
+                            symbolAttributes[shape["nam"]] = shape["def"]
+                except json.decoder.JSONDecodeError:
+                    print("Error: Invalid Symbol file")
+            symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes, gridTuple)
+            symbolInstance.libraryName = item["lib"]
+            symbolInstance.cellName = item["cell"]
+            symbolInstance.counter = instCounter
+            symbolInstance.instanceName = item["nam"]
+            symbolInstance.angle = item.get("ang", 0)
+            symbolInstance.netlistIgnore = bool(item.get("ign", 0))
+            symbolInstance.viewName = item["view"]
+            symbolInstance.attributes = symbolAttributes
+            for labelItem in symbolInstance.labels.values():
+                if labelItem.labelName in labelDict.keys():
+                    labelItem.labelValue = labelDict[labelItem.labelName][0]
+                    labelItem.labelVisible = labelDict[labelItem.labelName][1]
+            symbolInstance.setPos(item["loc"][0], item["loc"][1])
+            [labelItem.labelDefs() for labelItem in symbolInstance.labels.values()]
+            return symbolInstance
+        case "schematicNet":
+            start = QPoint(item["st"][0], item["st"][1])
+            end = QPoint(item["end"][0], item["end"][1])
+            position = QPoint(item["loc"][0], item["loc"][1])
+            netItem = net.schematicNet(start, end)
+            netItem.name = item["nam"]
+            netItem.nameSet = item["ns"]
+            netItem.setPos(position)
+            return netItem
+        case "schematicPin":
+            start = QPoint(item["st"][0], item["st"][1])
+            pinName = item["pn"]
+            pinDir = item["pd"]
+            pinType = item["pt"]
+            pinItem = shp.schematicPin(start, pinName, pinDir, pinType, gridTuple)
+            pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
+            pinItem.angle = item["ang"]
+            return pinItem
+        case "text":
+            start = QPoint(item["st"][0], item["st"][1])
+            text = shp.text(
+                start,
+                item["tc"],
+                item["ff"],
+                item["fs"],
+                item["th"],
+                item["ta"],
+                item["to"],
+                gridTuple,
+            )
+            text.setPos(QPoint(item["loc"][0], item["loc"][1]))
+            return text
 
 
 def createLayoutItems(item:dict, libraryDict: dict, gridTuple: (int, int)):

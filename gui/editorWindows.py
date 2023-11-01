@@ -51,6 +51,7 @@ from PySide6.QtCore import (
     Qt,
     Slot,
     QLineF,
+    QTemporaryFile,
 )
 from PySide6.QtGui import (
     QAction,
@@ -874,7 +875,7 @@ class editorWindow(QMainWindow):
         super().__init__()
         self.centralW = None
         self.viewItem = viewItem
-        self.file = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
+        self.file:pathlib.Path = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
         self.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
@@ -882,7 +883,7 @@ class editorWindow(QMainWindow):
         self.viewName = self.viewItem.viewName
         self.libraryDict = libraryDict
         self.libraryView = libraryView
-        self.parentView = None
+        self.parentEditor = None # type: editorWindow
         self._app = QApplication.instance()
         self._createActions()
         self._createTriggers()
@@ -897,8 +898,8 @@ class editorWindow(QMainWindow):
         self.majorGrid = 10  # snapping grid size
         self.gridTuple = (self.majorGrid, self.majorGrid)
         self.snapDistance = 20
-        if self._app.revedasim_path:
-            pass
+        # if self._app.revedasim_path:
+        #     pass
         self.init_UI()
 
     def init_UI(self):
@@ -908,6 +909,10 @@ class editorWindow(QMainWindow):
         ...
 
     def _createMenuBar(self):
+        """
+        Creates the menu bar for the editor.
+
+        """
         self.editorMenuBar = self.menuBar()
         self.editorMenuBar.setNativeMenuBar(False)
         # Returns QMenu object.
@@ -930,6 +935,9 @@ class editorWindow(QMainWindow):
         self.readOnlyCellIcon = QIcon(":/icons/lock.png")
         self.readOnlyCellAction = QAction("Read Only", self)
         self.readOnlyCellAction.setCheckable(True)
+
+        updateCellIcon = QIcon(":/icons/document-xaml.png")
+        self.updateCellAction = QAction(updateCellIcon, "Update Design", self)
 
         printIcon = QIcon(":/icons/printer--arrow.png")
         self.printAction = QAction(printIcon, "Print...", self)
@@ -1054,21 +1062,24 @@ class editorWindow(QMainWindow):
         simulateIcon = QIcon(":/icons/application-wave.png")
         self.simulateAction = QAction(simulateIcon, "Run RevEDA Sim GUI", self)
 
-        createLineIcon = QIcon(":/icons/edLayer-shape-line.png")
+        createLineIcon = QIcon(":/icons/layer-shape-line.png")
         self.createLineAction = QAction(createLineIcon, "Create Line...", self)
 
-        createRectIcon = QIcon(":/icons/edLayer-shape.png")
+        createRectIcon = QIcon(":/icons/layer-shape.png")
         self.createRectAction = QAction(createRectIcon, "Create Rectangle...", self)
 
-        createPolyIcon = QIcon(":/icons/edLayer-shape-polygon.png")
-        self.createPolyAction = QAction(createPolyIcon, "Create Polygon...", self)
+        createPolyIcon = QIcon(":/icons/layer-shape-polygon.png")
+        self.createPolygonAction = QAction(createPolyIcon, "Create Polygon...", self)
 
-        createCircleIcon = QIcon(":/icons/edLayer-shape-ellipse.png")
+        createCircleIcon = QIcon(":/icons/layer-shape-ellipse.png")
         self.createCircleAction = QAction(createCircleIcon, "Create Circle...", self)
 
-        createArcIcon = QIcon(":/icons/edLayer-shape-polyline.png")
+        createArcIcon = QIcon(":/icons/layer-shape-polyline.png")
         self.createArcAction = QAction(createArcIcon, "Create Arc...", self)
 
+        createViaIcon = QIcon(":/icons/layer-mask.png")
+        self.createViaAction = QAction(createViaIcon, "Create Via...", self)
+        
         createInstIcon = QIcon(":/icons/block--plus.png")
         self.createInstAction = QAction(createInstIcon, "Create Instance...", self)
 
@@ -1090,7 +1101,6 @@ class editorWindow(QMainWindow):
         createTextIcon = QIcon(":icons/sticky-note-text.png")
         self.createTextAction = QAction(createTextIcon, "Create Text...", self)
 
-        self.createLabelAction = QAction(createTextIcon, "Create Label...", self)
 
         ignoreIcon = QIcon(":/icons/minus-circle.png")
         self.ignoreAction = QAction(ignoreIcon, "Ignore", self)
@@ -1122,6 +1132,7 @@ class editorWindow(QMainWindow):
         # file menu
         self.menuFile.addAction(self.checkCellAction)
         self.menuFile.addAction(self.saveCellAction)
+        self.menuFile.addAction(self.updateCellAction)
         self.menuFile.addAction(self.printAction)
         self.menuFile.addAction(self.printPreviewAction)
         self.menuFile.addAction(self.exportImageAction)
@@ -1154,7 +1165,10 @@ class editorWindow(QMainWindow):
         self.menuCheck.addAction(self.viewCheckAction)
 
     def _createTriggers(self):
+        self.checkCellAction.triggered.connect(self.checkSaveCell)
+        self.saveCellAction.triggered.connect(self.saveCell)
         self.readOnlyCellAction.triggered.connect(self.readOnlyCellClick)
+        self.updateCellAction.triggered.connect(self.updateDesignScene)
         self.printAction.triggered.connect(self.printClick)
         self.printPreviewAction.triggered.connect(self.printPreviewClick)
         self.exportImageAction.triggered.connect(self.imageExportClick)
@@ -1175,6 +1189,7 @@ class editorWindow(QMainWindow):
         self.redoAction.triggered.connect(self.redoClick)
         self.moveByAction.triggered.connect(self.moveByClick)
         self.rotateAction.triggered.connect(self.rotateItemClick)
+        self.goUpAction.triggered.connect(self.goUpHierarchy)
 
     def _createShortcuts(self):
         self.redoAction.setShortcut("Shift+U")
@@ -1228,8 +1243,18 @@ class editorWindow(QMainWindow):
             self.centralW.scene.partialSelection = scd.partialSelection.isChecked()
             self.snapDistance = int(float(scd.snapDistanceEntry.text()))
 
+    def checkSaveCell(self):
+        pass
+
+    def saveCell(self):
+        pass
+
     def readOnlyCellClick(self):
         self.centralW.scene.readOnly = self.readOnlyCellAction.isChecked()
+
+    def updateDesignScene(self):
+        self.messageLine.setText('Reloading design.')
+        self.centralW.scene.reloadScene()
 
     def printClick(self):
         dlg = QPrintDialog(self)
@@ -1284,6 +1309,11 @@ class editorWindow(QMainWindow):
         self.centralW.scene.editModes.setMode("panView")
         self.messageLine.setText("Click on the view to pan it")
 
+    def goUpHierarchy(self):
+        if self.parentEditor is not None:
+            self.parentEditor.raise_()
+            # magic happens in close event.
+            self.close()
 
     def fitToWindow(self):
         self.centralW.scene.fitItemsInView()
@@ -1304,6 +1334,10 @@ class editorWindow(QMainWindow):
     def closeEvent(self, event):
         cellViewTuple = ddef.viewTuple(self.libName, self.cellName, self.viewName)
         self.appMainW.openViews.pop(cellViewTuple)
+        self.saveCell()
+        if self.parentEditor is not None:
+            self.parentEditor.updateDesignScene()
+            self.parentEditor.raise_()
         event.accept()
         super().closeEvent(event)
 
@@ -1349,8 +1383,8 @@ class layoutEditor(editorWindow):
     def _createActions(self):
         super()._createActions()
         self.exportGDSAction = QAction("Export GDS", self)
-        self.createViaAction = QAction("Create Via", self)
-        self.createPolygonAction = QAction("Create Polygon", self)
+        
+        
 
     def _addActions(self):
         super()._addActions()
@@ -1363,6 +1397,10 @@ class layoutEditor(editorWindow):
         self.menuCreate.addAction(self.createViaAction)
         self.menuCreate.addAction(self.createPolygonAction)
         self.menuTools.addAction(self.exportGDSAction)
+        # hierarchy submenu
+        self.hierMenu = self.menuEdit.addMenu("Hierarchy")
+        self.hierMenu.addAction(self.goUpAction)
+        self.hierMenu.addAction(self.goDownAction)
 
     def _layoutContextMenu(self):
         super()._editorContextMenu()
@@ -1370,10 +1408,21 @@ class layoutEditor(editorWindow):
 
     def _createToolBars(self):
         super()._createToolBars()
+        self.layoutToolbar = QToolBar("Layout Toolbar", self)
+        self.addToolBar(self.layoutToolbar)
+        self.layoutToolbar.addAction(self.createInstAction)
+        self.layoutToolbar.addAction(self.createRectAction)
+        self.layoutToolbar.addAction(self.createWireAction)
+        self.layoutToolbar.addAction(self.createPinAction)
+        self.layoutToolbar.addAction(self.createLabelAction)
+        self.layoutToolbar.addAction(self.createViaAction)
+        self.layoutToolbar.addAction(self.createPolygonAction)
+        self.layoutToolbar.addSeparator()
+        self.layoutToolbar.addAction(self.goDownAction)
 
     def _createTriggers(self):
         super()._createTriggers()
-        self.checkCellAction.triggered.connect(self.checkSaveCell)
+
         self.createInstAction.triggered.connect(self.createInstClick)
         self.createRectAction.triggered.connect(self.createRectClick)
         self.exportGDSAction.triggered.connect(self.exportGDSClick)
@@ -1582,6 +1631,9 @@ class layoutEditor(editorWindow):
     def checkSaveCell(self):
         self.centralW.scene.saveLayoutCell(self.file)
 
+    def saveCell(self):
+        self.centralW.scene.saveLayoutCell(self.file)
+
     def loadLayout(self):
         self.centralW.scene.loadLayoutCell(self.file)
 
@@ -1658,8 +1710,7 @@ class schematicEditor(editorWindow):
 
     def _createTriggers(self):
         super()._createTriggers()
-        self.checkCellAction.triggered.connect(self.checkSaveCellClick)
-        self.saveCellAction.triggered.connect(self.saveCellClick)
+
         self.createWireAction.triggered.connect(self.createWireClick)
         self.createInstAction.triggered.connect(self.createInstClick)
         self.createPinAction.triggered.connect(self.createPinClick)
@@ -1671,7 +1722,7 @@ class schematicEditor(editorWindow):
         self.simulateAction.triggered.connect(self.startSimClick)
         self.ignoreAction.triggered.connect(self.ignoreClick)
         self.goDownAction.triggered.connect(self.goDownClick)
-        self.goUpAction.triggered.connect(self.goUpClick)
+
         self.hilightNetAction.triggered.connect(self.hilightNetClick)
         self.netNameAction.triggered.connect(self.netNameClick)
 
@@ -1689,8 +1740,6 @@ class schematicEditor(editorWindow):
 
         self.propertyMenu = self.menuEdit.addMenu("Properties")
         self.propertyMenu.addAction(self.objPropAction)
-
-
 
         # hierarchy submenu
         self.hierMenu = self.menuEdit.addMenu("Hierarchy")
@@ -1791,7 +1840,7 @@ class schematicEditor(editorWindow):
             self.centralW.scene.noteFontStyle = textDlg.fontStyleCB.currentText()
             self.centralW.scene.noteAlign = textDlg.textAlignmCB.currentText()
             self.centralW.scene.noteOrient = textDlg.textOrientCB.currentText()
-            self.centralW.scenes.editModes.setMode("drawText")
+            self.centralW.scene.editModes.setMode("drawText")
 
     def createSymbolClick(self, s):
         self.centralW.scene.createSymbol()
@@ -1800,27 +1849,25 @@ class schematicEditor(editorWindow):
         self.centralW.scene.editModes.setMode("selectItem")
         self.centralW.scene.viewObjProperties()
 
-
-
     def startSimClick(self, s):
         import revedasim.simMainWindow as smw
 
         simguiw = smw.simMainWindow(self)
         simguiw.show()
 
-    def checkSaveCellClick(self):
+    def checkSaveCell(self):
         self.centralW.scene.groupAllNets()
-        self.centralW.scene.saveSchematicCell(self.file)
+        self.centralW.scene.saveSchematic(self.file)
 
-    def saveCellClick(self):
-        self.centralW.scene.saveSchematicCell(self.file)
+    def saveCell(self):
+        self.centralW.scene.saveSchematic(self.file)
 
     def loadSchematic(self):
         with open(self.file) as tempFile:
             items = json.load(tempFile)
-        self.centralW.scene.loadSchematicCell(items)
+        self.centralW.scene.loadSchematicItems(items)
         sceneNetsSet = self.centralW.scene.findSceneNetsSet()
-        # because do not save dot points, it is necessary to recreate them.
+        # because we do not save dot points, it is necessary to recreate them.
         for netItem in sceneNetsSet:
             netItem.findDotPoints()
 
@@ -1879,7 +1926,7 @@ class schematicEditor(editorWindow):
                 processedCells.add(itemCellTuple)
 
     def closeEvent(self, event):
-        self.centralW.scene.saveSchematicCell(self.file)
+        self.centralW.scene.saveSchematic(self.file)
         event.accept()
         super().closeEvent(event)
 
@@ -1944,8 +1991,6 @@ class schematicEditor(editorWindow):
     def goDownClick(self, s):
         self.centralW.scene.goDownHier()
 
-    def goUpClick(self, s):
-        self.centralW.scene.goUpHier()
 
     def ignoreClick(self, s):
         self.centralW.scene.ignoreSymbol()
@@ -1961,7 +2006,7 @@ class symbolEditor(editorWindow):
     def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView):
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Symbol Editor - {self.cellName} - {self.viewName}")
-        self._symbolActions()
+        # self._createActions()
 
     def init_UI(self):
         self.resize(1600, 800)
@@ -1971,8 +2016,8 @@ class symbolEditor(editorWindow):
         self.centralW = symbolContainer(self)
         self.setCentralWidget(self.centralW)
 
-    def _createActions(self):
-        super()._createActions()
+    # def _createActions(self):
+    #     super()._createActions()
 
     def _createShortcuts(self):
         super()._createShortcuts()
@@ -1993,7 +2038,7 @@ class symbolEditor(editorWindow):
         self.addToolBar(self.symbolToolbar)
         self.symbolToolbar.addAction(self.createLineAction)
         self.symbolToolbar.addAction(self.createRectAction)
-        self.symbolToolbar.addAction(self.createPolyAction)
+        self.symbolToolbar.addAction(self.createPolygonAction)
         self.symbolToolbar.addAction(self.createCircleAction)
         self.symbolToolbar.addAction(self.createArcAction)
         self.symbolToolbar.addAction(self.createLabelAction)
@@ -2005,7 +2050,7 @@ class symbolEditor(editorWindow):
         self.menuEdit.addAction(self.viewPropAction)
         self.menuCreate.addAction(self.createLineAction)
         self.menuCreate.addAction(self.createRectAction)
-        self.menuCreate.addAction(self.createPolyAction)
+        self.menuCreate.addAction(self.createPolygonAction)
         self.menuCreate.addAction(self.createCircleAction)
         self.menuCreate.addAction(self.createArcAction)
         self.menuCreate.addAction(self.createLabelAction)
@@ -2013,10 +2058,9 @@ class symbolEditor(editorWindow):
 
     def _createTriggers(self):
         super()._createTriggers()
-        self.checkCellAction.triggered.connect(self.checkSaveCell)
         self.createLineAction.triggered.connect(self.createLineClick)
         self.createRectAction.triggered.connect(self.createRectClick)
-        self.createPolyAction.triggered.connect(self.createPolyClick)
+        self.createPolygonAction.triggered.connect(self.createPolyClick)
         self.createArcAction.triggered.connect(self.createArcClick)
         self.createCircleAction.triggered.connect(self.createCircleClick)
         self.createLabelAction.triggered.connect(self.createLabelClick)
@@ -2034,6 +2078,9 @@ class symbolEditor(editorWindow):
         self.centralW.scene.itemProperties()
 
     def checkSaveCell(self):
+        self.centralW.scene.saveSymbolCell(self.file)
+
+    def saveCell(self):
         self.centralW.scene.saveSymbolCell(self.file)
 
     def createRectClick(self, s):
@@ -2452,13 +2499,13 @@ class symbol_scene(editor_scene):
         # some default attributes
         self.newPin = None
         self.pinName = ""
-        self.pinType = shp.pin.pinTypes[0]
-        self.pinDir = shp.pin.pinDirs[0]
+        self.pinType = shp.symbolPin.pinTypes[0]
+        self.pinDir = shp.symbolPin.pinDirs[0]
         self.labelDefinition = ""
-        self.labelType = shp.label.labelTypes[0]
-        self.labelOrient = shp.label.labelOrients[0]
-        self.labelAlignment = shp.label.labelAlignments[0]
-        self.labelUse = shp.label.labelUses[0]
+        self.labelType = shp.symbolLabel.labelTypes[0]
+        self.labelOrient = shp.symbolLabel.labelOrients[0]
+        self.labelAlignment = shp.symbolLabel.labelAlignments[0]
+        self.labelUse = shp.symbolLabel.labelUses[0]
         self.labelVisible = False
         self.labelHeight = "12"
         self.labelOpaque = True
@@ -2594,7 +2641,7 @@ class symbol_scene(editor_scene):
             print(e)
 
     def lineDraw(self, start: QPoint, current: QPoint):
-        line = shp.line(start, current, self.gridTuple)
+        line = shp.symbolLine(start, current, self.gridTuple)
         # self.addItem(line)
         undoCommand = us.addShapeUndo(self, line)
         self.undoStack.push(undoCommand)
@@ -2606,7 +2653,7 @@ class symbol_scene(editor_scene):
         """
         # rect = shp.rectangle(start, end - QPoint(pen.width() / 2, pen.width() / 2), pen,
         #                      gridTuple)
-        rect = shp.rectangle(start, end, self.gridTuple)
+        rect = shp.symbolRectangle(start, end, self.gridTuple)
         # self.addItem(rect)
         undoCommand = us.addShapeUndo(self, rect)
         self.undoStack.push(undoCommand)
@@ -2617,7 +2664,7 @@ class symbol_scene(editor_scene):
         Draws a circle on the scene
         """
         # snappedEnd = self.snapToGrid(end, gridTuple)
-        circle = shp.circle(start, end, self.gridTuple)
+        circle = shp.symbolCircle(start, end, self.gridTuple)
         # self.addItem(circle)
         undoCommand = us.addShapeUndo(self, circle)
         self.undoStack.push(undoCommand)
@@ -2627,14 +2674,14 @@ class symbol_scene(editor_scene):
         """
         Draws an arc inside the rectangle defined by start and end points.
         """
-        arc = shp.arc(start, end, self.gridTuple)
+        arc = shp.symbolArc(start, end, self.gridTuple)
         # self.addItem(arc)
         undoCommand = us.addShapeUndo(self, arc)
         self.undoStack.push(undoCommand)
         return arc
 
     def pinDraw(self, current):
-        pin = shp.pin(current, self.pinName, self.pinDir, self.pinType, self.gridTuple)
+        pin = shp.symbolPin(current, self.pinName, self.pinDir, self.pinType, self.gridTuple)
         # self.addItem(pin)
         undoCommand = us.addShapeUndo(self, pin)
         self.undoStack.push(undoCommand)
@@ -2650,7 +2697,7 @@ class symbol_scene(editor_scene):
         labelOrient,
         labelUse,
     ):
-        label = shp.label(
+        label = shp.symbolLabel(
             current,
             labelDefinition,
             labelType,
@@ -2704,7 +2751,7 @@ class symbol_scene(editor_scene):
         if not self.selectedItems():
             return
         for item in self.selectedItems():
-            if isinstance(item, shp.rectangle):
+            if isinstance(item, shp.symbolRectangle):
                 self.queryDlg = pdlg.rectPropertyDialog(self.editorWindow)
                 [left, top, width, height] = item.rect.getRect()
                 sceneTopLeftPoint = item.mapToScene(QPoint(left, top))
@@ -2714,7 +2761,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.rectHeightLine.setText(str(height))  # str(height))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateRectangleShape(item)
-            if isinstance(item, shp.circle):
+            if isinstance(item, shp.symbolCircle):
                 self.queryDlg = pdlg.circlePropertyDialog(self.editorWindow)
                 centre = item.mapToScene(item.centre).toTuple()
                 radius = item.radius
@@ -2723,7 +2770,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.radiusEdit.setText(str(radius))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateCircleShape(item)
-            if isinstance(item, shp.arc):
+            if isinstance(item, shp.symbolArc):
                 self.queryDlg = pdlg.arcPropertyDialog(self.editorWindow)
                 sceneStartPoint = item.mapToScene(item.start)
                 self.queryDlg.startXEdit.setText(str(sceneStartPoint.x()))
@@ -2732,7 +2779,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.heightEdit.setText(str(item.height))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateArcShape(item)
-            elif isinstance(item, shp.line):
+            elif isinstance(item, shp.symbolLine):
                 self.queryDlg = pdlg.linePropertyDialog(self.editorWindow)
                 sceneLineStartPoint = item.mapToScene(item.start).toPoint()
                 sceneLineEndPoint = item.mapToScene(item.end).toPoint()
@@ -2742,7 +2789,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.endYLine.setText(str(sceneLineEndPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLineShape(item)
-            elif isinstance(item, shp.pin):
+            elif isinstance(item, shp.symbolPin):
                 self.queryDlg = pdlg.pinPropertyDialog(self.editorWindow)
                 self.queryDlg.pinName.setText(str(item.pinName))
                 self.queryDlg.pinType.setCurrentText(item.pinType)
@@ -2752,7 +2799,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.pinYLine.setText(str(sceneStartPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updatePinShape(item)
-            elif isinstance(item, shp.label):
+            elif isinstance(item, shp.symbolLabel):
                 self.queryDlg = pdlg.labelPropertyDialog(self.editorWindow)
                 self.queryDlg.labelDefinition.setText(str(item.labelDefinition))
                 self.queryDlg.labelHeightEdit.setText(str(item.labelHeight))
@@ -2775,7 +2822,7 @@ class symbol_scene(editor_scene):
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLabelShape(item)
 
-    def updateRectangleShape(self, item: shp.rectangle):
+    def updateRectangleShape(self, item: shp.symbolRectangle):
         """
         Both dictionaries have the topleft corner of rectangle in scene coordinates.
         """
@@ -2795,7 +2842,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymRectUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updateCircleShape(self, item: shp.circle):
+    def updateCircleShape(self, item: shp.symbolCircle):
         origItemList = [item.centre.x(), item.centre.y(), item.radius]
         centerX = self.snapToBase(
             float(self.queryDlg.centerXEdit.text()), self.gridTuple[0]
@@ -2811,7 +2858,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymCircleUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updateArcShape(self, item: shp.arc):
+    def updateArcShape(self, item: shp.symbolArc):
         origItemList = [item.start.x(), item.start.y(), item.width, item.height]
         startX = self.snapToBase(float(self.queryDlg.startXEdit.text()), self.gridTuple[0])
         startY = self.snapToBase(float(self.queryDlg.startYEdit.text()), self.gridTuple[1])
@@ -2822,7 +2869,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymArcUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updateLineShape(self, item: shp.line):
+    def updateLineShape(self, item: shp.symbolLine):
         """
         Updates line shape from dialogue entries.
         """
@@ -2837,7 +2884,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymLineUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updatePinShape(self, item: shp.pin):
+    def updatePinShape(self, item: shp.symbolPin):
         origItemList = [
             item.start.x(),
             item.start.y(),
@@ -2860,7 +2907,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymPinUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updateLabelShape(self, item: shp.label):
+    def updateLabelShape(self, item: shp.symbolLabel):
         """
         update label with new values.
         """
@@ -2888,11 +2935,11 @@ class symbol_scene(editor_scene):
         labelUse = self.queryDlg.labelUseCombo.currentText()
         labelVisible = self.queryDlg.labelVisiCombo.currentText() == "Yes"
         if self.queryDlg.normalType.isChecked():
-            labelType = shp.label.labelTypes[0]
+            labelType = shp.symbolLabel.labelTypes[0]
         elif self.queryDlg.NLPType.isChecked():
-            labelType = shp.label.labelTypes[1]
+            labelType = shp.symbolLabel.labelTypes[1]
         elif self.queryDlg.pyLType.isChecked():
-            labelType = shp.label.labelTypes[2]
+            labelType = shp.symbolLabel.labelTypes[2]
         # set opacity to 1 so that the label is still visible on symbol editor
         item.setOpacity(1)
         newItemList = [
@@ -2915,24 +2962,33 @@ class symbol_scene(editor_scene):
                 if item["type"] in self.symbolShapes:
                     itemShape = lj.createSymbolItems(item, self.gridTuple)
                     # items should be always visible in symbol view
-                    if isinstance(itemShape, shp.label):
+                    if isinstance(itemShape, shp.symbolLabel):
                         itemShape.setOpacity(1)
                     self.addItem(itemShape)
                 elif item["type"] == "attr":
                     attr = lj.createSymbolAttribute(item)
                     self.attributeList.append(attr)
 
-    def saveSymbolCell(self, fileName):
+    def saveSymbolCell(self, fileName:pathlib.Path):
         # items = self.items(self.sceneRect())  # get items in scene rect
         items = self.items()
         items.insert(0, {"cellView": "symbol"})
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)  # add attribute list to list
-        with open(fileName, "w") as f:
+        with fileName.open(mode= "w") as f:
             try:
                 json.dump(items, f, cls=symenc.symbolEncoder, indent=4)
             except Exception as e:
                 self.logger.error(e)
+
+    def reloadScene(self):
+        items = self.items()
+        items.insert(0, {"cellView": "symbol"})
+        if hasattr(self, "attributeList"):
+            items.extend(self.attributeList)
+        items=json.loads(json.dumps(items, cls=symenc.symbolEncoder))
+        self.clear()
+        self.loadSymbol(items)
 
     def viewSymbolProperties(self):
         """
@@ -3051,7 +3107,7 @@ class schematic_scene(editor_scene):
                     if self.selectedItems():
                         self.rotateSelectedItems(self.mousePressLoc)
 
-                elif self.itemSelect:
+                elif self.editModes.selectItem:
                     self.selectSceneItems(modifiers)
         except Exception as e:
             self.logger.error(f"mouse press error: {e}")
@@ -3084,7 +3140,7 @@ class schematic_scene(editor_scene):
                 elif self.editModes.drawText and self.newText.isSelected():
                     self.newText.setPos(self.mouseMoveLoc - self.mousePressLoc)
 
-                elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectionRectItem.setRect(
                         QRectF(self.mousePressLoc, self.mouseMoveLoc)
                     )
@@ -3132,7 +3188,7 @@ class schematic_scene(editor_scene):
                     self.parent.parent.messageLine.setText("Pin added")
                     self.editModes.drawPin = False
                     self.newPin = None
-                elif self.itemSelect and modifiers == Qt.ShiftModifier:
+                elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
                     )
@@ -3152,7 +3208,7 @@ class schematic_scene(editor_scene):
         snapItems = {
             item
             for item in self.items(snapRect)
-            if isinstance(item, (shp.pin, net.schematicNet))
+            if isinstance(item, (shp.symbolPin, net.schematicNet))
         }
 
         try:
@@ -3162,7 +3218,7 @@ class schematic_scene(editor_scene):
             items = list()
             if len(snapItems) > 0:
                 for item in snapItems:
-                    if isinstance(item, shp.pin):
+                    if isinstance(item, shp.symbolPin):
                         items.append(item)
                         points.append(item.mapToScene(item.start))
                         lengths.append(
@@ -3453,11 +3509,11 @@ class schematic_scene(editor_scene):
                 symbolGroupDict[symbolItem.cellName] = symbolItem
         return symbolGroupDict
 
-    def findSceneSymbolSet(self) -> set[shp.symbolShape]:
+    def findSceneSymbolSet(self) -> set[shp.schematicSymbol]:
         """
         Find all the symbols on the scene as a set.
         """
-        return {item for item in self.items() if isinstance(item, shp.symbolShape)}
+        return {item for item in self.items() if isinstance(item, shp.schematicSymbol)}
 
     def findSceneNetsSet(self) -> set[net.schematicNet]:
         return {item for item in self.items() if isinstance(item, net.schematicNet)}
@@ -3596,7 +3652,7 @@ class schematic_scene(editor_scene):
                     else:
                         itemShapes.append(lj.createSymbolItems(item, self.gridTuple))
 
-                symbolInstance = shp.symbolShape(itemShapes, itemAttributes, self.gridTuple)
+                symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes, self.gridTuple)
                 symbolInstance.setPos(pos)
                 symbolInstance.counter = self.itemCounter
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
@@ -3616,7 +3672,7 @@ class schematic_scene(editor_scene):
             for item in self.selectedItems():
                 selectedItemJson = json.dumps(item, cls=schenc.schematicEncoder)
                 itemCopyDict = json.loads(selectedItemJson)
-                if isinstance(item, shp.symbolShape):
+                if isinstance(item, shp.schematicSymbol):
                     self.itemCounter += 1
                     itemCopyDict["name"] = f"I{self.itemCounter}"
                     itemCopyDict["ic"] = int(self.itemCounter)
@@ -3642,55 +3698,45 @@ class schematic_scene(editor_scene):
                     )
 
 
-    def saveSchematicCell(self, file: pathlib.Path):
+    def saveSchematic(self, file: pathlib.Path):
         try:
-            # self.sceneR = self.sceneRect()  # get scene rect
-            # items = self.items(self.sceneR)  # get items in scene rect
-            # only save symbol shapes
-            symbolItems = self.findSceneSymbolSet()
-            netItems = self.findSceneNetsSet()
-            pinItems = self.findSceneSchemPinsSet()
-            textItems = self.findSceneTextSet()
-            items = list(symbolItems | netItems | pinItems | textItems)
-            items.insert(0, {"cellView": "schematic"})
-            with open(file, "w") as f:
-                json.dump(items, f, cls=schenc.schematicEncoder, indent=4)
-            if self.parent.parent.parentView is not None:
-                if type(self.parentView) == schematicEditor:
-                    self.parent.parent.parentView.loadSchematic()
-                elif type(self.parentView) == symbolEditor:
-                    self.parent.parent.parentView.loadSymbol()
+            topLevelItems = [item for item in self.items() if item.parentItem() is None]
+
+            # Insert a layout item at the beginning of the list
+            topLevelItems.insert(0, {"cellView": "schematic"})
+            with file.open(mode="w") as f:
+                json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
+            if self.editorWindow.parentEditor is not None:
+                if type(self.editorWindow.parentEditor) == schematicEditor:
+                    self.editorWindow.parentEditor.loadSchematic()
+                elif type(self.editorWindow.parentEditor) == symbolEditor:
+                    self.editorWindow.parentEditor.loadSymbol()
         except Exception as e:
             self.logger.error(e)
 
-    def loadSchematicCell(self, itemsList):
+    def loadSchematicItems(self, itemsList: list[dict]) -> None:
         """
         load schematic from item list
         """
+        shapesList = list()
         for item in itemsList[1:]:
-            if item is not None:
-                if item["type"] == "symbolShape":
-                    itemShape = lj.createSchematicItems(
-                        item, self.libraryDict, item["view"], self.gridTuple
-                    )
-                    self.addItem(itemShape)
-                    if itemShape.counter > self.itemCounter:
-                        self.itemCounter = itemShape.counter
-                    [labelItem.labelDefs() for labelItem in itemShape.labels.values()]
-                elif item["type"] == "schematicNet":
-                    netShape = lj.createSchematicNets(item)
-                    self.addItem(netShape)
-                elif item["type"] == "schematicPin":
-                    pinShape = lj.createSchematicPins(item, self.gridTuple)
-                    self.addItem(pinShape)
-                elif item["type"] == "text":
-                    text = lj.createTextItem(item, self.gridTuple)
-                    self.addItem(text)
-
+            itemShape = lj.createSchematicItems(
+                    item, self.libraryDict, self.gridTuple
+                )
+            if type(itemShape) == shp.schematicSymbol and itemShape.counter > self.itemCounter:
+                self.itemCounter = itemShape.counter
+            shapesList.append(itemShape)
+        self.undoStack.push(us.loadShapesUndo(self, shapesList))
         # increment item counter for next symbol
         self.itemCounter += 1
-        # self.addItem(shp.text(QPoint(0, 200), self.textPen, 'Revolution EDA'))
-        self.update()
+
+    def reloadScene(self):
+        topLevelItems = [item for item in self.items() if item.parentItem() is None]
+        # Insert a layout item at the beginning of the list
+        topLevelItems.insert(0, {"cellView": "schematic"})
+        items = json.loads(json.dumps(topLevelItems, cls=schenc.schematicEncoder))
+        self.clear()
+        self.loadSchematicItems(items)
 
     def viewObjProperties(self):
         """
@@ -3699,7 +3745,7 @@ class schematic_scene(editor_scene):
         try:
             if self.selectedItems() is not None:
                 for item in self.selectedItems():
-                    if isinstance(item, shp.symbolShape):
+                    if isinstance(item, shp.schematicSymbol):
                         dlg = pdlg.instanceProperties(self.editorWindow, item)
                         if dlg.exec() == QDialog.Accepted:
                             item.instanceName = dlg.instNameEdit.text().strip()
@@ -4004,7 +4050,7 @@ class schematic_scene(editor_scene):
     def goDownHier(self):
         if self.selectedItems() is not None:
             for item in self.selectedItems():
-                if isinstance(item, shp.symbolShape):
+                if isinstance(item, shp.schematicSymbol):
                     dlg = fd.goDownHierDialogue(self.editorWindow)
                     libItem = libm.getLibItem(
                         self.editorWindow.libraryView.libraryModel, item.libraryName
@@ -4023,25 +4069,21 @@ class schematic_scene(editor_scene):
                         )
                         cellItem = libm.getCellItem(libItem, item.cellName)
                         viewItem = libm.getViewItem(cellItem, dlg.viewListCB.currentText())
-                        openViewT = self.editorWindow.libraryView.libBrowsW.openCellView(
+                        openViewTuple = self.editorWindow.libraryView.libBrowsW.openCellView(
                             viewItem, cellItem, libItem
                         )
-                        if self.editorWindow.appMainW.openViews[openViewT]:
-                            childWindow = self.editorWindow.appMainW.openViews[openViewT]
-                            childWindow.parentView = self.editorWindow
-                            childWindow.schematicToolbar.addAction(childWindow.goUpAction)
+                        if self.editorWindow.appMainW.openViews[openViewTuple]:
+                            childWindow = self.editorWindow.appMainW.openViews[openViewTuple]
+                            childWindow.parentEditor = self.editorWindow
+                            childWindow.symbolToolbar.addAction(childWindow.goUpAction)
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
 
-    def goUpHier(self):
-        if self.editorWindow.parentView is not None:
-            self.editorWindow.parentView.raise_()
-            self.editorWindow.close()
 
     def ignoreSymbol(self):
         if self.selectedItems() is not None:
             for item in self.selectedItems():
-                if isinstance(item, shp.symbolShape):
+                if isinstance(item, shp.schematicSymbol):
                     item.netlistIgnore = not item.netlistIgnore
         else:
             self.logger.warning("No symbol selected")
@@ -4530,23 +4572,40 @@ class layout_scene(editor_scene):
         try:
             with filePathObj.open("r") as file:
                 decodedData = json.load(file)
-
-            # Create layout items for each item in decoded data
-            layoutItems = [
-                lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
-                for item in decodedData[1:]
-                if item.get("type") in self.layoutShapes
-            ]
-            # A hack to get loading working. Otherwise, when it is saved the top-level items
-            # get destroyed.
-            undoCommand = us.loadShapesUndo(self, layoutItems)
-            self.undoStack.push(undoCommand)
+            # Create layout items for each item in decoded data in a generator expression
+            self.createLayoutItems(decodedData)
 
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
+    def createLayoutItems(self, decodedData):
+        layoutItems = [
+            lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
+            for item in decodedData[1:]
+            if item.get("type") in self.layoutShapes
+        ]
+        # A hack to get loading working. Otherwise, when it is saved the top-level items
+        # get destroyed.
+        undoCommand = us.loadShapesUndo(self, layoutItems)
+        self.undoStack.push(undoCommand)
+
+    def reloadScene(self):
+        # Get the top level items from the scene
+        topLevelItems = [item for item in self.items() if item.parentItem() is None]
+        # Insert a layout item at the beginning of the list
+        topLevelItems.insert(0, {"cellView": "layout"})
+        # Convert the top level items to JSON string
+        # Decode the JSON string back to Python objects
+        decodedData = json.loads(json.dumps(topLevelItems, cls=layenc.layoutEncoder))
+        # Clear the current scene
+        self.clear()
+        # Create layout items based on the decoded data
+        self.createLayoutItems(decodedData)
+
+
     def deleteSelectedItems(self):
         for item in self.selectedItems():
+            # if pin is to be deleted, the associated label should be also deleted.
             if isinstance(item, lshp.layoutPin) and item.label is not None:
                 undoCommand = us.deleteShapeUndo(self, item.label)
                 self.undoStack.push(undoCommand)
@@ -4928,11 +4987,12 @@ class layout_scene(editor_scene):
                         )
                         if self.editorWindow.appMainW.openViews[openViewT]:
                             childWindow = self.editorWindow.appMainW.openViews[openViewT]
-                            childWindow.parentView = self.editorWindow
-                            # childWindow.schematicToolbar.addAction(childWindow.goUpAction)
+                            childWindow.parentEditor = self.editorWindow
+                            childWindow.layoutToolbar.addAction(childWindow.goUpAction)
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
-                
+
+
     @staticmethod
     def rotateVector(mouseLoc: QPoint, vector: layp.layoutPath, transform: QTransform):
         """

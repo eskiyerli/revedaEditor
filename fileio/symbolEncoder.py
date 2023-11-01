@@ -81,28 +81,28 @@ class symbolAttribute(object):
 
 class symbolEncoder(json.JSONEncoder):
     def default(self, item):
-        if isinstance(item, shp.rectangle):
+        if isinstance(item, shp.symbolRectangle):
             itemDict = {"type": "rect", "rect": item.rect.getCoords(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
-        elif isinstance(item, shp.line):
+        elif isinstance(item, shp.symbolLine):
             itemDict = {"type": "line", "st": item.start.toTuple(), "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
-        elif isinstance(item, shp.circle):
+        elif isinstance(item, shp.symbolCircle):
             itemDict = {"type": "circle", "cen": item.centre.toTuple(),
                         "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
-        elif isinstance(item, shp.arc):
+        elif isinstance(item, shp.symbolArc):
             itemDict = {"type": "arc", "st": item.start.toTuple(), "end": item.end.toTuple(),
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
-        elif isinstance(item, shp.pin):
+        elif isinstance(item, shp.symbolPin):
             itemDict = {"type": "pin", "st": item.start.toTuple(), "nam": item.pinName,
                         "pd": item.pinDir, "pt": item.pinType,
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
@@ -115,7 +115,7 @@ class symbolEncoder(json.JSONEncoder):
                         "loc": (item.scenePos() - item.scene().origin).toTuple(),
                         "ang": item.angle, }
             return itemDict
-        elif isinstance(item, shp.label):
+        elif isinstance(item, shp.symbolLabel):
             itemDict = {"type": "label", "st": item.start.toTuple(), "nam": item.labelName,
                         "def": item.labelDefinition,  # label as entered
                         "txt": item.labelText,  # shown label

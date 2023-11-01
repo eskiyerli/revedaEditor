@@ -281,7 +281,7 @@ def createVaSymbol(parent: QMainWindow,
                 symbolScene.gridTuple,
             )
             symbolScene.addItem(
-                shp.pin(leftPinLocs[i], pinPen, pinName)
+                shp.symbolPin(leftPinLocs[i], pinPen, pinName)
             )
         for i, pinName in enumerate(rightPinNames):
             symbolScene.lineDraw(
@@ -291,7 +291,7 @@ def createVaSymbol(parent: QMainWindow,
                 symbolScene.gridTuple,
             )
             symbolScene.addItem(
-                shp.pin(rightPinLocs[i], pinPen, pinName)
+                shp.symbolPin(rightPinLocs[i], pinPen, pinName)
             )
         for i, pinName in enumerate(topPinNames):
             symbolScene.lineDraw(
@@ -300,7 +300,7 @@ def createVaSymbol(parent: QMainWindow,
                 symbolScene.symbolPen,
                 symbolScene.gridTuple,
             )
-            symbolScene.addItem(shp.pin(topPinLocs[i], pinPen, pinName))
+            symbolScene.addItem(shp.symbolPin(topPinLocs[i], pinPen, pinName))
         for i, pinName in enumerate(bottomPinNames):
             symbolScene.lineDraw(
                 bottomPinLocs[i],
@@ -309,7 +309,7 @@ def createVaSymbol(parent: QMainWindow,
                 symbolScene.gridTuple,
             )
             symbolScene.addItem(
-                shp.pin(bottomPinLocs[i], pinPen, pinName)
+                shp.symbolPin(bottomPinLocs[i], pinPen, pinName)
             )
         symbolScene.attributeList = list()  # empty attribute list
         for key, value in importedVaObj.modelParams.items():

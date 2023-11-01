@@ -75,7 +75,7 @@ def exportSpiceNetlist(libraryName: str, cellName: str, viewName: str,
         schematicEditor = edw.schematicEditor(viewPath, libraryDict,
                                               libraryView)
         schematicScene = schematicEditor.centralW.scene
-        schematicScene.loadSchematicCell(viewPath)
+        schematicScene.loadSchematicItems(viewPath)
         schematicScene.createNetlist(pathlib.Path(netlistPath), True)
 
 def createSymbol(libraryName:str, cellName:str, viewName:str):
@@ -89,5 +89,5 @@ def createSymbol(libraryName:str, cellName:str, viewName:str):
                                               libraryView)
         schematicScene = schematicEditor.centralW.scene
 
-        schematicScene.loadSchematicCell(viewPath)
+        schematicScene.loadSchematicItems(viewPath)
         schematicScene.createSymbol()
