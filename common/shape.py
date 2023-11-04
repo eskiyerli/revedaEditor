@@ -93,6 +93,9 @@ class symbolShape(QGraphicsItem):
             return newPos
         return super().itemChange(change, value)
 
+    def __repr__(self):
+        return f'symbolShape({self.gridTuple})'
+
     @property
     def pen(self):
         return self._pen
@@ -226,7 +229,7 @@ class symbolRectangle(symbolShape):
         painter.drawRect(self._rect)
 
     def __repr__(self):
-        return f"rect({self._start},{self._end},{self._gridTuple})"
+        return f"symbolRectangle({self._start},{self._end},{self._gridTuple})"
 
     @property
     def rect(self):
@@ -414,7 +417,7 @@ class symbolCircle(symbolShape):
         painter.drawEllipse(self._centre, self._radius, self._radius)
 
     def __repr__(self):
-        return f"circle({self._centre},{self._end},{self._gridTuple})"
+        return f"symbolCircle({self._centre},{self._end},{self._gridTuple})"
 
     @property
     def radius(self):
@@ -592,7 +595,7 @@ class symbolArc(symbolShape):
         self._rect = arc_rect.normalized()
 
     def __repr__(self):
-        return f"arc({self._start},{self._end},{self._gridTuple})"
+        return f"symbolArc({self._start},{self._end},{self._gridTuple})"
 
     @property
     def start(self):
@@ -755,7 +758,7 @@ class symbolLine(symbolShape):
         painter.drawLine(self._line)
 
     def __repr__(self):
-        return f"line({self._start},{self._end}, {self._gridTuple})"
+        return f"symbolLine({self._start},{self._end}, {self._gridTuple})"
 
     @property
     def rect(self):
@@ -843,38 +846,29 @@ class symbolLine(symbolShape):
 
 
 class symbolPolygon(symbolShape):
-    def __init__(self, points: list, layer: ddef.layLayer, gridTuple: [int, int]):
+    def __init__(self, points: list, gridTuple: [int, int]):
         super().__init__(gridTuple)
         self._points = points
-        self._layer = layer
         self._gridTuple = gridTuple
-        self._definePensBrushes()
         self._polygon = QPolygonF(self._points)
         self._selectedCorner = None
         self._selectedCornerIndex = None
 
     def __repr__(self):
-        return f"layoutPolygon({self._points}, {self._layer}, {self._gridTuple})"
+        return f"symbolPolygon({self._points}, {self._gridTuple})"
+
 
     def paint(self, painter, option, widget):
         if self.isSelected():
-            painter.setPen(self._selectedPen)
-            painter.setBrush(self._selectedBrush)
+            painter.setPen(symlyr.selectedSymbolPen)
+            self.setZValue(symlyr.selectedSymbolLayer.z)
             if self._selectedCorner is not None:
                 painter.drawEllipse(self._selectedCorner, 5, 5)
         else:
-            painter.setPen(self._pen)
-            painter.setBrush(self._brush)
+            painter.setPen(symlyr.symbolPen)
+            self.setZValue(symlyr.symbolLayer.z)
         painter.drawPolygon(self._polygon)
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
 
     def boundingRect(self) -> QRectF:
         return self._polygon.boundingRect()
@@ -907,15 +901,6 @@ class symbolPolygon(symbolShape):
         self.prepareGeometryChange()
         self._polygon = QPolygonF([*self._points, value])
 
-    @property
-    def layer(self):
-        return self._layer
-
-    @layer.setter
-    def layer(self, value: ddef.layLayer):
-        self.prepareGeometryChange()
-        self._layer = value
-        self._definePensBrushes()
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -972,7 +957,7 @@ class symbolPin(symbolShape):
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
 
     def __str__(self):
-        return f"pin: {self._pinName} {self.mapToScene(self._start)}"
+        return f"symbolPin: {self._pinName} {self.mapToScene(self._start)}"
 
     def boundingRect(self):
         return self._rect  #
@@ -1305,7 +1290,7 @@ class symbolLabel(symbolShape):
 
     def __repr__(self):
         return (
-            f"label({self._start},{self._labelDefinition},"
+            f"symbolLabel({self._start},{self._labelDefinition},"
             f" {self._labelType}, {self._labelHeight}, {self._labelAlign}, {self._labelOrient},"
             f" {self._labelUse}, {self._gridTuple})"
         )
@@ -1647,7 +1632,7 @@ class schematicSymbol(symbolShape):
         self.dashLines = dict()
 
     def __repr__(self):
-        return f"symbolShape({self.shapes}, {self._gridTuple})"
+        return f"schematicSymbol({self.shapes}, {self._gridTuple})"
 
     def paint(self, painter, option, widget):
         self.setZValue(symlyr.symbolLayer.z)

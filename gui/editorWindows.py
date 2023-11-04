@@ -51,7 +51,6 @@ from PySide6.QtCore import (
     Qt,
     Slot,
     QLineF,
-    QTemporaryFile,
 )
 from PySide6.QtGui import (
     QAction,
@@ -71,6 +70,8 @@ from PySide6.QtGui import (
     QTransform,
     QWheelEvent,
     QPen,
+    QFontDatabase,
+    QFont,
 )
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import (
@@ -123,7 +124,6 @@ import revedaEditor.gui.lsw as lsw
 import revedaEditor.resources.resources
 import revedaEditor.fileio.gdsExport as gdse
 import pdk.pcells as pcells
-
 
 
 class libraryBrowser(QMainWindow):
@@ -186,7 +186,9 @@ class libraryBrowser(QMainWindow):
         self.libraryMenu.addSeparator()
 
         newCellViewIcon = QIcon(":/icons/document--pencil.png")
-        self.newCellViewAction = QAction(newCellViewIcon, "Create New CellView...", self)
+        self.newCellViewAction = QAction(
+            newCellViewIcon, "Create New CellView...", self
+        )
         self.newCellViewAction.setToolTip("Create New Cellview")
         self.libraryMenu.addAction(self.newCellViewAction)
         self.newCellViewAction.triggered.connect(self.newCellViewClick)
@@ -198,7 +200,9 @@ class libraryBrowser(QMainWindow):
         self.openCellViewAction.triggered.connect(self.openCellViewClick)
 
         deleteCellViewIcon = QIcon(":/icons/node-delete.png")
-        self.deleteCellViewAction = QAction(deleteCellViewIcon, "Delete CellView...", self)
+        self.deleteCellViewAction = QAction(
+            deleteCellViewIcon, "Delete CellView...", self
+        )
         self.deleteCellViewAction.setToolTip("Delete Cellview")
         self.libraryMenu.addAction(self.deleteCellViewAction)
         self.deleteCellViewAction.triggered.connect(self.deleteCellViewClick)
@@ -343,7 +347,8 @@ class libraryBrowser(QMainWindow):
                     )
                     schematicWindow.loadSchematic()
                     switchViewList = [
-                        viewName.strip() for viewName in dlg.switchViews.text().split(",")
+                        viewName.strip()
+                        for viewName in dlg.switchViews.text().split(",")
                     ]
                     stopViewList = [
                         viewName.strip() for viewName in dlg.stopViews.text().split(",")
@@ -652,8 +657,12 @@ class designLibrariesView(QTreeView):
                     selectedLibItem.child(row).cellName
                     for row in range(selectedLibItem.rowCount())
                 ]
-                if cellName in libCellNames:  # check if there is the cell in the library
-                    cellItem = libm.getCellItem(selectedLibItem, dlg.cellCB.currentText())
+                if (
+                    cellName in libCellNames
+                ):  # check if there is the cell in the library
+                    cellItem = libm.getCellItem(
+                        selectedLibItem, dlg.cellCB.currentText()
+                    )
                 else:
                     cellItem = scb.createCell(
                         self.libBrowsW,
@@ -727,13 +736,21 @@ class designLibrariesView(QTreeView):
                     QAction("Create CellView...", self, triggered=self.createCellView)
                 )
                 menu.addAction(QAction("Copy Cell...", self, triggered=self.copyCell))
-                menu.addAction(QAction("Rename Cell...", self, triggered=self.renameCell))
-                menu.addAction(QAction("Delete Cell...", self, triggered=self.deleteCell))
+                menu.addAction(
+                    QAction("Rename Cell...", self, triggered=self.renameCell)
+                )
+                menu.addAction(
+                    QAction("Delete Cell...", self, triggered=self.deleteCell)
+                )
             elif self.selectedItem.data(Qt.UserRole + 1) == "view":
                 menu.addAction(QAction("Open View", self, triggered=self.openView))
                 menu.addAction(QAction("Copy View...", self, triggered=self.copyView))
-                menu.addAction(QAction("Rename View...", self, triggered=self.renameView))
-                menu.addAction(QAction("Delete View...", self, triggered=self.deleteView))
+                menu.addAction(
+                    QAction("Rename View...", self, triggered=self.renameView)
+                )
+                menu.addAction(
+                    QAction("Delete View...", self, triggered=self.deleteView)
+                )
             menu.exec(event.globalPos())
         except UnboundLocalError:
             pass
@@ -814,6 +831,17 @@ class libraryPathsTableView(QTableView):
 
 
 class symbolViewsModel(designLibrariesModel):
+    """
+    Initializes the object with the given `libraryDict` and `symbolViews`.
+
+    Parameters:
+        libraryDict (dict): A dictionary containing the library information.
+        symbolViews (list): A list of symbol views.
+
+    Returns:
+        None
+    """
+
     def __init__(self, libraryDict: dict, symbolViews: list):
         self.symbolViews = symbolViews
         super().__init__(libraryDict)
@@ -875,7 +903,9 @@ class editorWindow(QMainWindow):
         super().__init__()
         self.centralW = None
         self.viewItem = viewItem
-        self.file:pathlib.Path = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
+        self.file: pathlib.Path = self.viewItem.data(
+            Qt.UserRole + 2
+        )  # pathlib Path object
         self.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
@@ -883,7 +913,7 @@ class editorWindow(QMainWindow):
         self.viewName = self.viewItem.viewName
         self.libraryDict = libraryDict
         self.libraryView = libraryView
-        self.parentEditor = None # type: editorWindow
+        self.parentEditor = None  # type: editorWindow
         self._app = QApplication.instance()
         self._createActions()
         self._createTriggers()
@@ -968,9 +998,9 @@ class editorWindow(QMainWindow):
         self.redrawAction = QAction(redrawIcon, "Redraw", self)
 
         rulerIcon = QIcon(":/icons/ruler.png")
-        self.rulerAction = QAction(rulerIcon, "Ruler", self)
+        self.rulerAction = QAction(rulerIcon, "Add Ruler", self)
 
-        delRulerIcon = QIcon.fromTheme("delete")
+        delRulerIcon = QIcon.fromTheme(":/icons/ruler--minus.png")
         self.delRulerAction = QAction(delRulerIcon, "Delete Rulers", self)
 
         # display options
@@ -981,7 +1011,9 @@ class editorWindow(QMainWindow):
         self.selectConfigAction = QAction(selectConfigIcon, "Selection Config...", self)
 
         panZoomConfigIcon = QIcon(":/icons/selection-resize.png")
-        self.panZoomConfigAction = QAction(panZoomConfigIcon, "Pan/Zoom Config...", self)
+        self.panZoomConfigAction = QAction(
+            panZoomConfigIcon, "Pan/Zoom Config...", self
+        )
 
         undoIcon = QIcon(":/icons/arrow-circle-315-left.png")
         self.undoAction = QAction(undoIcon, "Undo", self)
@@ -1079,7 +1111,7 @@ class editorWindow(QMainWindow):
 
         createViaIcon = QIcon(":/icons/layer-mask.png")
         self.createViaAction = QAction(createViaIcon, "Create Via...", self)
-        
+
         createInstIcon = QIcon(":/icons/block--plus.png")
         self.createInstAction = QAction(createInstIcon, "Create Instance...", self)
 
@@ -1100,7 +1132,6 @@ class editorWindow(QMainWindow):
 
         createTextIcon = QIcon(":icons/sticky-note-text.png")
         self.createTextAction = QAction(createTextIcon, "Create Text...", self)
-
 
         ignoreIcon = QIcon(":/icons/minus-circle.png")
         self.ignoreAction = QAction(ignoreIcon, "Ignore", self)
@@ -1210,7 +1241,6 @@ class editorWindow(QMainWindow):
         self.centralW.scene.itemContextMenu.addAction(self.objPropAction)
         self.centralW.scene.itemContextMenu.addAction(self.selectAllAction)
         self.centralW.scene.itemContextMenu.addAction(self.deselectAllAction)
-        
 
     def dispConfigEdit(self):
         dcd = pdlg.displayConfigDialog(self)
@@ -1253,7 +1283,7 @@ class editorWindow(QMainWindow):
         self.centralW.scene.readOnly = self.readOnlyCellAction.isChecked()
 
     def updateDesignScene(self):
-        self.messageLine.setText('Reloading design.')
+        self.messageLine.setText("Reloading design.")
         self.centralW.scene.reloadScene()
 
     def printClick(self):
@@ -1262,7 +1292,9 @@ class editorWindow(QMainWindow):
             printer = dlg.printer()
             printRunner = startThread(self.centralW.view.printView(printer))
             self.appMainW.threadPool.start(printRunner)
-            self.logger.info("Printing started")  # self.centralW.view.printView(printer)
+            self.logger.info(
+                "Printing started"
+            )  # self.centralW.view.printView(printer)
 
     def printPreviewClick(self):
         printer = QPrinter(QPrinter.ScreenResolution)
@@ -1383,8 +1415,6 @@ class layoutEditor(editorWindow):
     def _createActions(self):
         super()._createActions()
         self.exportGDSAction = QAction("Export GDS", self)
-        
-        
 
     def _addActions(self):
         super()._addActions()
@@ -1396,6 +1426,9 @@ class layoutEditor(editorWindow):
         self.menuCreate.addAction(self.createLabelAction)
         self.menuCreate.addAction(self.createViaAction)
         self.menuCreate.addAction(self.createPolygonAction)
+        self.menuCreate.addSeparator()
+        self.menuCreate.addAction(self.rulerAction)
+        self.menuCreate.addAction(self.delRulerAction)
         self.menuTools.addAction(self.exportGDSAction)
         # hierarchy submenu
         self.hierMenu = self.menuEdit.addMenu("Hierarchy")
@@ -1418,6 +1451,9 @@ class layoutEditor(editorWindow):
         self.layoutToolbar.addAction(self.createViaAction)
         self.layoutToolbar.addAction(self.createPolygonAction)
         self.layoutToolbar.addSeparator()
+        self.layoutToolbar.addAction(self.rulerAction)
+        self.layoutToolbar.addAction(self.delRulerAction)
+        self.layoutToolbar.addSeparator()
         self.layoutToolbar.addAction(self.goDownAction)
 
     def _createTriggers(self):
@@ -1431,6 +1467,8 @@ class layoutEditor(editorWindow):
         self.createLabelAction.triggered.connect(self.createLabelClick)
         self.createViaAction.triggered.connect(self.createViaClick)
         self.createPolygonAction.triggered.connect(self.createPolygonClick)
+        self.rulerAction.triggered.connect(self.createRulerClick)
+        self.delRulerAction.triggered.connect(self.delRulerClick)
         self.deleteAction.triggered.connect(self.deleteClick)
         self.objPropAction.triggered.connect(self.objPropClick)
         self.stretchAction.triggered.connect(self.stretchClick)
@@ -1446,9 +1484,20 @@ class layoutEditor(editorWindow):
         self.createViaAction.setShortcut(Qt.Key_V)
         self.createPolygonAction.setShortcut(Qt.Key_G)
         self.stretchAction.setShortcut(Qt.Key_S)
+        self.rulerAction.setShortcut(Qt.Key_K)
+        self.delRulerAction.setShortcut("Shift+K")
 
     def createRectClick(self, s):
         self.centralW.scene.editModes.setMode("drawRect")
+
+    def createRulerClick(self, s):
+        self.centralW.scene.editModes.setMode("drawRuler")
+        self.messageLine.setText("Click on the first point of the ruler.")
+
+    def delRulerClick(self,s):
+        self.messageLine.setText("Deleting all rulers")
+        self.centralW.scene.deleteAllRulers()
+        self.centralW.scene.editModes.setMode("selectItem")
 
     def createPathClick(self, s):
         dlg = ldlg.createPathDialogue(self)
@@ -1491,8 +1540,12 @@ class layoutEditor(editorWindow):
 
     def createPinClick(self):
         dlg = ldlg.createLayoutPinDialog(self)
-        pinLayersNames = [f"{item.name} [{item.purpose}]" for item in laylyr.pdkPinLayers]
-        textLayersNames = [f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers]
+        pinLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkPinLayers
+        ]
+        textLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+        ]
         dlg.pinLayerCB.addItems(pinLayersNames)
         dlg.labelLayerCB.addItems(textLayersNames)
 
@@ -1511,17 +1564,21 @@ class layoutEditor(editorWindow):
             dlg.labelHeightCB.setCurrentText(
                 str(self.centralW.scene.newLabelTuple.fontHeight)
             )
-            dlg.labelAlignCB.setCurrentText(self.centralW.scene.newLabelTuple.labelAlign)
-            dlg.labelOrientCB.setCurrentText(self.centralW.scene.newLabelTuple.labelOrient)
+            dlg.labelAlignCB.setCurrentText(
+                self.centralW.scene.newLabelTuple.labelAlign
+            )
+            dlg.labelOrientCB.setCurrentText(
+                self.centralW.scene.newLabelTuple.labelOrient
+            )
         if dlg.exec() == QDialog.Accepted:
             self.centralW.scene.editModes.setMode("drawPin")
             pinName = dlg.pinName.text()
             pinDir = dlg.pinDir.currentText()
             pinType = dlg.pinType.currentText()
             pinLayerName = dlg.pinLayerCB.currentText().split()[0]
-            pinLayer = [item for item in laylyr.pdkPinLayers if item.name == pinLayerName][
-                0
-            ]
+            pinLayer = [
+                item for item in laylyr.pdkPinLayers if item.name == pinLayerName
+            ][0]
             labelLayerName = dlg.labelLayerCB.currentText().split()[0]
             labelLayer = [
                 item for item in laylyr.pdkTextLayers if item.name == labelLayerName
@@ -1546,7 +1603,9 @@ class layoutEditor(editorWindow):
 
     def createLabelClick(self):
         dlg = ldlg.createLayoutLabelDialog(self)
-        textLayersNames = [f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers]
+        textLayersNames = [
+            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+        ]
         dlg.labelLayerCB.addItems(textLayersNames)
         if dlg.exec() == QDialog.Accepted:
             self.centralW.scene.editModes.setMode("addLabel")
@@ -1650,8 +1709,12 @@ class layoutEditor(editorWindow):
             libItem = libm.getLibItem(
                 libraryModel, self.layoutChooser.libNamesCB.currentText()
             )
-            cellItem = libm.getCellItem(libItem, self.layoutChooser.cellCB.currentText())
-            viewItem = libm.getViewItem(cellItem, self.layoutChooser.viewCB.currentText())
+            cellItem = libm.getCellItem(
+                libItem, self.layoutChooser.cellCB.currentText()
+            )
+            viewItem = libm.getViewItem(
+                cellItem, self.layoutChooser.viewCB.currentText()
+            )
             self.centralW.scene.layoutInstanceTuple = ddef.viewItemTuple(
                 libItem, cellItem, viewItem
             )
@@ -1665,11 +1728,14 @@ class layoutEditor(editorWindow):
         if dlg.exec() == QDialog.Accepted:
             self.gdsExportDir = pathlib.Path(dlg.exportPathEdit.text().strip())
             gdsExportPath = self.gdsExportDir / f"{self.cellName}.gds"
-            self.checkSaveCell() # save and reload the cell to get the positions right
+            self.checkSaveCell()  # save and reload the cell to get the positions right
             self.centralW.scene.clear()
             self.loadLayout()
-            layoutItems = [item for item in self.centralW.scene.items() if item.parentItem()
-                           is None]
+            layoutItems = [
+                item
+                for item in self.centralW.scene.items()
+                if item.parentItem() is None
+            ]
             gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, gdsExportPath)
             gdsExportObj.unit = Quantity(dlg.unitEdit.text().strip()).real
             gdsExportObj.precision = Quantity(dlg.precisionEdit.text().strip()).real
@@ -1704,7 +1770,7 @@ class schematicEditor(editorWindow):
     def _createActions(self):
         super()._createActions()
         self.netNameAction = QAction("Net Name", self)
-        self.netNameAction.setShortcut("l")
+        self.netNameAction.setShortcut(Qt.Key_L)
         self.hilightNetAction = QAction("Highlight Net", self)
         self.hilightNetAction.setCheckable(True)
 
@@ -1816,8 +1882,12 @@ class schematicEditor(editorWindow):
             libItem = libm.getLibItem(
                 libraryModel, self.symbolChooser.libNamesCB.currentText()
             )
-            cellItem = libm.getCellItem(libItem, self.symbolChooser.cellCB.currentText())
-            viewItem = libm.getViewItem(cellItem, self.symbolChooser.viewCB.currentText())
+            cellItem = libm.getCellItem(
+                libItem, self.symbolChooser.cellCB.currentText()
+            )
+            viewItem = libm.getViewItem(
+                cellItem, self.symbolChooser.viewCB.currentText()
+            )
             self.centralW.scene.instanceSymbolTuple = ddef.viewItemTuple(
                 libItem, cellItem, viewItem
             )
@@ -1991,7 +2061,6 @@ class schematicEditor(editorWindow):
     def goDownClick(self, s):
         self.centralW.scene.goDownHier()
 
-
     def ignoreClick(self, s):
         self.centralW.scene.ignoreSymbol()
 
@@ -2092,7 +2161,7 @@ class symbolEditor(editorWindow):
         self.messageLine.setText("Press left mouse button for the first point.")
 
     def createPolyClick(self, s):
-        pass
+        self.centralW.scene.editModes.setMode("drawPolygon")
 
     def createArcClick(self, s):
         self.centralW.scene.editModes.setMode("drawArc")
@@ -2149,11 +2218,15 @@ class symbolEditor(editorWindow):
             self.centralW.scene.editModes.setMode("addLabel")
             # directly setting scene class attributes here to pass the information.
             self.centralW.scene.labelDefinition = createLabelDlg.labelDefinition.text()
-            self.centralW.scene.labelHeight = createLabelDlg.labelHeightEdit.text().strip()
+            self.centralW.scene.labelHeight = (
+                createLabelDlg.labelHeightEdit.text().strip()
+            )
             self.centralW.scene.labelAlignment = (
                 createLabelDlg.labelAlignCombo.currentText()
             )
-            self.centralW.scene.labelOrient = createLabelDlg.labelOrientCombo.currentText()
+            self.centralW.scene.labelOrient = (
+                createLabelDlg.labelOrientCombo.currentText()
+            )
             self.centralW.scene.labelUse = createLabelDlg.labelUseCombo.currentText()
             self.centralW.scene.labelOpaque = (
                 createLabelDlg.labelVisiCombo.currentText() == "Yes"
@@ -2265,7 +2338,7 @@ class editor_scene(QGraphicsScene):
             copyItem=False,
             rotateItem=False,
             changeOrigin=False,
-            panView = False,
+            panView=False,
         )
         self.readOnly = False  # if the scene is not editable
         self.undoStack = QUndoStack()
@@ -2336,7 +2409,9 @@ class editor_scene(QGraphicsScene):
             QEvent.GraphicsSceneMousePress,
             QEvent.GraphicsSceneMouseRelease,
         ]:
-            event.setScenePos(self.snapToGrid(event.scenePos(), self.gridTuple).toPointF())
+            event.setScenePos(
+                self.snapToGrid(event.scenePos(), self.gridTuple).toPointF()
+            )
             return False
         else:
             return super().eventFilter(source, event)
@@ -2403,12 +2478,9 @@ class editor_scene(QGraphicsScene):
                         item.stretch = True
             except AttributeError:
                 self.messageLine.setText("Nothing selected")
-    
-
 
     def fitItemsInView(self) -> None:
-
-        self.setSceneRect(self.itemsBoundingRect().adjusted(-40,-40, 40, 40))
+        self.setSceneRect(self.itemsBoundingRect().adjusted(-40, -40, 40, 40))
         self.views()[0].fitInView(self.sceneRect(), Qt.KeepAspectRatio)
         self.views()[0].viewport().update()
 
@@ -2463,8 +2535,9 @@ class editor_scene(QGraphicsScene):
         height = view_widget.height()
         self.setSceneRect(point.x() - width / 2, point.y() - height / 2, width, height)
 
-    
-
+    def addUndoStack(self, item):
+        undoCommand = us.addShapeUndo(self, item)
+        self.undoStack.push(undoCommand)
 
 class symbol_scene(editor_scene):
     """
@@ -2482,7 +2555,7 @@ class symbol_scene(editor_scene):
             copyItem=False,
             rotateItem=False,
             changeOrigin=False,
-            panView = False,
+            panView=False,
             drawPin=False,
             drawArc=False,
             drawRect=False,
@@ -2493,7 +2566,7 @@ class symbol_scene(editor_scene):
             stretchItem=False,
         )
 
-        self.symbolShapes = ["line", "arc", "rect", "circle", "pin", "label"]
+        self.symbolShapes = ["line", "arc", "rect", "circle", "pin", "label", "polygon"]
 
         self.origin = QPoint(0, 0)
         # some default attributes
@@ -2513,6 +2586,8 @@ class symbol_scene(editor_scene):
         self.newRect = None
         self.newCirc = None
         self.newArc = None
+        self.newPolygon = None
+        self.polygonGuideLine = None
 
     @property
     def drawMode(self):
@@ -2566,7 +2641,30 @@ class symbol_scene(editor_scene):
                     self.editorWindow.messageLine.setText(
                         "Click on the center of the circle"
                     )
-                    self.newCircle = self.circleDraw(self.mousePressLoc, self.mousePressLoc)
+                    self.newCircle = self.circleDraw(
+                        self.mousePressLoc, self.mousePressLoc
+                    )
+                elif self.editModes.drawPolygon:
+                    if self.newPolygon is None:
+                        # Create a new polygon
+                        self.newPolygon = shp.symbolPolygon(
+                            [self.mousePressLoc, self.mousePressLoc],
+                            self.gridTuple,
+                        )
+                        self.addUndoStack(self.newPolygon)
+                        # Create a guide line for the polygon
+                        self.polygonGuideLine = QGraphicsLineItem(
+                            QLineF(
+                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                            )
+                        )
+                        self.polygonGuideLine.setPen(
+                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
+                        )
+                        self.addUndoStack(self.polygonGuideLine)
+
+                    else:
+                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.drawArc:
                     self.editorWindow.messageLine.setText("Start drawing an arc")
                     self.newArc = self.arcDraw(self.mousePressLoc, self.mousePressLoc)
@@ -2606,6 +2704,11 @@ class symbol_scene(editor_scene):
                 self.selectionRectItem.setRect(
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
+        else:
+            if self.editModes.drawPolygon and self.newPolygon is not None:
+                self.polygonGuideLine.setLine(
+                    QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
+                )
         self.statusLine.showMessage(
             f"Cursor Position: {(self.mouseMoveLoc - self.origin).toTuple()}"
         )
@@ -2638,7 +2741,22 @@ class symbol_scene(editor_scene):
                     self.removeItem(self.selectionRectItem)
                     self.selectionRectItem = None
         except Exception as e:
-            print(e)
+            self.logger.error(f"Error in Mouse Press Event: {e} ")
+
+    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(event)
+        self.mouseDoubleClickLoc = event.scenePos().toPoint()
+        try:
+            if event.button() == Qt.LeftButton:
+                if self.editModes.drawPolygon:
+                    self.newPolygon.polygon.remove(0)
+                    self.newPolygon.points.pop(0)
+                    self.editModes.setMode("selectItem")
+                    self.newPolygon = None
+                    self.removeItem(self.polygonGuideLine)
+                    self.polygonGuideLine = None
+        except Exception as e:
+            self.logger.error(f"Error in mouse Double Click Event: {e}")
 
     def lineDraw(self, start: QPoint, current: QPoint):
         line = shp.symbolLine(start, current, self.gridTuple)
@@ -2681,7 +2799,9 @@ class symbol_scene(editor_scene):
         return arc
 
     def pinDraw(self, current):
-        pin = shp.symbolPin(current, self.pinName, self.pinDir, self.pinType, self.gridTuple)
+        pin = shp.symbolPin(
+            current, self.pinName, self.pinDir, self.pinType, self.gridTuple
+        )
         # self.addItem(pin)
         undoCommand = us.addShapeUndo(self, pin)
         self.undoStack.push(undoCommand)
@@ -2735,13 +2855,17 @@ class symbol_scene(editor_scene):
     def moveBySelectedItems(self):
         if self.selectedItems():
             dlg = pdlg.moveByDialogue(self.editorWindow)
-            dlg.xEdit.setText('0')
-            dlg.yEdit.setText('0')
+            dlg.xEdit.setText("0")
+            dlg.yEdit.setText("0")
             if dlg.exec() == QDialog.Accepted:
                 for item in self.selectedItems():
-                    item.moveBy(self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]), 
-                                self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]))
-            self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+                    item.moveBy(
+                        self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]),
+                        self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]),
+                    )
+            self.editorWindow.messageLine.setText(
+                f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}"
+            )
             self.editModes.setMode("selectItem")
 
     def itemProperties(self):
@@ -2827,8 +2951,12 @@ class symbol_scene(editor_scene):
         Both dictionaries have the topleft corner of rectangle in scene coordinates.
         """
         origItemList = item.rect.getRect()  # in item coordinates
-        left = self.snapToBase(float(self.queryDlg.rectLeftLine.text()), self.gridTuple[0])
-        top = self.snapToBase(float(self.queryDlg.rectTopLine.text()), self.gridTuple[1])
+        left = self.snapToBase(
+            float(self.queryDlg.rectLeftLine.text()), self.gridTuple[0]
+        )
+        top = self.snapToBase(
+            float(self.queryDlg.rectTopLine.text()), self.gridTuple[1]
+        )
         width = self.snapToBase(
             float(self.queryDlg.rectWidthLine.text()), self.gridTuple[0]
         )
@@ -2850,7 +2978,9 @@ class symbol_scene(editor_scene):
         centerY = self.snapToBase(
             float(self.queryDlg.centerYEdit.text()), self.gridTuple[1]
         )
-        radius = self.snapToBase(float(self.queryDlg.radiusEdit.text()), self.gridTuple[0])
+        radius = self.snapToBase(
+            float(self.queryDlg.radiusEdit.text()), self.gridTuple[0]
+        )
         centrePoint = item.mapFromScene(
             self.snapToGrid(QPoint(centerX, centerY), self.gridTuple)
         )
@@ -2860,11 +2990,19 @@ class symbol_scene(editor_scene):
 
     def updateArcShape(self, item: shp.symbolArc):
         origItemList = [item.start.x(), item.start.y(), item.width, item.height]
-        startX = self.snapToBase(float(self.queryDlg.startXEdit.text()), self.gridTuple[0])
-        startY = self.snapToBase(float(self.queryDlg.startYEdit.text()), self.gridTuple[1])
+        startX = self.snapToBase(
+            float(self.queryDlg.startXEdit.text()), self.gridTuple[0]
+        )
+        startY = self.snapToBase(
+            float(self.queryDlg.startYEdit.text()), self.gridTuple[1]
+        )
         start = item.mapFromScene(QPoint(startX, startY)).toPoint()
-        width = self.snapToBase(float(self.queryDlg.widthEdit.text()), self.gridTuple[0])
-        height = self.snapToBase(float(self.queryDlg.heightEdit.text()), self.gridTuple[1])
+        width = self.snapToBase(
+            float(self.queryDlg.widthEdit.text()), self.gridTuple[0]
+        )
+        height = self.snapToBase(
+            float(self.queryDlg.heightEdit.text()), self.gridTuple[1]
+        )
         newItemList = [start.x(), start.y(), width, height]
         undoCommand = us.updateSymArcUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
@@ -2874,8 +3012,12 @@ class symbol_scene(editor_scene):
         Updates line shape from dialogue entries.
         """
         origItemList = [item.start.x(), item.start.y(), item.end.x(), item.end.y()]
-        startX = self.snapToBase(float(self.queryDlg.startXLine.text()), self.gridTuple[0])
-        startY = self.snapToBase(float(self.queryDlg.startYLine.text()), self.gridTuple[1])
+        startX = self.snapToBase(
+            float(self.queryDlg.startXLine.text()), self.gridTuple[0]
+        )
+        startY = self.snapToBase(
+            float(self.queryDlg.startYLine.text()), self.gridTuple[1]
+        )
         endX = self.snapToBase(float(self.queryDlg.endXLine.text()), self.gridTuple[0])
         endY = self.snapToBase(float(self.queryDlg.endYLine.text()), self.gridTuple[1])
         start = item.mapFromScene(QPoint(startX, startY)).toPoint()
@@ -2969,13 +3111,13 @@ class symbol_scene(editor_scene):
                     attr = lj.createSymbolAttribute(item)
                     self.attributeList.append(attr)
 
-    def saveSymbolCell(self, fileName:pathlib.Path):
+    def saveSymbolCell(self, fileName: pathlib.Path):
         # items = self.items(self.sceneRect())  # get items in scene rect
         items = self.items()
         items.insert(0, {"cellView": "symbol"})
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)  # add attribute list to list
-        with fileName.open(mode= "w") as f:
+        with fileName.open(mode="w") as f:
             try:
                 json.dump(items, f, cls=symenc.symbolEncoder, indent=4)
             except Exception as e:
@@ -2986,7 +3128,7 @@ class symbol_scene(editor_scene):
         items.insert(0, {"cellView": "symbol"})
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)
-        items=json.loads(json.dumps(items, cls=symenc.symbolEncoder))
+        items = json.loads(json.dumps(items, cls=symenc.symbolEncoder))
         self.clear()
         self.loadSymbol(items)
 
@@ -3004,7 +3146,9 @@ class symbol_scene(editor_scene):
                 # label name is not changed.
                 item.labelHeight = symbolPropDialogue.labelHeightList[i].text()
                 item.labelAlign = symbolPropDialogue.labelAlignmentList[i].currentText()
-                item.labelOrient = symbolPropDialogue.labelOrientationList[i].currentText()
+                item.labelOrient = symbolPropDialogue.labelOrientationList[
+                    i
+                ].currentText()
                 item.labelUse = symbolPropDialogue.labelUseList[i].currentText()
                 item.labelType = symbolPropDialogue.labelTypeList[i].currentText()
                 item.update(item.boundingRect())
@@ -3036,7 +3180,7 @@ class schematic_scene(editor_scene):
             copyItem=False,
             rotateItem=False,
             changeOrigin=False,
-            panView = False,
+            panView=False,
             drawPin=False,
             drawWire=False,
             drawText=False,
@@ -3161,7 +3305,9 @@ class schematic_scene(editor_scene):
                     self.mouseReleaseLoc = self.findSnapPoint(
                         self.mouseReleaseLoc, self.snapDistance, set(self.wires)
                     )
-                    self.extendWires(self.wires, self.mousePressLoc, self.mouseReleaseLoc)
+                    self.extendWires(
+                        self.wires, self.mousePressLoc, self.mouseReleaseLoc
+                    )
                     if self.snapPointRect:
                         self.removeItem(self.snapPointRect)
                         self.snapPointRect = None
@@ -3381,7 +3527,9 @@ class schematic_scene(editor_scene):
         """
         # select a net from the set and remove it from the set
         try:
-            initialNet = unnamedNetsSet.pop()  # assign it a name, net0, net1, net2, etc.
+            initialNet = (
+                unnamedNetsSet.pop()
+            )  # assign it a name, net0, net1, net2, etc.
         except KeyError:  # initialNet set is empty
             pass
         else:
@@ -3484,7 +3632,9 @@ class schematic_scene(editor_scene):
                 if not pinItem.connected:
                     # assign a default net name prefixed with d(efault).
                     symbolItem.pinNetMap[pinName] = f"dnet{netCounter}"
-                    self.logger.warning(f"left unconnected:{symbolItem.pinNetMap[pinName]}")
+                    self.logger.warning(
+                        f"left unconnected:{symbolItem.pinNetMap[pinName]}"
+                    )
                     netCounter += 1
             # now reorder pinNetMap according pinOrder attribute
             if symbolItem.attr.get("pinOrder"):
@@ -3519,14 +3669,18 @@ class schematic_scene(editor_scene):
         return {item for item in self.items() if isinstance(item, net.schematicNet)}
 
     def findSceneSchemPinsSet(self) -> set[shp.schematicPin]:
-        pinsSceneSet = {item for item in self.items() if isinstance(item, shp.schematicPin)}
+        pinsSceneSet = {
+            item for item in self.items() if isinstance(item, shp.schematicPin)
+        }
         if pinsSceneSet:  # check pinsSceneSet is empty
             return pinsSceneSet
         else:
             return set()
 
     def findSceneTextSet(self) -> set[shp.text]:
-        if textSceneSet := {item for item in self.items() if isinstance(item, shp.text)}:
+        if textSceneSet := {
+            item for item in self.items() if isinstance(item, shp.text)
+        }:
             return textSceneSet
         else:
             return set()
@@ -3562,7 +3716,7 @@ class schematic_scene(editor_scene):
             lines[2].start = secondPoint
             lines[2].end = end
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(f"extend wires error{e}")
 
     def pruneWires(self, lines, pen):
         if lines[0].start == lines[2].end:  # if the first and last points are the same
@@ -3572,12 +3726,11 @@ class schematic_scene(editor_scene):
             return None
         # if the line is vertical or horizontal
         elif (
-            lines[0].start.x() == lines[2].end.x() or lines[0].start.y() == lines[2].end.y()
+            lines[0].start.x() == lines[2].end.x()
+            or lines[0].start.y() == lines[2].end.y()
         ):
             newLine = net.schematicNet(lines[0].start, lines[2].end)
-            self.addItem(newLine)
-            undoCommand = us.addShapeUndo(self, newLine)
-            self.undoStack.push(undoCommand)
+            self.addUndoStack(newLine)
             for line in lines:
                 self.removeItem(line)
                 del line
@@ -3589,8 +3742,7 @@ class schematic_scene(editor_scene):
                     lines.remove(line)
                     del line
                 else:
-                    undoCommand = us.addShapeUndo(self, line)
-                    self.undoStack.push(undoCommand)
+                    self.addUndoStack(line)
             return lines
 
     def addPin(self, pos: QPoint):
@@ -3598,12 +3750,10 @@ class schematic_scene(editor_scene):
             pin = shp.schematicPin(
                 pos, self.pinName, self.pinDir, self.pinType, self.gridTuple
             )
-            self.addItem(pin)
-            undoCommand = us.addShapeUndo(self, pin)
-            self.undoStack.push(undoCommand)
+            self.addUndoStack(pin)
             return pin
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(f"Pin add error: {e}")
 
     def addNote(self, pos: QPoint):
         """
@@ -3619,9 +3769,7 @@ class schematic_scene(editor_scene):
             self.noteOrient,
             self.gridTuple,
         )
-        self.addItem(text)
-        undoCommand = us.addShapeUndo(self, text)
-        self.undoStack.push(undoCommand)
+        self.addUndoStack(text)
         return text
 
     def drawInstance(self, pos: QPoint):
@@ -3629,10 +3777,9 @@ class schematic_scene(editor_scene):
         Add an instance of a symbol to the scene.
         """
         instance = self.instSymbol(pos)
-        self.addItem(instance)
+
         self.itemCounter += 1
-        undoCommand = us.addShapeUndo(self, instance)
-        self.undoStack.push(undoCommand)
+        self.addUndoStack(instance)
         self.instanceSymbolTuple = None
         return instance
 
@@ -3652,7 +3799,9 @@ class schematic_scene(editor_scene):
                     else:
                         itemShapes.append(lj.createSymbolItems(item, self.gridTuple))
 
-                symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes, self.gridTuple)
+                symbolInstance = shp.schematicSymbol(
+                    itemShapes, itemAttributes, self.gridTuple
+                )
                 symbolInstance.setPos(pos)
                 symbolInstance.counter = self.itemCounter
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
@@ -3688,15 +3837,14 @@ class schematic_scene(editor_scene):
                 elif isinstance(item, shp.text):
                     shape = lj.createTextItem(itemCopyDict, self.gridTuple)
                 if shape is not None:
-                    self.undoStack.push(us.addShapeUndo(self, shape))
-                # shift position by four grid units to right and down
+                    self.addUndoStack(shape)
+                    # shift position by four grid units to right and down
                     shape.setPos(
                         QPoint(
                             item.pos().x() + 4 * self.gridTuple[0],
                             item.pos().y() + 4 * self.gridTuple[1],
                         )
                     )
-
 
     def saveSchematic(self, file: pathlib.Path):
         try:
@@ -3720,10 +3868,11 @@ class schematic_scene(editor_scene):
         """
         shapesList = list()
         for item in itemsList[1:]:
-            itemShape = lj.createSchematicItems(
-                    item, self.libraryDict, self.gridTuple
-                )
-            if type(itemShape) == shp.schematicSymbol and itemShape.counter > self.itemCounter:
+            itemShape = lj.createSchematicItems(item, self.libraryDict, self.gridTuple)
+            if (
+                type(itemShape) == shp.schematicSymbol
+                and itemShape.counter > self.itemCounter
+            ):
                 self.itemCounter = itemShape.counter
             shapesList.append(itemShape)
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
@@ -3784,7 +3933,10 @@ class schematic_scene(editor_scene):
                                         item.labels[tempLabelName].labelVisible = True
                                     else:
                                         item.labels[tempLabelName].labelVisible = False
-                            [labelItem.labelDefs() for labelItem in item.labels.values()]
+                            [
+                                labelItem.labelDefs()
+                                for labelItem in item.labels.values()
+                            ]
 
                     elif isinstance(item, net.schematicNet):
                         dlg = pdlg.netProperties(self.editorWindow, item)
@@ -3924,7 +4076,9 @@ class schematic_scene(editor_scene):
             if pinItem.pinDir == shp.schematicPin.pinDirs[2]
         ]
 
-        dlg = pdlg.symbolCreateDialog(self.parent.parent, inputPins, outputPins, inoutPins)
+        dlg = pdlg.symbolCreateDialog(
+            self.parent.parent, inputPins, outputPins, inoutPins
+        )
         if dlg.exec() == QDialog.Accepted:
             symbolViewItem = scb.createCellView(
                 self.parent.parent, symbolViewName, cellItem
@@ -3936,7 +4090,10 @@ class schematic_scene(editor_scene):
                 leftPinNames = list(
                     filter(
                         None,
-                        [pinName.strip() for pinName in dlg.leftPinsEdit.text().split(",")],
+                        [
+                            pinName.strip()
+                            for pinName in dlg.leftPinsEdit.text().split(",")
+                        ],
                     )
                 )
                 rightPinNames = list(
@@ -3951,7 +4108,10 @@ class schematic_scene(editor_scene):
                 topPinNames = list(
                     filter(
                         None,
-                        [pinName.strip() for pinName in dlg.topPinsEdit.text().split(",")],
+                        [
+                            pinName.strip()
+                            for pinName in dlg.topPinsEdit.text().split(",")
+                        ],
                     )
                 )
                 bottomPinNames = list(
@@ -3965,8 +4125,12 @@ class schematic_scene(editor_scene):
                 )
                 stubLength = int(float(dlg.stubLengthEdit.text().strip()))
                 pinDistance = int(float(dlg.pinDistanceEdit.text().strip()))
-                rectXDim = (max(len(topPinNames), len(bottomPinNames)) + 1) * pinDistance
-                rectYDim = (max(len(leftPinNames), len(rightPinNames)) + 1) * pinDistance
+                rectXDim = (
+                    max(len(topPinNames), len(bottomPinNames)) + 1
+                ) * pinDistance
+                rectYDim = (
+                    max(len(leftPinNames), len(rightPinNames)) + 1
+                ) * pinDistance
             except ValueError:
                 self.logger.error("Enter valid value")
 
@@ -4014,7 +4178,9 @@ class schematic_scene(editor_scene):
                 )
             )
         for i in range(len(rightPinNames)):
-            symbolScene.lineDraw(rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0))
+            symbolScene.lineDraw(
+                rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0)
+            )
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(rightPinNames[i])].toSymbolPin(
                     rightPinLocs[i], symbolScene.gridTuple
@@ -4039,7 +4205,9 @@ class schematic_scene(editor_scene):
         symbolScene.attributeList = list()  # empty attribute list
 
         symbolScene.attributeList.append(
-            symenc.symbolAttribute("XyceNetlistLine", "X[@instName] [@cellName] [@pinList]")
+            symenc.symbolAttribute(
+                "XyceNetlistLine", "X[@instName] [@cellName] [@pinList]"
+            )
         )
 
         symbolWindow.checkSaveCell()
@@ -4060,7 +4228,8 @@ class schematic_scene(editor_scene):
                         cellItem.child(i).text()
                         for i in range(cellItem.rowCount())
                         # if cellItem.child(i).text() != item.viewName
-                        if 'schematic' in cellItem.child(i).text() or 'symbol' in cellItem.child(i).text()
+                        if "schematic" in cellItem.child(i).text()
+                        or "symbol" in cellItem.child(i).text()
                     ]
                     dlg.viewListCB.addItems(viewNames)
                     if dlg.exec() == QDialog.Accepted:
@@ -4068,17 +4237,22 @@ class schematic_scene(editor_scene):
                             self.editorWindow.libraryView.libraryModel, item.libraryName
                         )
                         cellItem = libm.getCellItem(libItem, item.cellName)
-                        viewItem = libm.getViewItem(cellItem, dlg.viewListCB.currentText())
-                        openViewTuple = self.editorWindow.libraryView.libBrowsW.openCellView(
-                            viewItem, cellItem, libItem
+                        viewItem = libm.getViewItem(
+                            cellItem, dlg.viewListCB.currentText()
+                        )
+                        openViewTuple = (
+                            self.editorWindow.libraryView.libBrowsW.openCellView(
+                                viewItem, cellItem, libItem
+                            )
                         )
                         if self.editorWindow.appMainW.openViews[openViewTuple]:
-                            childWindow = self.editorWindow.appMainW.openViews[openViewTuple]
+                            childWindow = self.editorWindow.appMainW.openViews[
+                                openViewTuple
+                            ]
                             childWindow.parentEditor = self.editorWindow
                             childWindow.symbolToolbar.addAction(childWindow.goUpAction)
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
-
 
     def ignoreSymbol(self):
         if self.selectedItems() is not None:
@@ -4091,14 +4265,19 @@ class schematic_scene(editor_scene):
     def moveBySelectedItems(self):
         if self.selectedItems():
             dlg = pdlg.moveByDialogue(self.editorWindow)
-            dlg.xEdit.setText('0')
-            dlg.yEdit.setText('0')
+            dlg.xEdit.setText("0")
+            dlg.yEdit.setText("0")
             if dlg.exec() == QDialog.Accepted:
                 for item in self.selectedItems():
-                    item.moveBy(self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]), 
-                                self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]))
-                self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+                    item.moveBy(
+                        self.snapToBase(float(dlg.xEdit.text()), self.gridTuple[0]),
+                        self.snapToBase(float(dlg.yEdit.text()), self.gridTuple[1]),
+                    )
+                self.editorWindow.messageLine.setText(
+                    f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}"
+                )
                 self.editModes.setMode("selectItem")
+
 
 class layout_scene(editor_scene):
     def __init__(self, parent):
@@ -4113,6 +4292,7 @@ class layout_scene(editor_scene):
             "Pin",
             "Polygon",
             "Pcell",
+            "Ruler",
         ]
         # draw modes
         self.editModes = ddef.layoutModes(
@@ -4122,7 +4302,7 @@ class layout_scene(editor_scene):
             copyItem=False,
             rotateItem=False,
             changeOrigin=False,
-            panView = False,
+            panView=False,
             drawPath=False,
             drawPin=False,
             drawArc=False,
@@ -4132,6 +4312,7 @@ class layout_scene(editor_scene):
             drawRect=False,
             drawLine=False,
             drawCircle=False,
+            drawRuler=False,
             stretchItem=False,
             addInstance=False,
         )
@@ -4152,8 +4333,25 @@ class layout_scene(editor_scene):
         self.newPolygon = None
         self.arrayViaTuple = None
         self.singleVia = None
-        self.arrayVia = None
-        self.polygonGuideLine = None
+        self._arrayVia = None
+        self._polygonGuideLine = None
+        self._newRuler = None
+        self.rulersSet = set()
+        # this needs move to configuration file...
+        fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
+        fixedFamily = [
+            family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
+        ][0]
+        fontStyle = QFontDatabase.styles(fixedFamily)[0]
+        self.rulerFont = QFont(fixedFamily)
+        self.rulerFont.setStyleName(fontStyle)
+        fontSize =  [size for size in
+            QFontDatabase.pointSizes(fixedFamily, fontStyle)][1]
+        self.rulerFont.setPointSize(fontSize)
+        self.rulerFont.setKerning(False)
+        self.rulerTickGap = fabproc.dbu
+        self.rulerTickLength = int(fabproc.dbu/10)
+        self.rulerWidth = 2
 
     @property
     def drawMode(self):
@@ -4165,9 +4363,12 @@ class layout_scene(editor_scene):
                 self.editModes.drawPolygon,
                 self.editModes.drawRect,
                 self.editModes.drawCircle,
+                self.editModes.drawRuler,
             )
         )
+    
 
+    
     # Order of drawing
     # 1. Rect
     # 2. Path
@@ -4224,6 +4425,20 @@ class layout_scene(editor_scene):
                     )
                     self.newPath.name = self.newPathTuple.name
                     self.addUndoStack(self.newPath)
+                elif self.editModes.drawRuler:
+                    if self._newRuler is None:
+                        self._newRuler = lshp.layoutRuler(
+                            QLineF(self.mousePressLoc, self.mousePressLoc),
+                            width=self.rulerWidth,
+                            tickGap=self.rulerTickGap,
+                            tickLength=self.rulerTickLength,
+                            tickFont=self.rulerFont,
+                            gridTuple=self.gridTuple,
+                        )
+                        self.addUndoStack(self._newRuler)
+                    else:
+                        self._newRuler = None
+
                 elif self.editModes.drawPin and self.newLabel is None:
                     # Create a new pin
                     self.newPin = lshp.layoutPin(
@@ -4237,9 +4452,9 @@ class layout_scene(editor_scene):
                     self.newLabelTuple = None
                     self.newLabel = None
                     self.editModes.setMode("selectItem")
-                elif self.editModes.addVia and self.arrayVia is not None:
+                elif self.editModes.addVia and self._arrayVia is not None:
                     self.arrayViaTuple = None
-                    self.arrayVia = None
+                    self._arrayVia = None
                     self.editModes.setMode("selectItem")
                 elif self.editModes.drawPolygon:
                     if self.newPolygon is None:
@@ -4251,13 +4466,15 @@ class layout_scene(editor_scene):
                         )
                         self.addUndoStack(self.newPolygon)
                         # Create a guide line for the polygon
-                        self.polygonGuideLine = QGraphicsLineItem(
-                            QLineF(self.newPolygon.points[-2], self.newPolygon.points[-1])
+                        self._polygonGuideLine = QGraphicsLineItem(
+                            QLineF(
+                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                            )
                         )
-                        self.polygonGuideLine.setPen(
+                        self._polygonGuideLine.setPen(
                             QPen(QColor(255, 255, 0), 1, Qt.DashLine)
                         )
-                        self.addUndoStack(self.polygonGuideLine)
+                        self.addUndoStack(self._polygonGuideLine)
 
                     else:
                         self.newPolygon.addPoint(self.mousePressLoc)
@@ -4317,6 +4534,10 @@ class layout_scene(editor_scene):
                 self.newPath.draftLine = QLineF(
                     self.newPath.draftLine.p1(), self.mouseMoveLoc
                 )
+            elif self.editModes.drawRuler and self._newRuler is not None:
+                self._newRuler.draftLine = QLineF(
+                    self._newRuler.draftLine.p1(), self.mouseMoveLoc
+                )
             # Handle adding label mode
             elif self.editModes.addLabel:
                 if self.newLabel is not None:  # already defined a new label
@@ -4329,13 +4550,13 @@ class layout_scene(editor_scene):
                     self.addUndoStack(self.newLabel)
             # Handle adding via mode with array via tuple
             elif self.editModes.addVia and self.arrayViaTuple is not None:
-                if self.arrayVia is None:
+                if self._arrayVia is None:
                     singleVia = lshp.layoutVia(
                         QPoint(0, 0),
                         *self.arrayViaTuple.singleViaTuple,
                         self.gridTuple,
                     )
-                    self.arrayVia = lshp.layoutViaArray(
+                    self._arrayVia = lshp.layoutViaArray(
                         self.mouseMoveLoc,
                         singleVia,
                         self.arrayViaTuple.spacing,
@@ -4343,13 +4564,13 @@ class layout_scene(editor_scene):
                         self.arrayViaTuple.ynum,
                         self.gridTuple,
                     )
-                    self.addUndoStack(self.arrayVia)
+                    self.addUndoStack(self._arrayVia)
                 else:
-                    self.arrayVia.setPos(self.mouseMoveLoc - self.arrayVia.start)
-                    self.arrayVia.setSelected(True)
+                    self._arrayVia.setPos(self.mouseMoveLoc - self._arrayVia.start)
+                    self._arrayVia.setSelected(True)
             # Handle drawing polygon mode
             elif self.editModes.drawPolygon and self.newPolygon is not None:
-                self.polygonGuideLine.setLine(
+                self._polygonGuideLine.setLine(
                     QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
                 )
             # Handle adding instance mode with layout instance tuple
@@ -4370,9 +4591,12 @@ class layout_scene(editor_scene):
                             for param in initArgs
                             if (param != "self" and param != "gridTuple")
                         ]
-                        argDict = {arg: getattr(self.newInstance, arg) for arg in argsUsed}
+                        argDict = {
+                            arg: getattr(self.newInstance, arg) for arg in argsUsed
+                        }
                         lineEditDict = {
-                            key: edf.shortLineEdit(value) for key, value in argDict.items()
+                            key: edf.shortLineEdit(value)
+                            for key, value in argDict.items()
                         }
                         for key, value in lineEditDict.items():
                             dlg.instanceParamsLayout.addRow(key, value)
@@ -4402,7 +4626,9 @@ class layout_scene(editor_scene):
                 if self.editModes.drawRect:
                     self.newRect.setSelected(False)
                     self.newRect = None
-                elif self.editModes.drawPin:  # finish pin editing and start label editing
+                elif (
+                    self.editModes.drawPin
+                ):  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc, *self.newLabelTuple, self.gridTuple
@@ -4413,7 +4639,7 @@ class layout_scene(editor_scene):
                     elif self.newPin is None and self.newLabel is not None:
                         # finish label editing
                         self.newLabel = None
-                elif self.editModes.addInstance:
+                elif self.editModes.addInstance and self.newInstance is not None:
                     self.newInstance = None
                     self.layoutInstanceTuple = None
                     self.editModes.setMode("selectItem")
@@ -4437,13 +4663,14 @@ class layout_scene(editor_scene):
                     self.newPolygon.points.pop(0)
                     self.editModes.setMode("selectItem")
                     self.newPolygon = None
-                    self.removeItem(self.polygonGuideLine)
-                    self.polygonGuideLine = None
-                elif self.editModes.drawPath:
+                    self.removeItem(self._polygonGuideLine)
+                    self._polygonGuideLine = None
+                elif self.editModes.drawPath and self.newPath is not None:
                     if self.newPath.draftLine.length() < self.gridTuple[0]:
                         self.removeItem(self.newPath)
                     self.newPath = None
                     self.editModes.setMode("selectItem")
+
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
 
@@ -4473,7 +4700,9 @@ class layout_scene(editor_scene):
                             self.logger.error("Not a layout cell")
                         else:
                             instanceShapes = [
-                                lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
+                                lj.layoutItems(
+                                    item, self.libraryDict, self.gridTuple
+                                )
                                 for item in decodedData[1:]
                                 if item.get("type") in self.layoutShapes
                             ]
@@ -4528,10 +4757,6 @@ class layout_scene(editor_scene):
                     except Exception as e:
                         self.logger.error(f"Cannot read pcell: {e}")
 
-    def addUndoStack(self, item):
-        undoCommand = us.addShapeUndo(self, item)
-        self.undoStack.push(undoCommand)
-
     def findScenelayoutCellSet(self) -> set[lshp.layoutInstance]:
         """
         Find all the symbols on the scene as a set.
@@ -4574,13 +4799,12 @@ class layout_scene(editor_scene):
                 decodedData = json.load(file)
             # Create layout items for each item in decoded data in a generator expression
             self.createLayoutItems(decodedData)
-
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
     def createLayoutItems(self, decodedData):
         layoutItems = [
-            lj.createLayoutItems(item, self.libraryDict, self.gridTuple)
+            lj.layoutItems(self).create(item)
             for item in decodedData[1:]
             if item.get("type") in self.layoutShapes
         ]
@@ -4601,7 +4825,6 @@ class layout_scene(editor_scene):
         self.clear()
         # Create layout items based on the decoded data
         self.createLayoutItems(decodedData)
-
 
     def deleteSelectedItems(self):
         for item in self.selectedItems():
@@ -4633,10 +4856,10 @@ class layout_scene(editor_scene):
                             self.layoutPolygonProperties(item)
                         case lshp.layoutInstance:
                             self.layoutInstanceProperties(item)
-                        case _ :
-                            if item.__class__.__bases__[0]  == lshp.layoutPcell:
+                        case _:
+                            if item.__class__.__bases__[0] == lshp.layoutPcell:
                                 self.layoutPCellProperties(item)
-                                    
+
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
 
@@ -4645,7 +4868,9 @@ class layout_scene(editor_scene):
         dlg.polygonLayerCB.addItems(
             [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
         )
-        dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} [" f"{item.layer.purpose}]")
+        dlg.polygonLayerCB.setCurrentText(
+            f"{item.layer.name} [" f"{item.layer.purpose}]"
+        )
         for i, point in enumerate(item.points):
             dlg.pointXEdits[i].setText(str(point.x() / fabproc.dbu))
             dlg.pointYEdits[i].setText(str(point.y() / fabproc.dbu))
@@ -4862,23 +5087,30 @@ class layout_scene(editor_scene):
                 self.gridTuple,
             )
             item.layer.name = dlg.pinLayerCB.currentText()
-        
+
     def layoutInstanceProperties(self, item):
         dlg = ldlg.layoutInstancePropertiesDialog(self.editorWindow)
         dlg.instanceLibName.setText(item.libraryName)
         dlg.instanceCellName.setText(item.cellName)
         dlg.instanceViewName.setText(item.viewName)
         dlg.instanceNameEdit.setText(item.instanceName)
-        dlg.xEdit.setText(str(item.scenePos().x()/fabproc.dbu))
-        dlg.yEdit.setText(str(item.scenePos().y()/fabproc.dbu))
+        dlg.xEdit.setText(str(item.scenePos().x() / fabproc.dbu))
+        dlg.yEdit.setText(str(item.scenePos().y() / fabproc.dbu))
         if dlg.exec() == QDialog.Accepted:
             item.libraryName = dlg.instanceLibName.text().strip()
             item.cellName = dlg.instanceCellName.text().strip()
             item.viewName = dlg.instanceViewName.text().strip()
             item.instanceName = dlg.instanceNameEdit.text().strip()
-            item.setPos(QPoint(self.snapToBase(float(dlg.xEdit.text())*fabproc.dbu, self.gridTuple[0]), 
-                               self.snapToBase(float(dlg.yEdit.text())*fabproc.dbu, self.gridTuple[1])))
-            
+            item.setPos(
+                QPoint(
+                    self.snapToBase(
+                        float(dlg.xEdit.text()) * fabproc.dbu, self.gridTuple[0]
+                    ),
+                    self.snapToBase(
+                        float(dlg.yEdit.text()) * fabproc.dbu, self.gridTuple[1]
+                    ),
+                )
+            )
 
     def layoutPCellProperties(self, item: lshp.layoutPcell):
         dlg = ldlg.pcellInstancePropertiesDialog(self.editorWindow)
@@ -4889,8 +5121,8 @@ class layout_scene(editor_scene):
         lineEditDict = self.extractPcellInstanceParameters(item)
         for key, value in lineEditDict.items():
             dlg.instanceParamsLayout.addRow(key, value)
-        dlg.xEdit.setText(str(item.scenePos().x()/fabproc.dbu))
-        dlg.yEdit.setText(str(item.scenePos().y()/fabproc.dbu))
+        dlg.xEdit.setText(str(item.scenePos().x() / fabproc.dbu))
+        dlg.yEdit.setText(str(item.scenePos().y() / fabproc.dbu))
         if dlg.exec() == QDialog.Accepted:
             item.libraryName = dlg.pcellLibName.text()
             item.cellName = dlg.pcellCellName.text()
@@ -4898,32 +5130,28 @@ class layout_scene(editor_scene):
             item.instanceName = dlg.instanceNameEdit.text()
             rowCount = dlg.instanceParamsLayout.rowCount()
             instParamDict = {}
-            for row in range(4,rowCount): # first 4 rows are already processed.
-                labelText = dlg.instanceParamsLayout.itemAt(row,
-                                                QFormLayout.LabelRole).widget().text()
-                paramValue = dlg.instanceParamsLayout.itemAt(row,
-                                                        QFormLayout.FieldRole).widget().text()
+            for row in range(4, rowCount):  # first 4 rows are already processed.
+                labelText = (
+                    dlg.instanceParamsLayout.itemAt(row, QFormLayout.LabelRole)
+                    .widget()
+                    .text()
+                )
+                paramValue = (
+                    dlg.instanceParamsLayout.itemAt(row, QFormLayout.FieldRole)
+                    .widget()
+                    .text()
+                )
                 instParamDict[labelText] = paramValue
 
             item(**instParamDict)
 
-
-    def extractPcellInstanceParameters(self, instance:lshp.layoutPcell) -> dict:
-        initArgs = inspect.signature(
-            instance.__class__.__init__
-        ).parameters
+    def extractPcellInstanceParameters(self, instance: lshp.layoutPcell) -> dict:
+        initArgs = inspect.signature(instance.__class__.__init__).parameters
         argsUsed = [
-            param
-            for param in initArgs
-            if (param != "self" and param != "gridTuple")
+            param for param in initArgs if (param != "self" and param != "gridTuple")
         ]
-        argDict = {
-            arg: getattr(instance, arg) for arg in argsUsed
-        }
-        lineEditDict = {
-            key: edf.shortLineEdit(value)
-            for key, value in argDict.items()
-        }
+        argDict = {arg: getattr(instance, arg) for arg in argsUsed}
+        lineEditDict = {key: edf.shortLineEdit(value) for key, value in argDict.items()}
         return lineEditDict
 
     def copySelectedItems(self):
@@ -4933,14 +5161,13 @@ class layout_scene(editor_scene):
         for item in self.selectedItems():
             # Create a deep copy of the item using JSON serialization
             itemCopyDict = json.loads(json.dumps(item, cls=layenc.layoutEncoder))
-            shape = lj.createLayoutItems(itemCopyDict, self.libraryDict,
-                                     self.gridTuple)
-            match itemCopyDict['type']:
+            shape = lj.layoutItems(itemCopyDict, self.libraryDict, self.gridTuple)
+            match itemCopyDict["type"]:
                 case "Inst" | "Pcell":
-                    self.itemCounter +=1
-                    shape.instanceName = f'I{self.itemCounter}'
+                    self.itemCounter += 1
+                    shape.instanceName = f"I{self.itemCounter}"
                     shape.counter = self.itemCounter
-            self.undoStack.push( us.addShapeUndo(self, shape))
+            self.undoStack.push(us.addShapeUndo(self, shape))
             shape.setPos(
                 QPoint(
                     item.pos().x() + 4 * self.gridTuple[0],
@@ -4951,15 +5178,27 @@ class layout_scene(editor_scene):
     def moveBySelectedItems(self):
         if self.selectedItems():
             dlg = pdlg.moveByDialogue(self.editorWindow)
-            dlg.xEdit.setText('0.0')
-            dlg.yEdit.setText('0.0')
+            dlg.xEdit.setText("0.0")
+            dlg.yEdit.setText("0.0")
             if dlg.exec() == QDialog.Accepted:
                 for item in self.selectedItems():
-                    item.moveBy(self.snapToBase(float(dlg.xEdit.text())*fabproc.dbu, self.gridTuple[0]), 
-                                self.snapToBase(float(dlg.yEdit.text())*fabproc.dbu, self.gridTuple[1]))
-                self.editorWindow.messageLine.setText(f'Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}')
+                    item.moveBy(
+                        self.snapToBase(
+                            float(dlg.xEdit.text()) * fabproc.dbu, self.gridTuple[0]
+                        ),
+                        self.snapToBase(
+                            float(dlg.yEdit.text()) * fabproc.dbu, self.gridTuple[1]
+                        ),
+                    )
+                self.editorWindow.messageLine.setText(
+                    f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}"
+                )
                 self.editModes.setMode("selectItem")
-
+    def deleteAllRulers(self):
+        for ruler in self.rulersSet:
+            undoCommand = us.deleteShapeUndo(self,ruler)
+            self.undoStack.push(undoCommand)
+            
     def goDownHier(self):
         if self.selectedItems():
             for item in self.selectedItems():
@@ -4973,7 +5212,7 @@ class layout_scene(editor_scene):
                         cellItem.child(i).text()
                         for i in range(cellItem.rowCount())
                         # if cellItem.child(i).text() != item.viewName
-                        if 'layout' in cellItem.child(i).text()
+                        if "layout" in cellItem.child(i).text()
                     ]
                     dlg.viewListCB.addItems(viewNames)
                     if dlg.exec() == QDialog.Accepted:
@@ -4981,17 +5220,22 @@ class layout_scene(editor_scene):
                             self.editorWindow.libraryView.libraryModel, item.libraryName
                         )
                         cellItem = libm.getCellItem(libItem, item.cellName)
-                        viewItem = libm.getViewItem(cellItem, dlg.viewListCB.currentText())
-                        openViewT = self.editorWindow.libraryView.libBrowsW.openCellView(
-                            viewItem, cellItem, libItem
+                        viewItem = libm.getViewItem(
+                            cellItem, dlg.viewListCB.currentText()
+                        )
+                        openViewT = (
+                            self.editorWindow.libraryView.libBrowsW.openCellView(
+                                viewItem, cellItem, libItem
+                            )
                         )
                         if self.editorWindow.appMainW.openViews[openViewT]:
-                            childWindow = self.editorWindow.appMainW.openViews[openViewT]
+                            childWindow = self.editorWindow.appMainW.openViews[
+                                openViewT
+                            ]
                             childWindow.parentEditor = self.editorWindow
                             childWindow.layoutToolbar.addAction(childWindow.goUpAction)
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
-
 
     @staticmethod
     def rotateVector(mouseLoc: QPoint, vector: layp.layoutPath, transform: QTransform):
@@ -5290,7 +5534,9 @@ class xyceNetlist:
                         schematic.libraryView.libraryModel, item.libraryName
                     )
                     cellItem = libm.getCellItem(libItem, item.cellName)
-                    viewItems = [cellItem.child(row) for row in range(cellItem.rowCount())]
+                    viewItems = [
+                        cellItem.child(row) for row in range(cellItem.rowCount())
+                    ]
                     viewNames = [view.viewName for view in viewItems]
 
                     viewDict = dict(zip(viewNames, viewItems))
@@ -5337,10 +5583,14 @@ class xyceNetlist:
                         self.recursiveNetlisting(schematicObj, cirFile)
                         cirFile.write(".ENDS\n")
                 elif viewDict[viewName].viewType == "veriloga":
-                    with viewDict[viewName].data(Qt.UserRole + 2).open(mode="r") as vaview:
+                    with viewDict[viewName].data(Qt.UserRole + 2).open(
+                        mode="r"
+                    ) as vaview:
                         items = json.load(vaview)
                     netlistLine = items[3]["netlistLine"]
-                    netlistLine = netlistLine.replace("[@instName]", f"{item.instanceName}")
+                    netlistLine = netlistLine.replace(
+                        "[@instName]", f"{item.instanceName}"
+                    )
                     # TODO: fix veriloga netlisting
                     # for pinName, netName in item.pinNetMap.items():
                     #     netlistLine = netlistLine.replace(f"[|{pinName}:%]", f"{netName}")
@@ -5461,7 +5711,9 @@ class configViewEdit(QMainWindow):
 
         self.centralWidget.confModel = configModel(self.configDict)
         # self.centralWidget.configDictGroup.setVisible(False)
-        self.centralWidget.configDictLayout.removeWidget(self.centralWidget.configViewTable)
+        self.centralWidget.configDictLayout.removeWidget(
+            self.centralWidget.configViewTable
+        )
         self.centralWidget.configViewTable = configTable(self.centralWidget.confModel)
         self.centralWidget.configDictLayout.addWidget(
             self.centralWidget.configViewTable

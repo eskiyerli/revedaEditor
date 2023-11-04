@@ -71,6 +71,7 @@ class layoutEncoder(json.JSONEncoder):
                     "vdt": item.via.viaDefTuple.name,
                     "w": item.via.width,
                     "h": item.via.height,
+                    "ang": item.angle,
                 }
                 itemDict = {
                     "type": "Via",
@@ -89,6 +90,7 @@ class layoutEncoder(json.JSONEncoder):
                     "pd": item.pinDir,
                     "pt": item.pinType,
                     "ln": laylyr.pdkPinLayers.index(item.layer),
+                    "ang": item.angle,
                 }
             case lshp.layoutLabel:
                 itemDict = {
@@ -100,15 +102,24 @@ class layoutEncoder(json.JSONEncoder):
                     "fh": item.fontHeight,
                     "la": item.labelAlign,
                     "lo": item.labelOrient,
-                    "ln": laylyr.pdkTextLayers.index(item.layer)
+                    "ln": laylyr.pdkTextLayers.index(item.layer),
+                    "ang": item.angle,
                 }
-
             case lshp.layoutPolygon:
                 pointsList = [item.mapToScene(point).toTuple() for point in item.points]
                 itemDict = {
                     "type": "Polygon",
                     "ps": pointsList,
                     "ln": laylyr.pdkAllLayers.index(item.layer),
+                    "ang": item.angle,
+                }
+            case lshp.layoutRuler:
+                itemDict = {
+                    "type": "Ruler",
+                    "dfl1": item.mapToScene(item.draftLine.p1()).toTuple(),
+                    "dfl2": item.mapToScene(item.draftLine.p2()).toTuple(),
+                    "md": item.mode,
+                    "ang": item.angle,
                 }
             case _ :  # now check super class types:
                 match item.__class__.__bases__[0]:

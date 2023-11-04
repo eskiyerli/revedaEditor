@@ -1,4 +1,3 @@
-
 #    “Commons Clause” License Condition v1.0
 #   #
 #    The Software is provided to you by the Licensor under the License, as defined
@@ -57,22 +56,33 @@ layoutLabelTuple = namedtuple(
         "labelLayer",
     ],
 )
+rulerTuple = namedtuple("rulerTuple", ["point", "line", "text"])
+
 # pdk related classes and namedtuples
 # this tuple defines the minimum dimensions of a via
 # This can be extended to define the maximum dimensions
 viaDefTuple = namedtuple(
-    "viaDefTuple", ["name", "layer", "type", "minWidth", "maxWidth",  "minHeight", "maxHeight", "minSpacing", "maxSpacing"]
+    "viaDefTuple",
+    [
+        "name",
+        "layer",
+        "type",
+        "minWidth",
+        "maxWidth",
+        "minHeight",
+        "maxHeight",
+        "minSpacing",
+        "maxSpacing",
+    ],
 )
 # Single and array via definitions
-singleViaTuple = namedtuple(
-    "singleViaTuple", ["viaDefTuple", "width", "height"]
+singleViaTuple = namedtuple("singleViaTuple", ["viaDefTuple", "width", "height"])
+
+arrayViaTuple = namedtuple(
+    "arrayViaTuple", ["singleViaTuple", "spacing", "xnum", "ynum"]
 )
 
-arrayViaTuple = namedtuple("arrayViaTuple", ["singleViaTuple", "spacing","xnum", "ynum"])
-
 rectCoords = namedtuple("rectCoords", ["left", "top", "w", "h"])
-
-
 
 
 @dataclass
@@ -106,6 +116,7 @@ class layLayer:
     gdsLayer: int = 0  # gds edLayer
     datatype: int = 0  # gds datatype
 
+
 @dataclass
 class editModes:
     selectItem: bool
@@ -121,6 +132,7 @@ class editModes:
             self.__dict__[key] = False
         self.__dict__[attribute] = True
 
+
 @dataclass
 class symbolModes(editModes):
     drawPin: bool
@@ -132,12 +144,14 @@ class symbolModes(editModes):
     drawPolygon: bool
     stretchItem: bool
 
+
 @dataclass
 class schematicModes(editModes):
     drawPin: bool
     drawWire: bool
     drawText: bool
     addInstance: bool
+
 
 @dataclass
 class layoutModes(editModes):
@@ -150,5 +164,6 @@ class layoutModes(editModes):
     drawRect: bool
     drawLine: bool
     drawCircle: bool
+    drawRuler: bool
     stretchItem: bool
     addInstance: bool

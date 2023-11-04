@@ -15,15 +15,19 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
-# import math
+
 
 # shape class definition for symbol editor.
 # base class for all shapes: rectangle, circle, line
 import itertools
+import math
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QPointF, QLineF
 from PySide6.QtGui import (
     QPen,
@@ -64,7 +68,6 @@ class layoutShape(QGraphicsItem):
 
     def __repr__(self):
         return f"layoutShape({self._gridTuple})"
-
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
@@ -180,7 +183,6 @@ class layoutShape(QGraphicsItem):
     def contextMenuEvent(self, event):
         self.scene().itemContextMenu.exec_(event.screenPos())
 
-
     @staticmethod
     def snapToBase(number, base):
         """
@@ -214,6 +216,7 @@ class layoutRect(layoutShape):
         self._end = self._rect.bottomRight()
         self._layer = layer
         self._gridTuple = gridTuple
+        self._stretch = False
         self._stretchSide = None
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
         self._definePensBrushes()
@@ -498,7 +501,6 @@ class layoutInstance(layoutShape):
     def viewName(self, value: str):
         self._viewName = value
 
-
     @property
     def instanceName(self):
         return self._instanceName
@@ -584,6 +586,18 @@ class layoutPath(layoutShape):
         endExtend: int = 0,
         mode: int = 0,
     ):
+        """
+        Initialize the class instance.
+
+        Args:
+            draftLine (QLineF): The draft line.
+            layer (ddef.layLayer): The layer.
+            gridTuple (tuple[int, int]): The grid tuple.
+            width (float, optional): The width. Defaults to 1.0.
+            startExtend (int, optional): The start extend. Defaults to 0.
+            endExtend (int, optional): The end extend. Defaults to 0.
+            mode (int, optional): The mode. Defaults to 0.
+        """
         super().__init__(gridTuple)
         self.start = None
         self._draftLine = draftLine
@@ -600,8 +614,7 @@ class layoutPath(layoutShape):
         self._definePensBrushes()
         self._rect = QRectF(0, 0, 0, 0)
         self._angle = 0
-        self._rectCorners( self._draftLine.angle())
-
+        self._rectCorners(self._draftLine.angle())
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
@@ -725,7 +738,7 @@ class layoutPath(layoutShape):
     def draftLine(self, line: QLineF):
         self.prepareGeometryChange()
         self._draftLine = line
-        angle=self._draftLine.angle()
+        angle = self._draftLine.angle()
         self._rectCorners(angle)
 
     @property
@@ -843,6 +856,206 @@ class layoutPath(layoutShape):
             self._stretchSide = None
             self.setCursor(Qt.ArrowCursor)
 
+
+class layoutRuler(layoutShape):
+    def __init__(
+        self,
+        draftLine: QLineF,
+        width: float,
+        tickGap: float,
+        tickLength: int,
+        tickFont: QFont,
+        gridTuple: tuple[int, int],
+        mode: int = 0,
+    ):
+        """
+        Initialize the TickLine object.
+
+        Args:
+            draftLine (QLineF): The draft line.
+            width (float): The width of the line.
+            tickGap (float): The gap between ticks.
+            tickLength (int): The length of the ticks.
+            tickFont (QFont): The font for tick labels.
+            gridTuple (tuple[int, int]): The grid tuple.
+            mode (int, optional): The mode. Defaults to 0.
+        """
+        super().__init__(gridTuple)
+
+        self._draftLine = draftLine
+        self._width = width
+        self._tickGap = tickGap
+        self._tickLength = tickLength
+        self._gridTuple = gridTuple
+        self._mode = mode
+        self._angle = 0
+        self._rect = QRect(0, 0, 0, 0)
+        penColour = QColor(255, 255, 40)
+        # penColour.setAlpha(128)
+        self._pen = QPen(penColour, self._width, Qt.SolidLine)
+        self._selectedPen = QPen(Qt.red, self._width+1, Qt.SolidLine)
+        # self._pen.setCosmetic(True)
+        self._tickTuples = list()
+        self._tickFont = tickFont
+        self._determineAngle(self._draftLine.angle())
+        self._fm = QFontMetrics(self._tickFont)
+        # Enable child event filtering for filters and handles
+        self.setFiltersChildEvents(True)
+        self.setHandlesChildEvents(True)
+        # Enable flag to indicate that the item contains children in shape
+        self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        self._createRulerTicks()
+        self.setCacheMode(QGraphicsItem.ItemCoordinateCache)
+
+        self.update(self.boundingRect())
+        
+        
+    def __repr__(self):
+        return f"layoutRuler({self._draftLine}, {self._width}, {self._tickGap}, {self._tickLength}, {self._tickFont}, {self._gridTuple}, {self._mode})"
+
+    def _determineAngle(self, angle: float):
+        match self._mode:
+            case 0:  # manhattan
+                self._createManhattanRuler(angle)
+            case 1:  # diagonal
+                self._createDiagonalRuler(angle)
+            case 2:
+                self._createAnyAngleRuler(angle)
+        self._draftLine.setAngle(0)
+        self.setTransformOriginPoint(self.draftLine.p1())
+        self.setRotation(-self._angle)
+
+    def _createManhattanRuler(self, angle):
+        if 0 <= angle <= 45 or 360 > angle > 315:
+            self._angle = 0
+        elif 45 < angle <= 135:
+            self._angle = 90
+        elif 135 < angle <= 225:
+            self._angle = 180
+        elif 225 < angle <= 315:
+            self._angle = 270
+
+    def _createDiagonalRuler(self, angle):
+        if 0 <= angle <= 22.5 or 360 > angle > 337.5:
+            self._angle = 0
+        elif 22.5 < angle <= 67.5:
+            self._angle = 45
+        elif 67.5 < angle <= 112.5:
+            self._angle = 90
+        elif 112.5 < angle <= 157.5:
+            self._angle = 135
+        elif 157.5 < angle <= 202.5:
+            self._angle = 180
+        elif 202.5 < angle <= 247.5:
+            self._angle = 225
+        elif 247.5 < angle <= 292.5:
+            self._angle = 270
+        elif 292.5 < angle <= 337.5:
+            self._angle = 315
+
+    def _createAnyAngleRuler(self, angle):
+        self._angle = angle
+
+    def _createRulerTicks(self):
+        self._tickTuples = list()
+        direction = QPoint(0, 0)
+        perpendicular = QPoint(0, 0)
+        if self._draftLine.length() >= self._tickGap:
+            numberOfTicks = math.ceil(self._draftLine.length() / self._tickGap)
+            direction = self._draftLine.p2() - self._draftLine.p1()
+            if direction != QPoint(
+                0, 0
+            ):  # no need for a tick when the line is zero length
+                direction /= direction.manhattanLength()
+                perpendicular = QPointF(-direction.y(), direction.x())
+                for i in range(numberOfTicks):
+                    self._tickTuples.append(
+                        ddef.rulerTuple(
+                            self._draftLine.p1()
+                            + i * self._tickGap * direction
+                            + perpendicular * self._tickLength,
+                            QLineF(
+                                self._draftLine.p1() + i * self._tickGap * direction,
+                                self._draftLine.p1()
+                                + i * self._tickGap * direction
+                                + perpendicular * self._tickLength,
+                            ),
+                            str(float(i)),
+                        )
+                    )
+        self._tickTuples.append(
+            ddef.rulerTuple(
+                self.draftLine.p2() + direction * self._gridTuple[0] * 0.5,
+                QLineF(
+                    self._draftLine.p2(),
+                    self.draftLine.p2() + +perpendicular * self._tickLength,
+                ),
+                str(round(self._draftLine.length() / self._tickGap, 3)),
+            )
+        )
+        point1 = self._draftLine.p1().toPoint()
+        point2 = (
+            self._draftLine.p2() + perpendicular * (self._tickLength + len(self._tickTuples[-1].text)*self._fm.maxWidth())
+        ).toPoint()
+        self._rect = QRectF(point1, point2).normalized()
+
+    def boundingRect(self) -> QRectF:
+        return self._rect.adjusted(-4,-4,4,4)
+
+    def paint(self, painter, option, widget):
+        if self.isSelected():
+            painter.setPen(self._selectedPen)
+            painter.drawRect(self.childrenBoundingRect())
+        else:
+            painter.setPen(self._pen)
+        painter.drawLine(self._draftLine)
+        painter.setFont(self._tickFont)
+        for tickTuple in self._tickTuples:
+            painter.drawLine(tickTuple.line)
+            painter.save()
+            painter.translate(tickTuple.point)
+            painter.rotate(self.angle)
+            painter.translate(-tickTuple.point)
+            painter.drawText(tickTuple.point.x(), tickTuple.point.y(), tickTuple.text)
+            painter.restore()
+
+
+    @property
+    def draftLine(self):
+        return self._draftLine
+
+    @draftLine.setter
+    def draftLine(self, line: QLineF):
+        self.prepareGeometryChange()
+        self._draftLine = line
+        angle = self._draftLine.angle()
+        self._determineAngle(angle)
+        self._createRulerTicks()
+
+    @property
+    def width(self):
+        return self._width
+
+    @width.setter
+    def width(self, width: float):
+        self._width = width
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: int):
+        self._mode = value
+
+    @property
+    def tickFont(self):
+        return self._tickFont
+    
+    @property
+    def tickGap(self):
+        return self._tickGap
+    
 
 class layoutLabel(layoutShape):
     labelAlignments = ["Left", "Center", "Right"]
@@ -1413,7 +1626,6 @@ class layoutViaArray(layoutShape):
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
             item.setParentItem(self)
 
-
     def __repr__(self):
         return f"layoutViaArray({self._via}, {self._xnum}, {self._ynum}, {self._gridTuple})"
 
@@ -1586,7 +1798,6 @@ class layoutPolygon(layoutShape):
         self.prepareGeometryChange()
         self._points = value
         self._polygon = QPolygonF(self._points)
-
 
     def addPoint(self, point: QPoint):
         self.prepareGeometryChange()

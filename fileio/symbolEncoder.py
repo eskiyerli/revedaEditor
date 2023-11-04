@@ -23,27 +23,6 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-#   “Commons Clause” License Condition v1.0
-#  #
-#   The Software is provided to you by the Licensor under the License, as defined
-#   below, subject to the following condition.
-#  #
-#   Without limiting other conditions in the License, the grant of rights under the
-#   License will not include, and the License does not grant to you, the right to
-#   Sell the Software.
-#  #
-#   For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#   granted to you under the License to provide to third parties, for a fee or other
-#   consideration (including without limitation fees for hosting or consulting/
-#   support services related to the Software), a product or service whose value
-#   derives, entirely or substantially, from the functionality of the Software. Any
-#   license notice or attribution required by the License must also include this
-#   Commons Clause License Condition notice.
-#  #
-#   Software: Revolution EDA
-#   License: Mozilla Public License 2.0
-#   Licensor: Revolution Semiconductor (Registered in the Netherlands)
-
 import json
 
 import revedaEditor.common.shape as shp
@@ -81,51 +60,59 @@ class symbolAttribute(object):
 
 class symbolEncoder(json.JSONEncoder):
     def default(self, item):
-        if isinstance(item, shp.symbolRectangle):
-            itemDict = {"type": "rect", "rect": item.rect.getCoords(),
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.symbolLine):
-            itemDict = {"type": "line", "st": item.start.toTuple(), "end": item.end.toTuple(),
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.symbolCircle):
-            itemDict = {"type": "circle", "cen": item.centre.toTuple(),
-                        "end": item.end.toTuple(),
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.symbolArc):
-            itemDict = {"type": "arc", "st": item.start.toTuple(), "end": item.end.toTuple(),
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.symbolPin):
-            itemDict = {"type": "pin", "st": item.start.toTuple(), "nam": item.pinName,
-                        "pd": item.pinDir, "pt": item.pinType,
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.text):
-            itemDict = {"type": "text", "st": item.start.toTuple(),
-                        'tc': item.textContent, 'ff': item.fontFamily, 'fs': item.fontStyle,
-                        'th': item.textHeight, 'ta': item.textAlignment, 'to': item.textOrient,
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, shp.symbolLabel):
-            itemDict = {"type": "label", "st": item.start.toTuple(), "nam": item.labelName,
-                        "def": item.labelDefinition,  # label as entered
-                        "txt": item.labelText,  # shown label
-                        "val": item.labelValue,  # label value
-                        "vis": item.labelVisible,  # label visibility
-                        "lt": item.labelType, "ht": item.labelHeight, "al": item.labelAlign,
-                        "or": item.labelOrient, "use": item.labelUse,
-                        "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                        "ang": item.angle, }
-            return itemDict
-        elif isinstance(item, symbolAttribute):
-            itemDict = {"type": "attr", "nam": item.name, "def": item.definition, }
-            return itemDict
+        match type(item):
+            case shp.symbolRectangle:
+                itemDict = {"type": "rect", "rect": item.rect.getCoords(),
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolLine:
+                itemDict = {"type": "line", "st": item.start.toTuple(), "end": item.end.toTuple(),
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolCircle:
+                itemDict = {"type": "circle", "cen": item.centre.toTuple(),
+                            "end": item.end.toTuple(),
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolPolygon:
+                pointsList = [item.mapToScene(point).toTuple() for point in item.points]
+                itemDict = {
+                        "type": "polygon",
+                        "ps": pointsList,
+                    }
+                return itemDict
+            case shp.symbolArc:
+                itemDict = {"type": "arc", "st": item.start.toTuple(), "end": item.end.toTuple(),
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolPin:
+                itemDict = {"type": "pin", "st": item.start.toTuple(), "nam": item.pinName,
+                            "pd": item.pinDir, "pt": item.pinType,
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.text:
+                itemDict = {"type": "text", "st": item.start.toTuple(),
+                            'tc': item.textContent, 'ff': item.fontFamily, 'fs': item.fontStyle,
+                            'th': item.textHeight, 'ta': item.textAlignment, 'to': item.textOrient,
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolLabel:
+                itemDict = {"type": "label", "st": item.start.toTuple(), "nam": item.labelName,
+                            "def": item.labelDefinition,  # label as entered
+                            "txt": item.labelText,  # shown label
+                            "val": item.labelValue,  # label value
+                            "vis": item.labelVisible,  # label visibility
+                            "lt": item.labelType, "ht": item.labelHeight, "al": item.labelAlign,
+                            "or": item.labelOrient, "use": item.labelUse,
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                            "ang": item.angle, }
+                return itemDict
+            case shp.symbolAttribute:
+                itemDict = {"type": "attr", "nam": item.name, "def": item.definition, }
+                return itemDict
