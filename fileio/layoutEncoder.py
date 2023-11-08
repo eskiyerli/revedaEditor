@@ -130,7 +130,7 @@ class layoutEncoder(json.JSONEncoder):
                         args_used = [
                             param
                             for param in init_args
-                            if (param != "self" and param != "gridTuple")
+                            if (param != "self" and param != "snapTuple")
                         ]
 
                         argDict = {arg: getattr(item, arg) for arg in args_used}

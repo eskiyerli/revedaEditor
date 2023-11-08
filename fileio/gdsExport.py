@@ -128,7 +128,7 @@ class gdsExporter:
         argsUsed = [
             param
             for param in initArgs
-            if (param != "self" and param != "gridTuple")
+            if (param != "self" and param != "snapTuple")
         ]
         argDict = {
             arg: getattr(instance, arg) for arg in argsUsed

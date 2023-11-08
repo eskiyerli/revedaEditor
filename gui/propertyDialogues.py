@@ -26,7 +26,6 @@
 # properties dialogues for various editor functions
 
 import pathlib
-import inspect
 from PySide6.QtGui import (
     QFontDatabase,
 )
@@ -46,7 +45,7 @@ from PySide6.QtWidgets import (
 )
 
 import revedaEditor.common.net as net
-import revedaEditor.common.shape as shp
+import revedaEditor.common.shapes as shp
 import revedaEditor.gui.editFunctions as edf
 
 
@@ -468,12 +467,12 @@ class instanceProperties(QDialog):
         instanceAttributesLayout.setColumnStretch(0, 0)
         instanceAttributesLayout.setColumnStretch(1, 1)
         # now list instance attributes
-        for counter, name in enumerate(self.instance.attr.keys()):
+        for counter, name in enumerate(self.instance._symattrs.keys()):
             instanceAttributesLayout.addWidget(edf.boldLabel(name, self), counter, 0)
             labelType = edf.longLineEdit()
             labelType.setReadOnly(True)
             labelNameEdit = edf.longLineEdit()
-            labelNameEdit.setText(self.instance.attr.get(name))
+            labelNameEdit.setText(self.instance._symattrs.get(name))
             labelNameEdit.setToolTip(f"{name} attribute (Read Only)")
             instanceAttributesLayout.addWidget(labelNameEdit, counter, 1)
 
@@ -708,11 +707,15 @@ class displayConfigDialog(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.vLayout = QVBoxLayout()
+        gridValueGroup = QGroupBox("Grid Values")
         fLayout = QFormLayout()
+        gridValueGroup.setLayout(fLayout)
         self.majorGridEntry = QLineEdit()
-        fLayout.addRow("Major Grid:", self.majorGridEntry)
-        self.snapDistanceEntry = QLineEdit()
-        fLayout.addRow("Snap Distance", self.snapDistanceEntry)
+        self.majorGridEntry.setToolTip("Enter Dot or Line Grid Spacing Value as a multiple of scene grid")
+        fLayout.addRow("GridSpacing:", self.majorGridEntry)
+        self.snapGridEdit = QLineEdit()
+        self.snapGridEdit.setToolTip("Enter the Snap Grid Value as a multiple of scene grid")
+        fLayout.addRow("Snap Distance", self.snapGridEdit)
 
         gridTypeGroup = QGroupBox("Grid Type")
         gridTypeLayout = QHBoxLayout()
@@ -725,7 +728,7 @@ class displayConfigDialog(QDialog):
         gridTypeLayout.addWidget(self.noType)
         gridTypeGroup.setLayout(gridTypeLayout)
 
-        self.vLayout.addLayout(fLayout)
+        self.vLayout.addWidget(gridValueGroup)
         self.vLayout.addWidget(gridTypeGroup)
         self.vLayout.addStretch(1)
 

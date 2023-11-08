@@ -53,7 +53,7 @@ import revedaEditor.backend.dataDefinitions as ddef
 
 
 class layoutShape(QGraphicsItem):
-    def __init__(self, gridTuple: tuple[int, int]) -> None:
+    def __init__(self, snapTuple: tuple[int, int]) -> None:
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -61,21 +61,21 @@ class layoutShape(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
         self._pen = None
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._angle = 0  # rotation angle
         self._stretch: bool = False
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
     def __repr__(self):
-        return f"layoutShape({self._gridTuple})"
+        return f"layoutShape({self._snapTuple})"
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
             viewRect = self.scene().views()[0].viewport().rect()
-            newPos.setX(round(newPos.x() / self._gridTuple[0]) * self._gridTuple[0])
-            newPos.setY(round(newPos.y() / self._gridTuple[1]) * self._gridTuple[1])
+            newPos.setX(round(newPos.x() / self._snapTuple[0]) * self._snapTuple[0])
+            newPos.setY(round(newPos.y() / self._snapTuple[1]) * self._snapTuple[1])
 
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -125,12 +125,12 @@ class layoutShape(QGraphicsItem):
         # self.update(self.boundingRect())
 
     @property
-    def gridTuple(self):
-        return self._gridTuple
+    def snapTuple(self):
+        return self._snapTuple
 
-    @gridTuple.setter
-    def gridTuple(self, value: int):
-        self._gridTuple = value
+    @snapTuple.setter
+    def snapTuple(self, value: int):
+        self._snapTuple = value
 
     @property
     def stretch(self):
@@ -190,13 +190,13 @@ class layoutShape(QGraphicsItem):
         """
         return base * int(round(number / base))
 
-    def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
+    def snapToGrid(self, point: QPoint, snapTuple: tuple[int, int]):
         """
         snap point to grid. Divides and multiplies by grid size.
         """
         return QPoint(
-            gridTuple[0] * int(round(point.x() / gridTuple[0])),
-            gridTuple[1] * int(round(point.y() / gridTuple[1])),
+            snapTuple[0] * int(round(point.x() / snapTuple[0])),
+            snapTuple[1] * int(round(point.y() / snapTuple[1])),
         )
 
 
@@ -208,14 +208,14 @@ class layoutRect(layoutShape):
         start: QPoint,
         end: QPoint,
         layer: ddef.layLayer,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
         self._end = self._rect.bottomRight()
         self._layer = layer
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._stretch = False
         self._stretchSide = None
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
@@ -232,7 +232,7 @@ class layoutRect(layoutShape):
 
     def __repr__(self):
         return (
-            f"layoutRect({self._start}, {self._end}, {self._layer}, {self._gridTuple})"
+            f"layoutRect({self._start}, {self._end}, {self._layer}, {self._snapTuple})"
         )
 
     def paint(self, painter, option, widget):
@@ -378,20 +378,20 @@ class layoutRect(layoutShape):
         eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.snapTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = layoutRect.sides[2]
             elif eventPos.y() == self.snapToBase(
-                self._rect.bottom(), self.gridTuple[1]
+                self._rect.bottom(), self.snapTuple[1]
             ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
@@ -427,8 +427,8 @@ class layoutRect(layoutShape):
 
 
 class layoutInstance(layoutShape):
-    def __init__(self, shapes: list[layoutShape], gridTuple: tuple[int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, shapes: list[layoutShape], snapTuple: tuple[int, int]):
+        super().__init__(snapTuple)
         # List of shapes in the symbol
         self._shapes = shapes
         # Flag to indicate if the symbol is in draft mode
@@ -467,7 +467,7 @@ class layoutInstance(layoutShape):
         self._shapes = list()
 
     def __repr__(self):
-        return f"layoutInstance({self._shapes}, {self._gridTuple})"
+        return f"layoutInstance({self._shapes}, {self._snapTuple})"
 
     def boundingRect(self):
         return self.childrenBoundingRect().normalized().adjusted(-2, -2, 2, 2)
@@ -530,11 +530,11 @@ class layoutInstance(layoutShape):
 
 
 class layoutPcell(layoutInstance):
-    def __init__(self, shapes: list, gridTuple: tuple[int, int]):
-        super().__init__(shapes, gridTuple)
+    def __init__(self, shapes: list, snapTuple: tuple[int, int]):
+        super().__init__(shapes, snapTuple)
 
     def __repr__(self):
-        return f"layoutPcell({self._shapes}, {self._gridTuple}"
+        return f"layoutPcell({self._shapes}, {self._snapTuple}"
 
 
 class layoutLine(layoutShape):
@@ -542,14 +542,14 @@ class layoutLine(layoutShape):
         self,
         draftLine: QLineF,
         layer: ddef.layLayer,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
         width: float = 1.0,
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._draftLine = draftLine
         self._layer = layer
         self._width = width
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
         self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
         self._rect = (
@@ -559,7 +559,7 @@ class layoutLine(layoutShape):
         )
 
     def __repr__(self):
-        return f"layoutLine({self._draftLine}, {self._layer}, {self._gridTuple}, {self._width})"
+        return f"layoutLine({self._draftLine}, {self._layer}, {self._snapTuple}, {self._width})"
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -580,7 +580,7 @@ class layoutPath(layoutShape):
         self,
         draftLine: QLineF,
         layer: ddef.layLayer,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
         width: float = 1.0,
         startExtend: int = 0,
         endExtend: int = 0,
@@ -592,19 +592,19 @@ class layoutPath(layoutShape):
         Args:
             draftLine (QLineF): The draft line.
             layer (ddef.layLayer): The layer.
-            gridTuple (tuple[int, int]): The grid tuple.
+            snapTuple (tuple[int, int]): The grid tuple.
             width (float, optional): The width. Defaults to 1.0.
             startExtend (int, optional): The start extend. Defaults to 0.
             endExtend (int, optional): The end extend. Defaults to 0.
             mode (int, optional): The mode. Defaults to 0.
         """
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self.start = None
         self._draftLine = draftLine
         self._startExtend = startExtend
         self._endExtend = endExtend
         self._width = width
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._layer = layer
         self._mode = mode
         self._name = ""
@@ -629,7 +629,7 @@ class layoutPath(layoutShape):
 
     def __repr__(self):
         return (
-            f"layoutPath({self._draftLine}, {self._layer}, {self._gridTuple}, "
+            f"layoutPath({self._draftLine}, {self._layer}, {self._snapTuple}, "
             f"{self._width}, {self._startExtend}, {self._endExtend}, {self._mode})"
         )
 
@@ -865,7 +865,7 @@ class layoutRuler(layoutShape):
         tickGap: float,
         tickLength: int,
         tickFont: QFont,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
         mode: int = 0,
     ):
         """
@@ -877,16 +877,16 @@ class layoutRuler(layoutShape):
             tickGap (float): The gap between ticks.
             tickLength (int): The length of the ticks.
             tickFont (QFont): The font for tick labels.
-            gridTuple (tuple[int, int]): The grid tuple.
+            snapTuple (tuple[int, int]): The grid tuple.
             mode (int, optional): The mode. Defaults to 0.
         """
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
 
         self._draftLine = draftLine
         self._width = width
         self._tickGap = tickGap
         self._tickLength = tickLength
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._mode = mode
         self._angle = 0
         self._rect = QRect(0, 0, 0, 0)
@@ -905,13 +905,13 @@ class layoutRuler(layoutShape):
         # Enable flag to indicate that the item contains children in shape
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
         self._createRulerTicks()
-        self.setCacheMode(QGraphicsItem.ItemCoordinateCache)
+        # self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
         self.update(self.boundingRect())
         
         
     def __repr__(self):
-        return f"layoutRuler({self._draftLine}, {self._width}, {self._tickGap}, {self._tickLength}, {self._tickFont}, {self._gridTuple}, {self._mode})"
+        return f"layoutRuler({self._draftLine}, {self._width}, {self._tickGap}, {self._tickLength}, {self._tickFont}, {self._snapTuple}, {self._mode})"
 
     def _determineAngle(self, angle: float):
         match self._mode:
@@ -985,7 +985,7 @@ class layoutRuler(layoutShape):
                     )
         self._tickTuples.append(
             ddef.rulerTuple(
-                self.draftLine.p2() + direction * self._gridTuple[0] * 0.5,
+                self.draftLine.p2() + direction * self._snapTuple[0] * 0.5,
                 QLineF(
                     self._draftLine.p2(),
                     self.draftLine.p2() + +perpendicular * self._tickLength,
@@ -1071,9 +1071,9 @@ class layoutLabel(layoutShape):
         labelAlign: str,
         labelOrient: str,
         layer: ddef.layLayer,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._start = start
         self._labelText = labelText
         self._fontFamily = fontFamily
@@ -1107,7 +1107,7 @@ class layoutLabel(layoutShape):
         return (
             f"layoutLabel({self._start}, {self._labelText}, {self._fontFamily}, "
             f"{self._fontStyle}, {self._fontHeight}, {self._labelAlign}, "
-            f"{self._labelOrient}, {self._layer}, {self._gridTuple})"
+            f"{self._labelOrient}, {self._layer}, {self._snapTuple})"
         )
 
     def definePensBrushes(self):
@@ -1148,10 +1148,10 @@ class layoutLabel(layoutShape):
             )
             .normalized()
             .adjusted(
-                -self._gridTuple[0] * 0.5,
-                self._gridTuple[1] * 0.5,
-                self._gridTuple[0] * 0.5,
-                self._gridTuple[1] * 0.5,
+                -self._snapTuple[0] * 0.5,
+                self._snapTuple[1] * 0.5,
+                self._snapTuple[0] * 0.5,
+                self._snapTuple[1] * 0.5,
             )
         )  #
 
@@ -1287,9 +1287,9 @@ class layoutPin(layoutShape):
         pinDir: str,
         pinType: str,
         layer: ddef.layLayer,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
 
         self._pinName = pinName
         self._pinDir = pinDir
@@ -1316,7 +1316,7 @@ class layoutPin(layoutShape):
     def __repr__(self):
         return (
             f"layoutPin({self._start}, {self._end}, {self._pinName}, {self._pinDir}, "
-            f"{self._pinType}, {self._layer}, {self._gridTuple})"
+            f"{self._pinType}, {self._layer}, {self._snapTuple})"
         )
 
     def paint(self, painter, option, widget):
@@ -1420,20 +1420,20 @@ class layoutPin(layoutShape):
         eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.snapTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = layoutRect.sides[2]
             elif eventPos.y() == self.snapToBase(
-                self._rect.bottom(), self.gridTuple[1]
+                self._rect.bottom(), self.snapTuple[1]
             ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
@@ -1475,9 +1475,9 @@ class layoutVia(layoutShape):
         viaDefTuple: ddef.viaDefTuple,
         width: int,
         height: int,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         end = start + QPoint(width, height)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
@@ -1485,7 +1485,7 @@ class layoutVia(layoutShape):
         self._viaDefTuple = viaDefTuple
         self._layer = viaDefTuple.layer
         self._name = viaDefTuple.name
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._type = viaDefTuple.type
         self._width = width
         self._height = height
@@ -1502,7 +1502,7 @@ class layoutVia(layoutShape):
 
     def __repr__(self):
         return (
-            f"layoutVia({self._start}, {self._end}, {self._layer}, {self._gridTuple})"
+            f"layoutVia({self._start}, {self._end}, {self._layer}, {self._snapTuple})"
         )
 
     def paint(self, painter, option, widget):
@@ -1581,8 +1581,8 @@ class layoutVia(layoutShape):
         self.update()
 
     @property
-    def gridTuple(self):
-        return self._gridTuple
+    def snapTuple(self):
+        return self._snapTuple
 
 
 class layoutViaArray(layoutShape):
@@ -1593,9 +1593,9 @@ class layoutViaArray(layoutShape):
         spacing: float,
         xnum: int,
         ynum: int,
-        gridTuple,
+        snapTuple,
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._start = start
         self._via = via  # prototype via
         self._xnum = xnum
@@ -1620,14 +1620,14 @@ class layoutViaArray(layoutShape):
                 self._via.viaDefTuple,
                 via.width,
                 via.height,
-                self._gridTuple,
+                self._snapTuple,
             )
             item.setFlag(QGraphicsItem.ItemIsSelectable, False)
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
             item.setParentItem(self)
 
     def __repr__(self):
-        return f"layoutViaArray({self._via}, {self._xnum}, {self._ynum}, {self._gridTuple})"
+        return f"layoutViaArray({self._via}, {self._xnum}, {self._ynum}, {self._snapTuple})"
 
     def boundingRect(self) -> QRectF:
         return self.childrenBoundingRect()
@@ -1749,18 +1749,18 @@ class layoutViaArray(layoutShape):
 
 
 class layoutPolygon(layoutShape):
-    def __init__(self, points: list, layer: ddef.layLayer, gridTuple: [int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, points: list, layer: ddef.layLayer, snapTuple: [int, int]):
+        super().__init__(snapTuple)
         self._points = points
         self._layer = layer
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._definePensBrushes()
         self._polygon = QPolygonF(self._points)
         self._selectedCorner = None
         self._selectedCornerIndex = None
 
     def __repr__(self):
-        return f"layoutPolygon({self._points}, {self._layer}, {self._gridTuple})"
+        return f"layoutPolygon({self._points}, {self._layer}, {self._snapTuple})"
 
     def paint(self, painter, option, widget):
         if self.isSelected():

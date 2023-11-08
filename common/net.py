@@ -72,10 +72,10 @@ class schematicNet(QGraphicsLineItem):
         '''
         Return the shape of the net.
         '''
-        gridTuple = self.scene().gridTuple
+        snapTuple = self.scene().snapTuple
         path = QPainterPath()
         path.addRect(QRectF(self.line().p1(), self.line().p2()).normalized().adjusted(
-            -0.5 * gridTuple[0], -0.5 * gridTuple[1], 0.5 * gridTuple[0], 0.5 * gridTuple[1]))
+            -0.5 * snapTuple[0], -0.5 * snapTuple[1], 0.5 * snapTuple[0], 0.5 * snapTuple[1]))
         return path
 
     def paint(self, painter, option, widget) -> None:

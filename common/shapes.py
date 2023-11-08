@@ -1,28 +1,30 @@
-#   “Commons Clause” License Condition v1.0
-#  #
-#   The Software is provided to you by the Licensor under the License, as defined
-#   below, subject to the following condition.
-#  #
-#   Without limiting other conditions in the License, the grant of rights under the
-#   License will not include, and the License does not grant to you, the right to
-#   Sell the Software.
-#  #
-#   For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#   granted to you under the License to provide to third parties, for a fee or other
-#   consideration (including without limitation fees for hosting or consulting/
-#   support services related to the Software), a product or service whose value
-#   derives, entirely or substantially, from the functionality of the Software. Any
-#   license notice or attribution required by the License must also include this
-#   Commons Clause License Condition notice.
-#  #
-#   Software: Revolution EDA
-#   License: Mozilla Public License 2.0
-#   Licensor: Revolution Semiconductor (Registered in the Netherlands)
+#    “Commons Clause” License Condition v1.0
+#   #
+#    The Software is provided to you by the Licensor under the License, as defined
+#    below, subject to the following condition.
+#
+#    Without limiting other conditions in the License, the grant of rights under the
+#    License will not include, and the License does not grant to you, the right to
+#    Sell the Software.
+#
+#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
+#    granted to you under the License to provide to third parties, for a fee or other
+#    consideration (including without limitation fees for hosting or consulting/
+#    support services related to the Software), a product or service whose value
+#    derives, entirely or substantially, from the functionality of the Software. Any
+#    license notice or attribution required by the License must also include this
+#    Commons Clause License Condition notice.
+#
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
+#    Software: Revolution EDA
+#    License: Mozilla Public License 2.0
+#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
+#
 
 import math
 
-# shape class definition for symbol editor.
-# base class for all shapes: rectangle, circle, line
 from PySide6.QtCore import (
     QPoint,
     QRect,
@@ -56,25 +58,26 @@ import revedaEditor.common.net as net
 
 
 class symbolShape(QGraphicsItem):
-    def __init__(self, gridTuple: tuple[int, int]) -> None:
+    def __init__(self, snapTuple: tuple[int, int]) -> None:
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._angle = 0  # rotation angle
         self._stretch: bool = False
         self._pen = symlyr.defaultPen
+        self._draft: bool = False
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange and self.scene():
             newPos = value.toPoint()
             sceneRect = self.scene().sceneRect()
             viewRect = self.scene().views()[0].viewport().rect()
-            newPos.setX(round(newPos.x() / self._gridTuple[0]) * self._gridTuple[0])
-            newPos.setY(round(newPos.y() / self._gridTuple[1]) * self._gridTuple[1])
+            newPos.setX(round(newPos.x() / self._snapTuple[0]) * self._snapTuple[0])
+            newPos.setY(round(newPos.y() / self._snapTuple[1]) * self._snapTuple[1])
 
             if not sceneRect.contains(newPos):
                 # Keep the item inside the scene rect.
@@ -94,7 +97,7 @@ class symbolShape(QGraphicsItem):
         return super().itemChange(change, value)
 
     def __repr__(self):
-        return f'symbolShape({self.gridTuple})'
+        return f'symbolShape({self.snapTuple})'
 
     @property
     def pen(self):
@@ -120,12 +123,12 @@ class symbolShape(QGraphicsItem):
         self.setRotation(value)  # self.update(self.boundingRect())
 
     @property
-    def gridTuple(self):
-        return self._gridTuple
+    def snapTuple(self):
+        return self._snapTuple
 
-    @gridTuple.setter
-    def gridTuple(self, value: int):
-        self._gridTuple = value
+    @snapTuple.setter
+    def snapTuple(self, value: int):
+        self._snapTuple = value
 
     @property
     def stretch(self):
@@ -134,6 +137,18 @@ class symbolShape(QGraphicsItem):
     @stretch.setter
     def stretch(self, value: bool):
         self._stretch = value
+
+    @property
+    def draft(self) -> bool:
+        return self._draft
+
+    @draft.setter
+    def draft(self, value: bool):
+        assert isinstance(value, bool)
+        self._draft = value
+        # all the child items and their children should be also draft.
+        for item in self.childItems():
+            item.draft = True
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
@@ -180,13 +195,13 @@ class symbolShape(QGraphicsItem):
         """
         return base * int(round(number / base))
 
-    def snapToGrid(self, point: QPoint, gridTuple: tuple[int, int]):
+    def snapToGrid(self, point: QPoint, snapTuple: tuple[int, int]):
         """
         snap point to grid. Divides and multiplies by grid size.
         """
         return QPoint(
-            gridTuple[0] * int(round(point.x() / gridTuple[0])),
-            gridTuple[1] * int(round(point.y() / gridTuple[1])),
+            snapTuple[0] * int(round(point.x() / snapTuple[0])),
+            snapTuple[1] * int(round(point.y() / snapTuple[1])),
         )
 
 
@@ -197,8 +212,8 @@ class symbolRectangle(symbolShape):
 
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]) -> None:
-        super().__init__(gridTuple)
+    def __init__(self, start: QPoint, end: QPoint, snapTuple: tuple[int, int]) -> None:
+        super().__init__(snapTuple)
         self._rect = QRectF(start, end).normalized()
         self._start = self._rect.topLeft()
         self._end = self._rect.bottomRight()
@@ -209,7 +224,10 @@ class symbolRectangle(symbolShape):
         return self._rect.normalized().adjusted(-2, -2, 2, 2)
 
     def paint(self, painter, option, widget):
-        if self.isSelected():
+        if self.draft:
+            painter.setPen(symlyr.draftPen)
+            self.setZValue(symlyr.draftLayer.z)
+        elif self.isSelected():
             painter.setPen(symlyr.selectedSymbolPen)
             self.setZValue(symlyr.symbolLayer.z)
             if self.stretch:
@@ -229,7 +247,7 @@ class symbolRectangle(symbolShape):
         painter.drawRect(self._rect)
 
     def __repr__(self):
-        return f"symbolRectangle({self._start},{self._end},{self._gridTuple})"
+        return f"symbolRectangle({self._start},{self._end},{self._snapTuple})"
 
     @property
     def rect(self):
@@ -338,20 +356,20 @@ class symbolRectangle(symbolShape):
         eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = symbolRectangle.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = symbolRectangle.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.snapTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = symbolRectangle.sides[2]
             elif eventPos.y() == self.snapToBase(
-                self._rect.bottom(), self.gridTuple[1]
+                self._rect.bottom(), self.snapTuple[1]
             ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
@@ -389,12 +407,12 @@ class symbolRectangle(symbolShape):
 
 
 class symbolCircle(symbolShape):
-    def __init__(self, centre: QPoint, end: QPoint, gridTuple: tuple[int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, centre: QPoint, end: QPoint, snapTuple: tuple[int, int]):
+        super().__init__(snapTuple)
         xlen = abs(end.x() - centre.x())
         ylen = abs(end.y() - centre.y())
         self._radius = self.snapToBase(
-            int(math.sqrt(xlen**2 + ylen**2)), self.gridTuple[0]
+            int(math.sqrt(xlen**2 + ylen**2)), self.snapTuple[0]
         )
         self._centre = centre
         self._topLeft = self._centre - QPoint(self._radius, self._radius)
@@ -417,7 +435,7 @@ class symbolCircle(symbolShape):
         painter.drawEllipse(self._centre, self._radius, self._radius)
 
     def __repr__(self):
-        return f"symbolCircle({self._centre},{self._end},{self._gridTuple})"
+        return f"symbolCircle({self._centre},{self._end},{self._snapTuple})"
 
     @property
     def radius(self):
@@ -426,7 +444,7 @@ class symbolCircle(symbolShape):
     @radius.setter
     def radius(self, radius: int):
         self.prepareGeometryChange()
-        self._radius = self.snapToBase(radius, self._gridTuple[0])
+        self._radius = self.snapToBase(radius, self._snapTuple[0])
         self._end = self._centre + QPoint(self._radius, 0)
         self._topLeft = self._centre - QPoint(self._radius, self._radius)
         self._rightBottom = self._centre + QPoint(self._radius, self._radius)
@@ -478,14 +496,14 @@ class symbolCircle(symbolShape):
         super().mousePressEvent(event)
         if self.isSelected() and self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            # eventPos = self.snap2grid(event.pos(), self._gridTuple)
+            # eventPos = self.snap2grid(event.pos(), self._snapTuple)
             eventPos = event.pos().toPoint()
             distance = self.snapToBase(
                 math.sqrt(
                     (eventPos.x() - self._centre.x()) ** 2
                     + (eventPos.y() - self._centre.y()) ** 2
                 ),
-                self._gridTuple[0],
+                self._snapTuple[0],
             )
             if distance == self._radius:
                 self._startStretch = True
@@ -500,7 +518,7 @@ class symbolCircle(symbolShape):
                     (eventPos.x() - self._centre.x()) ** 2
                     + (eventPos.y() - self._centre.y()) ** 2
                 ),
-                self._gridTuple[0],
+                self._snapTuple[0],
             )
             self.prepareGeometryChange()
             self._radius = distance
@@ -525,8 +543,8 @@ class symbolArc(symbolShape):
     arcTypes = ["Up", "Right", "Down", "Left"]
     sides = ["Left", "Right", "Top", "Bottom"]
 
-    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, start: QPoint, end: QPoint, snapTuple: tuple[int, int]):
+        super().__init__(snapTuple)
         self._start = start
         self._end = end
         self._rect = QRectF(self._start, self._end).normalized()
@@ -595,7 +613,7 @@ class symbolArc(symbolShape):
         self._rect = arc_rect.normalized()
 
     def __repr__(self):
-        return f"symbolArc({self._start},{self._end},{self._gridTuple})"
+        return f"symbolArc({self._start},{self._end},{self._snapTuple})"
 
     @property
     def start(self):
@@ -605,7 +623,7 @@ class symbolArc(symbolShape):
     def start(self, point: QPoint):
         assert isinstance(point, QPoint)
         self.prepareGeometryChange()
-        self._start = self.snapToGrid(point, self.gridTuple)
+        self._start = self.snapToGrid(point, self.snapTuple)
 
     @property
     def end(self):
@@ -646,20 +664,20 @@ class symbolArc(symbolShape):
         eventPos = event.pos().toPoint()
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if eventPos.x() == self.snapToBase(self._rect.left(), self.gridTuple[0]):
+            if eventPos.x() == self.snapToBase(self._rect.left(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = symbolArc.sides[0]
-            elif eventPos.x() == self.snapToBase(self._rect.right(), self.gridTuple[0]):
+            elif eventPos.x() == self.snapToBase(self._rect.right(), self.snapTuple[0]):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = symbolArc.sides[1]
-            elif eventPos.y() == self.snapToBase(self._rect.top(), self.gridTuple[1]):
+            elif eventPos.y() == self.snapToBase(self._rect.top(), self.snapTuple[1]):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
                     self._stretchSide = symbolArc.sides[2]
             elif eventPos.y() == self.snapToBase(
-                self._rect.bottom(), self.gridTuple[1]
+                self._rect.bottom(), self.snapTuple[1]
             ):
                 if self._rect.left() <= eventPos.x() <= self._rect.right():
                     self.setCursor(Qt.SizeVerCursor)
@@ -694,17 +712,17 @@ class symbolArc(symbolShape):
             self.setCursor(Qt.ArrowCursor)
 
             if self._arcType == symbolArc.arcTypes[0]:
-                self._start = self.snapToGrid(self._rect.bottomLeft(), self.gridTuple)
-                self._end = self.snapToGrid(self._rect.topRight(), self.gridTuple)
+                self._start = self.snapToGrid(self._rect.bottomLeft(), self.snapTuple)
+                self._end = self.snapToGrid(self._rect.topRight(), self.snapTuple)
             elif self._arcType == symbolArc.arcTypes[1]:
-                self._start = self.snapToGrid(self._rect.topLeft(), self.gridTuple)
-                self._end = self.snapToGrid(self._rect.bottomRight(), self.gridTuple)
+                self._start = self.snapToGrid(self._rect.topLeft(), self.snapTuple)
+                self._end = self.snapToGrid(self._rect.bottomRight(), self.snapTuple)
             elif self._arcType == symbolArc.arcTypes[2]:
-                self._start = self.snapToGrid(self._rect.topRight(), self.gridTuple)
-                self._end = self.snapToGrid(self._rect.bottomLeft(), self.gridTuple)
+                self._start = self.snapToGrid(self._rect.topRight(), self.snapTuple)
+                self._end = self.snapToGrid(self._rect.bottomLeft(), self.snapTuple)
             elif self._arcType == symbolArc.arcTypes[3]:
-                self._start = self.snapToGrid(self._rect.bottomRight(), self.gridTuple)
-                self._end = self.snapToGrid(self._rect.topLeft(), self.gridTuple)
+                self._start = self.snapToGrid(self._rect.bottomRight(), self.snapTuple)
+                self._end = self.snapToGrid(self._rect.topLeft(), self.snapTuple)
             self._rect = QRectF(self._start, self._end).normalized()
 
 
@@ -715,8 +733,8 @@ class symbolLine(symbolShape):
 
     stretchSides = ["start", "end"]
 
-    def __init__(self, start: QPoint, end: QPoint, gridTuple: tuple[int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, start: QPoint, end: QPoint, snapTuple: tuple[int, int]):
+        super().__init__(snapTuple)
         self._end = end
         self._start = start
         self._stretch = False
@@ -748,17 +766,17 @@ class symbolLine(symbolShape):
                 self.setZValue(symlyr.stretchSymbolLayer.z)
                 if self._stretchSide == symbolLine.stretchSides[0]:
                     painter.drawEllipse(
-                        self._start, self.gridTuple[0], self.gridTuple[1]
+                        self._start, self.snapTuple[0], self.snapTuple[1]
                     )
                 elif self._stretchSide == symbolLine.stretchSides[1]:
-                    painter.drawEllipse(self._end, self.gridTuple[0], self.gridTuple[1])
+                    painter.drawEllipse(self._end, self.snapTuple[0], self.snapTuple[1])
         else:
             painter.setPen(symlyr.symbolPen)
             self.setZValue(symlyr.symbolLayer.z)
         painter.drawLine(self._line)
 
     def __repr__(self):
-        return f"symbolLine({self._start},{self._end}, {self._gridTuple})"
+        return f"symbolLine({self._start},{self._end}, {self._snapTuple})"
 
     @property
     def rect(self):
@@ -846,16 +864,16 @@ class symbolLine(symbolShape):
 
 
 class symbolPolygon(symbolShape):
-    def __init__(self, points: list, gridTuple: [int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, points: list, snapTuple: [int, int]):
+        super().__init__(snapTuple)
         self._points = points
-        self._gridTuple = gridTuple
+        self._snapTuple = snapTuple
         self._polygon = QPolygonF(self._points)
         self._selectedCorner = None
         self._selectedCornerIndex = None
 
     def __repr__(self):
-        return f"symbolPolygon({self._points}, {self._gridTuple})"
+        return f"symbolPolygon({self._points}, {self._snapTuple})"
 
 
     def paint(self, painter, option, widget):
@@ -945,9 +963,9 @@ class symbolPin(symbolShape):
         pinName: str,
         pinDir: str,
         pinType: str,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
 
         self._start = start  # centre of pin
         self._pinName = pinName
@@ -978,7 +996,7 @@ class symbolPin(symbolShape):
     def __repr__(self):
         return (
             f"pin({self._start},{self._pinName}, {self._pinDir}, {self._pinType},"
-            f" {self._gridTuple})"
+            f" {self._snapTuple})"
         )
 
     @property
@@ -1030,7 +1048,7 @@ class symbolPin(symbolShape):
 
     def toSchematicPin(self, start: QPoint):
         return schematicPin(
-            start, self.pinName, self.pinDir, self.pinType, self.gridTuple
+            start, self.pinName, self.pinDir, self.pinType, self.snapTuple
         )
 
 
@@ -1051,9 +1069,9 @@ class text(symbolShape):
         textHeight: str,
         textAlign: str,
         textOrient: str,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._start = start
         self._textContent = textContent
         self._textHeight = textHeight
@@ -1081,7 +1099,7 @@ class text(symbolShape):
         return (
             f"text({self._start},{self._textContent}, {self._textFont.family()},"
             f" {self._textFont.style()}, {self._textHeight}, {self._textAlign},"
-            f"{self._textOrient}, {self._gridTuple})"
+            f"{self._textOrient}, {self._snapTuple})"
         )
 
     def setOrient(self):
@@ -1265,9 +1283,9 @@ class symbolLabel(symbolShape):
         labelAlign: str,
         labelOrient: str,
         labelUse: str,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._start = start  # top left corner
         self._labelDefinition = labelDefinition  # label definition is what is
         # entered in the symbol editor
@@ -1292,7 +1310,7 @@ class symbolLabel(symbolShape):
         return (
             f"symbolLabel({self._start},{self._labelDefinition},"
             f" {self._labelType}, {self._labelHeight}, {self._labelAlign}, {self._labelOrient},"
-            f" {self._labelUse}, {self._gridTuple})"
+            f" {self._labelUse}, {self._snapTuple})"
         )
 
     def boundingRect(self):
@@ -1305,10 +1323,10 @@ class symbolLabel(symbolShape):
             )
             .normalized()
             .adjusted(
-                -self._gridTuple[0] * 0.5,
-                self._gridTuple[1] * 0.5,
-                self._gridTuple[0] * 0.5,
-                self._gridTuple[1] * 0.5,
+                -self._snapTuple[0] * 0.5,
+                self._snapTuple[1] * 0.5,
+                self._snapTuple[0] * 0.5,
+                self._snapTuple[1] * 0.5,
             )
         )  #
 
@@ -1459,7 +1477,7 @@ class symbolLabel(symbolShape):
         if labelOrient in self.labelOrients:
             self._labelOrient = labelOrient
         else:
-            print("Invalid label orientation")
+            self.scene().logger.error("Invalid label orientation")
 
     @property
     def labelUse(self):
@@ -1499,45 +1517,72 @@ class symbolLabel(symbolShape):
 
     def labelDefs(self):
         """
-        This method will create label name, value andtext from label
-        definition. It should be run label is defined or redefined.
+        This method creates label name, value, and text from a label definition.
+        It should be called when a label is defined or redefined.
         """
         self.prepareGeometryChange()
+
         if self._labelType == symbolLabel.labelTypes[0]:
+            # Set label name, value, and text to label definition
             self._labelName = self._labelDefinition
+            self._labelValue = self._labelDefinition
             self._labelText = self._labelDefinition
-            self._labelValue = None
             self._labelValueSet = True
-        elif self.labelType == symbolLabel.labelTypes[1]:
+
+        elif self._labelType == symbolLabel.labelTypes[1]:
             try:
                 if self._labelDefinition in symbolLabel.predefinedLabels:
                     self._labelValueSet = True
-                    match self.labelDefinition:
+                    match self._labelDefinition:
                         case "[@cellName]":
+                            # Set label name to "cellName" and value and text to parent item's cell name
                             self._labelName = "cellName"
-                            self._labelValue = self.parentItem().cellName
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = self.parentItem().cellName
                             self._labelText = self._labelValue
                         case "[@instName]":
+                            # Set label name to "instName" and value and text to parent item's counter with prefix "I"
                             self._labelName = "instName"
-                            self._labelValue = f"I{self.parentItem().counter}"
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = f"I{self.parentItem().counter}"
                             self._labelText = self._labelValue
+
                         case "[@libName]":
+                            # Set label name to "libName" and value and text to parent item's library name
                             self._labelName = "libName"
-                            self._labelValue = self.parentItem().libraryName
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = self.parentItem().libraryName
                             self._labelText = self._labelValue
                         case "[@viewName]":
-                            self._viewName = "viewName"
-                            self._labelValue = self.parentItem().viewName
+                            # Set label name to "viewName" and value and text to parent item's view name
+                            self._labelName = "viewName"
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = self.parentItem().viewName
                             self._labelText = self._labelValue
                         case "[@modelName]":
+                            # Set label name to "modelName" and value and text to parent item's "modelName" attribute
                             self._labelName = "modelName"
-                            self._labelValue = self.parentItem().attr.get(
-                                "modelName", ""
-                            )
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = self.parentItem().attr.get("modelName", "")
+
                             self._labelText = self._labelValue
                         case "[@elementNum]":
+                            # Set label name to "elementNum" and value and text to parent item's counter
                             self._labelName = "elementNum"
-                            self._labelValue = f"{self.parentItem().counter}"
+                            if self.parentItem() is None:
+                                self._labelValue = self._labelDefinition
+                            else:
+                                self._labelValue = f"{self.parentItem().counter}"
                             self._labelText = self._labelValue
                 else:
                     labelFields = (
@@ -1554,49 +1599,32 @@ class symbolLabel(symbolShape):
                             self._labelText = self._labelValue
                         case 2:
                             if self._labelValueSet:
-                                self._labelText = (
-                                    labelFields[1]
-                                    .strip()
-                                    .replace("%", self._labelValue)
-                                )
+                                # Set label text to the second field of label definition with "%" replaced by label value
+                                self._labelText = labelFields[1].strip().replace("%", self._labelValue)
                             else:
                                 self._labelValue = "?"
                         case 3:
                             tempLabelValue = (
                                 labelFields[2].strip().split("=")[-1].split()[-1]
                             )
-                            if self.labelValueSet:
-                                self._labelText = labelFields[2].replace(
-                                    tempLabelValue, self._labelValue
-                                )
+                            if self._labelValueSet:
+                                # Set label text to the third field of label definition with temp label value replaced by label value
+                                self._labelText = labelFields[2].replace(tempLabelValue, self._labelValue)
                             else:
                                 self._labelText = labelFields[2]
-                                self._labelValue = tempLabelValue
-
+                                self._labelValue
             except Exception as e:
-                if self.scene():
-                    self.scene().logger.error(e)
-        elif self._labelType == symbolLabel.labelTypes[2]:  # pyLabel
-            try:
-                labelFields = self._labelDefinition.strip().split("=")
-                self._labelName = labelFields[0].strip()
-                labelFunction = labelFields[1].strip()
-                # pass the PDK callback class named with "cellName" the labels
-                # dictionary of instance.w
-                expression = f"cb.{self.parentItem().cellName}(self.parentItem().labels).{labelFunction}"
-                self._labelValue = Quantity(eval(expression)).render(prec=3)
-                self._labelText = f"{self._labelName}={self._labelValue}"
-            except Exception as e:
-                if self.scene():
-                    self.scene().logger.error(e)
-
+                self.scene().logger.error(
+                    f"Error parsing label definition: {self._labelDefinition}"
+                )
+                self.scene().logger.error(e)
 
 class schematicSymbol(symbolShape):
-    def __init__(self, shapes: list, attr: dict, gridTuple: tuple[int, int]):
-        super().__init__(gridTuple)
+    def __init__(self, shapes: list, attr: dict, snapTuple: tuple[int, int]):
+        super().__init__(snapTuple)
         assert shapes is not None  # must not be an empty list
-        self.shapes = shapes  # list of shapes in the symbol
-        self.attr = attr  # parameters common to all instances of symbol
+        self._shapes = shapes  # list of shapes in the symbol
+        self._symattrs = attr  # parameters common to all instances of symbol
         self._counter = 0  # item's number on schematic
         self._libraryName = ""
         self._cellName = ""
@@ -1605,7 +1633,6 @@ class schematicSymbol(symbolShape):
         self._netlistLine = ""
         # self._simViewName = None
         self._angle = 0.0
-        self._drawings = list()
         self._labels = dict()  # dict of labels
         self._pins = dict()  # dict of pins
         self._netlistIgnore = False
@@ -1613,7 +1640,15 @@ class schematicSymbol(symbolShape):
         self.pinLocations = dict()  # pinName: pinRect
         self.pinNetMap = dict()  # pinName: netName
         self.pinNetTupleList = list()  # list of pinNetTuple
-        for item in self.shapes:
+        self.addShapes()
+        self.setFiltersChildEvents(True)
+        self.setHandlesChildEvents(True)
+        self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+
+        self.dashLines = dict()
+
+    def addShapes(self):
+        for item in self._shapes:
             item.setFlag(QGraphicsItem.ItemIsSelectable, False)
             item.setFlag(QGraphicsItem.ItemStacksBehindParent, True)
             item.setParentItem(self)
@@ -1621,18 +1656,9 @@ class schematicSymbol(symbolShape):
                 self._pins[item.pinName] = item
             elif type(item) is symbolLabel:
                 self._labels[item.labelName] = item
-            else:
-                self._drawings.append(item)
-        self.setFiltersChildEvents(True)
-        self.setHandlesChildEvents(True)
-        self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
-        self.borderRect = (
-            self.childrenBoundingRect().normalized().adjusted(-1, -1, 1, 1)
-        )
-        self.dashLines = dict()
 
     def __repr__(self):
-        return f"schematicSymbol({self.shapes}, {self._gridTuple})"
+        return f"schematicSymbol({self._shapes}, {self._snapTuple})"
 
     def paint(self, painter, option, widget):
         self.setZValue(symlyr.symbolLayer.z)
@@ -1784,8 +1810,22 @@ class schematicSymbol(symbolShape):
         return self._pins
 
     @property
-    def drawings(self):
-        return self._drawings
+    def shapes(self):
+        return self._shapes
+
+    @shapes.setter
+    def shapes(self, shapeList:list):
+        self.prepareGeometryChange()
+        self._shapes = shapeList
+        self.addShapes()
+
+    @property
+    def symattrs(self):
+        return self._symattrs
+
+    @symattrs.setter
+    def symattrs(self, attrDict: dict):
+        self._symattrs = attrDict
 
     @property
     def netlistIgnore(self) -> bool:
@@ -1797,14 +1837,10 @@ class schematicSymbol(symbolShape):
         self._netlistIgnore = value
 
     @property
-    def draft(self) -> bool:
-        return self._draft
-
-    @draft.setter
-    def draft(self, value: bool):
-        assert isinstance(value, bool)
-        self._draft = value
-
+    def borderRect(self):
+        return (
+            self.childrenBoundingRect().normalized().adjusted(-1, -1, 1, 1)
+        )
 
 class schematicPin(symbolShape):
     """
@@ -1820,9 +1856,9 @@ class schematicPin(symbolShape):
         pinName: str,
         pinDir: str,
         pinType: str,
-        gridTuple: tuple[int, int],
+        snapTuple: tuple[int, int],
     ):
-        super().__init__(gridTuple)
+        super().__init__(snapTuple)
         self._start = start
         self._pinName = pinName
         self._pinDir = pinDir
@@ -1832,7 +1868,7 @@ class schematicPin(symbolShape):
     def __repr__(self):
         return (
             f"schematicPin({self._start}, {self._pinName}, {self._pinDir}, "
-            f"{self._pinType}, {self._gridTuple})"
+            f"{self._pinType}, {self._snapTuple})"
         )
 
     def paint(self, painter, option, widget):
@@ -1957,7 +1993,7 @@ class schematicPin(symbolShape):
     #     self.setPos(event.scenePos() - event.buttonDownPos(Qt.LeftButton))
 
     def toSymbolPin(self, start: QPoint):
-        return symbolPin(start, self.pinName, self.pinDir, self.pinType, self.gridTuple)
+        return symbolPin(start, self.pinName, self.pinDir, self.pinType, self.snapTuple)
 
     @property
     def start(self):

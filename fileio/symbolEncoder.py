@@ -25,7 +25,7 @@
 
 import json
 
-import revedaEditor.common.shape as shp
+import revedaEditor.common.shapes as shp
 
 
 class symbolAttribute(object):

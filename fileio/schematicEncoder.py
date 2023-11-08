@@ -26,17 +26,20 @@
 import json
 
 import revedaEditor.common.net as net
-import revedaEditor.common.shape as shp
+import revedaEditor.common.shapes as shp
 
 
 class schematicEncoder(json.JSONEncoder):
     def default(self, item):
         if isinstance(item, shp.schematicSymbol):
-            # get label values and visibility
-            itemLabelDict = {
-                label.labelName: [label.labelValue, label.labelVisible]
-                for label in item.labels.values()
-            }
+            # if item was drawn as a draft, then just carry the labels
+            if item.draft:
+                itemLabelDict = item.labelDict
+            else:
+                itemLabelDict = {
+                    label.labelName: [label.labelValue, label.labelVisible]
+                    for label in item.labels.values()
+                }
             itemDict = {
                 "type": "symbolShape",
                 "lib": item.libraryName,
@@ -48,6 +51,7 @@ class schematicEncoder(json.JSONEncoder):
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
                 "ign": int(item.netlistIgnore),
+                "br": item.boundingRect().getCoords(),
             }
             return itemDict
         elif isinstance(item, net.schematicNet):
