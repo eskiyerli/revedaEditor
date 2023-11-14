@@ -3250,7 +3250,8 @@ class schematic_scene(editor_scene):
         self.pinType = "Signal"
         self.pinDir = "Input"
         self.parentView = None
-        self.wires = None
+        # self.wires = None
+        self._newNet = None
         self.newInstance = None
         self.newPin = None
         self.newText = None
@@ -3288,10 +3289,21 @@ class schematic_scene(editor_scene):
                 if self.editModes.addInstance:
                     self.newInstance = self.drawInstance(self.mousePressLoc)
                     self.newInstance.setSelected(True)
+                elif self.editModes.drawWire and self._newNet is not None:
+                    self.mouseReleaseLoc = self.findSnapPoint(
+                        self.mouseReleaseLoc, self.snapDistance, {self._newNet})
+                    self._newNet.setLine(QLineF(self.mousePressLoc, self.mouseReleaseLoc))  # self.mousePressLoc, self.mouseReleaseLoc
+                    if self.snapPointRect:
+                        self.removeItem(self.snapPointRect)
+                        self.snapPointRect = None
 
-                elif self.editModes.drawWire:
-                    self.editorWindow.messageLine.setText("Wire Mode")
-                    self.wires = self.addWires(self.mousePressLoc)
+                    self._newNet = None  # self.mergeNets()
+                    viewNets = {
+                        netItem
+                        for netItem in self.editorWindow.centralW.view.items()
+                        if isinstance(netItem, net.schematicNet)
+                    }
+                    [netItem.findDotPoints() for netItem in viewNets]
 
                 elif self.editModes.changeOrigin:  # change origin of the symbol
                     self.origin = self.mousePressLoc
@@ -3330,18 +3342,7 @@ class schematic_scene(editor_scene):
                     # TODO: think how to do it with mapFromScene
                     self.newInstance.setPos(self.mouseMoveLoc - self.mousePressLoc)
 
-                elif self.editModes.drawWire:
-                    self.mouseMoveLoc = self.findSnapPoint(
-                        self.mouseMoveLoc, self.snapDistance, set(self.wires)
-                    )
-                    if self.snapPointRect is None:
-                        rect = QRectF(QPointF(-5, -5), QPointF(5, 5))
-                        self.snapPointRect = QGraphicsRectItem(rect)
-                        self.snapPointRect.setPen(schlyr.draftPen)
-                        self.addItem(self.snapPointRect)
-                    self.snapPointRect.setPos(self.mouseMoveLoc)
-
-                    self.extendWires(self.wires, self.mousePressLoc, self.mouseMoveLoc)
+                    
                 elif self.editModes.drawPin and self.newPin.isSelected():
                     self.newPin.setPos(self.mouseMoveLoc - self.mousePressLoc)
 
@@ -3352,12 +3353,25 @@ class schematic_scene(editor_scene):
                     self.selectionRectItem.setRect(
                         QRectF(self.mousePressLoc, self.mouseMoveLoc)
                     )
-
+            else:
+                if self.editModes.drawWire and self._newNet is not None:
+                    self.mouseMoveLoc = self.findSnapPoint(
+                        self.mouseMoveLoc, self.snapDistance, {self._newNet}
+                    )
+                    if self.snapPointRect is None:
+                        rect = QRectF(QPointF(-5, -5), QPointF(5, 5))
+                        self.snapPointRect = QGraphicsRectItem(rect)
+                        self.snapPointRect.setPen(schlyr.draftPen)
+                        self.addItem(self.snapPointRect)
+                    self.snapPointRect.setPos(self.mouseMoveLoc)
+                    self._newNet.end = self.mouseMoveLoc
+                    if self._newNet.scene() is None:
+                        self.addUndoStack(self._newNet)
             self.editorWindow.statusLine.showMessage(
                 f"Cursor Position: {str((self.mouseMoveLoc - self.origin).toTuple())}"
             )
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(f'mouse move error: {e}')
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
@@ -3365,31 +3379,14 @@ class schematic_scene(editor_scene):
             self.mouseReleaseLoc = mouse_event.scenePos().toPoint()
             modifiers = QGuiApplication.keyboardModifiers()
             if mouse_event.button() == Qt.LeftButton:
-                if self.editModes.drawWire and self.wires:
-                    self.mouseReleaseLoc = self.findSnapPoint(
-                        self.mouseReleaseLoc, self.snapDistance, set(self.wires)
-                    )
-                    self.extendWires(
-                        self.wires, self.mousePressLoc, self.mouseReleaseLoc
-                    )
-                    if self.snapPointRect:
-                        self.removeItem(self.snapPointRect)
-                        self.snapPointRect = None
-
-                    if lines := self.pruneWires(self.wires, schlyr.wirePen):
-                        for line in lines:
-                            line.mergeNets()
-                    self.wires = None  # self.mergeNets()
-                    viewNets = {
-                        netItem
-                        for netItem in self.editorWindow.centralW.view.items()
-                        if isinstance(netItem, net.schematicNet)
-                    }
-                    [netItem.findDotPoints() for netItem in viewNets]
-
-                elif self.editModes.addInstance:
+                
+                if self.editModes.addInstance:
                     self.editModes.addInstance = False
 
+                elif self.editModes.drawWire and self._newNet is None:
+                    self.editorWindow.messageLine.setText("Wire Mode")
+                    self._newNet = net.schematicNet(self.mouseReleaseLoc, self.mouseReleaseLoc)
+                    print(self._newNet)
                 elif self.editModes.drawText:
                     self.parent.parent.messageLine.setText("Note added.")
                     self.editModes.drawText = False
@@ -3772,7 +3769,7 @@ class schematic_scene(editor_scene):
             firstPointY = start.y()
             firstPoint = QPoint(firstPointX, firstPointY)
             secondPoint = QPoint(firstPointX, end.y())
-            [self.addItem(line) for line in lines if line.scene() is None]
+            [self.addUndoStack(line) for line in lines if line.scene() is None]
             lines[0].start = start
             lines[0].end = firstPoint
             lines[1].start = firstPoint

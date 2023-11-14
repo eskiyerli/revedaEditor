@@ -158,7 +158,6 @@ class schematicItems:
     def create(self, item: dict):
         match item["type"]:
             case "symbolShape":
-
                 itemShapes = list()
                 symbolAttributes = dict()
                 symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes)
