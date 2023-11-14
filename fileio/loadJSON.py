@@ -80,7 +80,7 @@ class symbolItems:
         """
         start = QPoint(item["rect"][0], item["rect"][1])
         end = QPoint(item["rect"][2], item["rect"][3])
-        rect = shp.symbolRectangle(start, end, self.snapTuple)
+        rect = shp.symbolRectangle(start, end)
         rect.setPos(QPoint(item["loc"][0], item["loc"][1]), )
         rect.angle = item["ang"]
         return rect
@@ -88,8 +88,7 @@ class symbolItems:
     def createCircleItem(self, item: dict):
         centre = QPoint(item["cen"][0], item["cen"][1])
         end = QPoint(item["end"][0], item["end"][1])
-        circle = shp.symbolCircle(centre, end,
-                                  self.snapTuple)  # note that we are using grid
+        circle = shp.symbolCircle(centre, end)  # note that we are using grid
         # values for
         # scene
         circle.setPos(QPoint(item["loc"][0], item["loc"][1]), )
@@ -100,8 +99,7 @@ class symbolItems:
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
 
-        arc = shp.symbolArc(start, end,
-                            self.snapTuple)  # note that we are using grid values
+        arc = shp.symbolArc(start, end)  # note that we are using grid values
         # for scene
         arc.setPos(QPoint(item["loc"][0], item["loc"][1]))
         arc.angle = item["ang"]
@@ -111,14 +109,14 @@ class symbolItems:
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
 
-        line = shp.symbolLine(start, end, self.snapTuple)
+        line = shp.symbolLine(start, end)
         line.setPos(QPoint(item["loc"][0], item["loc"][1]))
         line.angle = item["ang"]
         return line
 
     def createPinItem(self, item: dict):
         start = QPoint(item["st"][0], item["st"][1])
-        pin = shp.symbolPin(start, item["nam"], item["pd"], item["pt"], self.snapTuple)
+        pin = shp.symbolPin(start, item["nam"], item["pd"], item["pt"])
         pin.setPos(QPoint(item["loc"][0], item["loc"][1]))
         pin.angle = item["ang"]
         return pin
@@ -126,7 +124,7 @@ class symbolItems:
     def createLabelItem(self, item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         label = shp.symbolLabel(start, item["def"], item["lt"], item["ht"], item["al"],
-                                item["or"], item["use"], self.snapTuple, )
+                                item["or"], item["use"] )
         label.setPos(QPoint(item["loc"][0], item["loc"][1]))
         label.angle = item["ang"]
         label.labelName = item["nam"]
@@ -138,13 +136,13 @@ class symbolItems:
     def createTextItem(self, item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         text = shp.text(start, item["tc"], item["ff"], item["fs"], item["th"], item["ta"],
-                        item["to"], self.snapTuple, )
+                        item["to"])
         text.setPos(QPoint(item["loc"][0], item["loc"][1]))
         return text
 
     def createPolygonItem(self, item: dict):
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
-        return shp.symbolPolygon(pointsList, self.snapTuple)
+        return shp.symbolPolygon(pointsList)
 
     @staticmethod
     def createSymbolAttribute(item: dict):
@@ -163,8 +161,7 @@ class schematicItems:
 
                 itemShapes = list()
                 symbolAttributes = dict()
-                symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes,
-                                                     self.snapTuple)
+                symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes)
                 symbolInstance.libraryName = item["lib"]
                 symbolInstance.cellName = item["cell"]
                 symbolInstance.viewName = item["view"]
@@ -235,28 +232,27 @@ class schematicItems:
                 pinName = item["pn"]
                 pinDir = item["pd"]
                 pinType = item["pt"]
-                pinItem = shp.schematicPin(start, pinName, pinDir, pinType, self.snapTuple)
+                pinItem = shp.schematicPin(start, pinName, pinDir, pinType,)
                 pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
                 pinItem.angle = item["ang"]
                 return pinItem
             case "text":
                 start = QPoint(item["st"][0], item["st"][1])
                 text = shp.text(start, item["tc"], item["ff"], item["fs"], item["th"], item["ta"],
-                                item["to"], self.snapTuple, )
+                                item["to"] )
                 text.setPos(QPoint(item["loc"][0], item["loc"][1]))
                 return text
 
     def createDraftSymbol(self, item: dict, symbolInstance: shp.schematicSymbol):
         rectItem = shp.symbolRectangle(QPoint(item["br"][0], item["br"][1]),
-                                       QPoint(item["br"][2], item["br"][3]),
-                                       self.snapTuple)
+                                       QPoint(item["br"][2], item["br"][3]))
         fixedFont = self.scene.fixedFont
         textItem = shp.text(rectItem.start, f'{item["lib"]}'
                                             f'/{item["cell"]}/'
                                             f'{item["view"]}',
                             fixedFont.family(), fixedFont.styleName(),
                             fixedFont.pointSize(), shp.text.textAlignments[0],
-                            shp.text.textOrients[0], self.snapTuple)
+                            shp.text.textOrients[0])
         symbolInstance.shapes = [rectItem, textItem]
         symbolInstance.draft = True
 
@@ -294,7 +290,7 @@ class layoutItems:
                             self.scene.logger.error("Not a pcell cell")
                         else:
                             pcellInstance = eval(
-                                f'pcell.{pcellDef[1]["reference"]}({self.snapTuple})')
+                                f'pcell.{pcellDef[1]["reference"]}()')
                             pcellInstance(**item["params"])
                             pcellInstance.libraryName = item["lib"]
                             pcellInstance.cellName = item["cell"]
@@ -337,7 +333,7 @@ class layoutItems:
                     itemShapes.append(layoutItems(self.scene, shape))
             except json.decoder.JSONDecodeError:
                 print("Error: Invalid Layout file")
-        layoutInstance = lshp.layoutInstance(itemShapes, self.snapTuple)
+        layoutInstance = lshp.layoutInstance(itemShapes)
         layoutInstance.libraryName = item["lib"]
         layoutInstance.cellName = item["cell"]
         layoutInstance.counter = instCounter
@@ -351,7 +347,7 @@ class layoutItems:
         start = QPoint(item["tl"][0], item["tl"][1])
         end = QPoint(item["br"][0], item["br"][1])
         layoutLayer = laylyr.pdkDrawingLayers[item["ln"]]
-        rect = lshp.layoutRect(start, end, layoutLayer, self.snapTuple)
+        rect = lshp.layoutRect(start, end, layoutLayer)
         # rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item.get("ang", 0)
         return rect
@@ -359,7 +355,7 @@ class layoutItems:
     def createPathShape(self, item):
         path = lshp.layoutPath(QLineF(QPoint(item["dfl1"][0], item["dfl1"][1]),
                                       QPoint(item["dfl2"][0], item["dfl2"][1]), ),
-                               laylyr.pdkDrawingLayers[item["ln"]], self.snapTuple, item["w"], item["se"],
+                               laylyr.pdkDrawingLayers[item["ln"]],item["w"], item["se"],
                                item["ee"], item["md"], )
         path.name = item.get("nam", "")
         path.angle = item.get("ang", 0)
@@ -368,15 +364,14 @@ class layoutItems:
     def createRulerShape(self, item):
         ruler = lshp.layoutRuler(QLineF(QPoint(item["dfl1"][0], item["dfl1"][1]),
                                         QPoint(item["dfl2"][0], item["dfl2"][1]), ), self.rulerWidth, self.rulerTickGap,
-                                 self.rulerTickLength, self.rulerFont, self.snapTuple, item["md"], )
+                                 self.rulerTickLength, self.rulerFont, item["md"], )
         ruler.angle = item.get("ang", 0)
         return ruler
 
     def createLabelShape(self, item):
         layoutLayer = laylyr.pdkTextLayers[item["ln"]]
         item = lshp.layoutLabel(QPoint(item["st"][0], item["st"][1]), item["lt"],
-                                item["ff"], item["fs"], item["fh"], item["la"], item["lo"], layoutLayer,
-                                self.snapTuple, )
+                                item["ff"], item["fs"], item["fh"], item["la"], item["lo"], layoutLayer, )
         item.angle = item.get("ang", 0)
         return item
 
@@ -384,22 +379,22 @@ class layoutItems:
         layoutLayer = laylyr.pdkPinLayers[item["ln"]]
         item = lshp.layoutPin(QPoint(item["tl"][0], item["tl"][1]),
                               QPoint(item["br"][0], item["br"][1]), item["pn"], item["pd"], item["pt"],
-                              layoutLayer, self.snapTuple, )
+                              layoutLayer,)
         item.angle = item.get("ang", 0)
         return item
 
     def createPolygonShape(self, item):
         layoutLayer = laylyr.pdkDrawingLayers[item["ln"]]
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
-        item = lshp.layoutPolygon(pointsList, layoutLayer, self.snapTuple)
+        item = lshp.layoutPolygon(pointsList, layoutLayer)
         item.angle = item.get("ang", 0)
         return item
 
     def createViaArrayShape(self, item):
         viaDefTuple = fabproc.processVias[fabproc.processViaNames.index(item["via"]["vdt"])]
         via = lshp.layoutVia(QPoint(item["via"]["st"][0], item["via"]["st"][1]),
-                             viaDefTuple, item["via"]["w"], item["via"]["h"], self.snapTuple, )
+                             viaDefTuple, item["via"]["w"], item["via"]["h"], )
         item = lshp.layoutViaArray(QPoint(item["st"][0], item["st"][1]), via, item["sp"],
-                                   item["xn"], item["yn"], self.snapTuple, )
+                                   item["xn"], item["yn"] )
         item.angle = item.get("ang", 0)
         return item

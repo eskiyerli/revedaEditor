@@ -195,17 +195,17 @@ def createCellView(parent, viewName, cellItem: cellItem) -> viewItem:
     items = list()
     if 'schematic' in viewName:
         items.insert(0, {'viewName': 'schematic'})
-        items.insert(1, {"snapGrid": (2,2)})
+        items.insert(1, {"snapGrid": (10,5)})
     elif 'symbol' in viewName:
         items.insert(0, {'viewName': 'symbol'})
-        items.insert(1, {"snapGrid": (2,2)})
+        items.insert(1, {"snapGrid": (10,5)})
     elif 'veriloga' in viewName:
         items.insert(0, {'viewName': 'veriloga'})
     elif 'config' in viewName:
         items.insert(0, {'viewName': 'config'})
     elif 'layout' in viewName:
         items.insert(0, {'viewName': 'layout'})
-        items.insert(1, {"snapGrid": (2,2)})
+        items.insert(1, {"snapGrid": (10,5)})
     elif 'pcell' in viewName:
         items.insert(0, {'viewName': 'pcell'})
     with viewPath.open(mode='w') as f:

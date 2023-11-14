@@ -113,6 +113,6 @@ class symbolEncoder(json.JSONEncoder):
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle, }
                 return itemDict
-            case shp.symbolAttribute:
+            case symbolAttribute:
                 itemDict = {"type": "attr", "nam": item.name, "def": item.definition, }
                 return itemDict
