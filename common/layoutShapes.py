@@ -69,26 +69,26 @@ class layoutShape(QGraphicsItem):
         return f"layoutShape()"
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemPositionChange and self.scene():
-            newPos = value.toPoint()
-            sceneRect = self.scene().sceneRect()
-            viewRect = self.scene().views()[0].viewport().rect()
-
-            if not sceneRect.contains(newPos):
-                # Keep the item inside the scene rect.
-                if newPos.x() > sceneRect.right():
-                    sceneRect.setRight(newPos.x())
-                    viewRect.setRight(newPos.x())
-                elif newPos.x() < sceneRect.left():
-                    sceneRect.setLeft(newPos.x())
-                    viewRect.setLeft(newPos.x())
-                if newPos.y() > sceneRect.bottom():
-                    sceneRect.setBottom(newPos.y())
-                    viewRect.setBottom(newPos.y())
-                elif newPos.y() < sceneRect.top():
-                    sceneRect.setTop(newPos.y())
-                    viewRect.setTop(newPos.y())
-            return newPos
+        # if change == QGraphicsItem.ItemPositionChange and self.scene():
+        #     newPos = value.toPoint()
+        #     sceneRect = self.scene().sceneRect()
+        #     viewRect = self.scene().views()[0].viewport().rect()
+        #
+        #     if not sceneRect.contains(newPos):
+        #         # Keep the item inside the scene rect.
+        #         if newPos.x() > sceneRect.right():
+        #             sceneRect.setRight(newPos.x())
+        #             viewRect.setRight(newPos.x())
+        #         elif newPos.x() < sceneRect.left():
+        #             sceneRect.setLeft(newPos.x())
+        #             viewRect.setLeft(newPos.x())
+        #         if newPos.y() > sceneRect.bottom():
+        #             sceneRect.setBottom(newPos.y())
+        #             viewRect.setBottom(newPos.y())
+        #         elif newPos.y() < sceneRect.top():
+        #             sceneRect.setTop(newPos.y())
+        #             viewRect.setTop(newPos.y())
+        #     return newPos
         return super().itemChange(change, value)
 
     @property

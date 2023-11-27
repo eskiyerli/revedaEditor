@@ -57,9 +57,9 @@ class schematicEncoder(json.JSONEncoder):
         elif isinstance(item, net.schematicNet):
             itemDict = {
                 "type": "schematicNet",
-                "st": item.start.toTuple(),
-                "end": item.end.toTuple(),
-                "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "st": item.mapToScene(item.draftLine.p1()).toPoint().toTuple(),
+                "end": item.mapToScene(item.draftLine.p2()).toPoint().toTuple(),
+                # "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "nam": item.name,
                 "ns": item.nameSet,
             }

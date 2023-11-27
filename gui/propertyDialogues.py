@@ -501,10 +501,15 @@ class netProperties(QDialog):
         self.mainLayout = QVBoxLayout()
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
+        netPointsBox = QGroupBox("Net Points")
+        netPointsLayout = QFormLayout()
+        netPointsBox.setLayout(netPointsLayout)
+        self.netStartPointEdit = edf.shortLineEdit()
+
         formBox = QGroupBox("Net Properties")
         formLayout = QFormLayout()
         self.netNameEdit = edf.longLineEdit()
-        self.netNameEdit.setText(self.net.name)
+        # self.netNameEdit.setText(self.net.name)
         formLayout.addRow(edf.boldLabel("Net Name", self), self.netNameEdit)
         formBox.setLayout(formLayout)
         self.mainLayout.addWidget(formBox)

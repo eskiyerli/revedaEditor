@@ -1243,6 +1243,7 @@ class editorWindow(QMainWindow):
         self.panAction.triggered.connect(self.panView)
         self.dispConfigAction.triggered.connect(self.dispConfigEdit)
         self.selectConfigAction.triggered.connect(self.selectConfigEdit)
+        self.stretchAction.triggered.connect(self.stretchClick)
         self.moveOriginAction.triggered.connect(self.moveOrigin)
         self.selectAllAction.triggered.connect(self.selectAllClick)
         self.deselectAllAction.triggered.connect(self.deselectAllClick)
@@ -1366,6 +1367,10 @@ class editorWindow(QMainWindow):
 
     def deselectAllClick(self):
         self.centralW.scene.deselectAll()
+
+    def stretchClick(self, s):
+        self.centralW.scene.editModes.setMode("stretchItem")
+        self.centralW.scene.stretchSelectedItems()
 
     def moveClick(self):
         self.centralW.scene.editModes.setMode("moveItem")
@@ -1512,7 +1517,7 @@ class layoutEditor(editorWindow):
         self.delRulerAction.triggered.connect(self.delRulerClick)
         self.deleteAction.triggered.connect(self.deleteClick)
         self.objPropAction.triggered.connect(self.objPropClick)
-        self.stretchAction.triggered.connect(self.stretchClick)
+
         self.goDownAction.triggered.connect(self.goDownClick)
 
     def _createShortcuts(self):
@@ -1717,10 +1722,6 @@ class layoutEditor(editorWindow):
 
     def createPolygonClick(self):
         self.centralW.scene.editModes.setMode("drawPolygon")
-
-    def stretchClick(self, s):
-        self.centralW.scene.editModes.setMode("stretchItem")
-        self.centralW.scene.stretchSelectedItem()
 
     def objPropClick(self, s):
         self.centralW.scene.viewObjProperties()
@@ -1977,10 +1978,9 @@ class schematicEditor(editorWindow):
         with open(self.file) as tempFile:
             items = json.load(tempFile)
         self.centralW.scene.loadSchematicItems(items)
-        sceneNetsSet = self.centralW.scene.findSceneNetsSet()
+
         # because we do not save dot points, it is necessary to recreate them.
-        for netItem in sceneNetsSet:
-            netItem.findDotPoints()
+
 
     def createConfigView(
         self,
@@ -2177,7 +2177,7 @@ class symbolEditor(editorWindow):
         self.createPinAction.triggered.connect(self.createPinClick)
         self.objPropAction.triggered.connect(self.objPropClick)
         self.deleteAction.triggered.connect(self.deleteClick)
-        self.stretchAction.triggered.connect(self.stretchClick)
+
         self.viewPropAction.triggered.connect(self.viewPropClick)
 
     def _symbolContextMenu(self):
@@ -2232,9 +2232,6 @@ class symbolEditor(editorWindow):
         self.centralW.scene.copySelectedItems()
         self.messageLine.setText("Copying selected items")
 
-    def stretchClick(self, s):
-        self.centralW.scene.editModes.setMode("stretchItem")
-        self.centralW.scene.stretchSelectedItem()
 
     def viewPropClick(self, s):
         self.centralW.scene.editModes.setMode("selectItem")
@@ -2514,7 +2511,7 @@ class editor_scene(QGraphicsScene):
                 self.undoStack.push(undoCommand)
             self.update()  # update the scene
 
-    def stretchSelectedItem(self):
+    def stretchSelectedItems(self):
         if self.selectedItems() is not None:
             try:
                 for item in self.selectedItems():
@@ -3242,6 +3239,7 @@ class schematic_scene(editor_scene):
         self.itemCounter = 0
         self.netCounter = 0
         self.schematicNets = {}  # netName: list of nets with the same name
+        self._crossDotPoints = {} # locations of cross dots
         self.crossDots = set()  # list of cross dots
         self.viewRect = None
         self.instanceSymbolTuple = None
@@ -3255,7 +3253,7 @@ class schematic_scene(editor_scene):
         self.newInstance = None
         self.newPin = None
         self.newText = None
-        self.snapPointRect = None
+        self._snapPointRect = None
         self.highlightNets = False
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
         fixedFamily = [
@@ -3275,6 +3273,12 @@ class schematic_scene(editor_scene):
             (self.editModes.drawPin, self.editModes.drawWire, self.editModes.drawText)
         )
 
+    def keyPressEvent(self, event: QKeyEvent):
+        match event.key():
+            case Qt.Key_Escape:
+                self.removeSnapRect()
+        super().keyPressEvent(event)
+
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(mouse_event)
         try:
@@ -3290,20 +3294,19 @@ class schematic_scene(editor_scene):
                     self.newInstance = self.drawInstance(self.mousePressLoc)
                     self.newInstance.setSelected(True)
                 elif self.editModes.drawWire and self._newNet is not None:
-                    self.mouseReleaseLoc = self.findSnapPoint(
-                        self.mouseReleaseLoc, self.snapDistance, {self._newNet})
-                    self._newNet.setLine(QLineF(self.mousePressLoc, self.mouseReleaseLoc))  # self.mousePressLoc, self.mouseReleaseLoc
-                    if self.snapPointRect:
-                        self.removeItem(self.snapPointRect)
-                        self.snapPointRect = None
-
+                    # self.mousePressLoc = self.findSnapPoint(
+                    #     self.mousePressLoc, self.snapDistance, {self._newNet})
+                    # # self._newNet.draftLine = QLineF(self.mouseReleaseLoc, self.mousePressLoc)
+                    # self._newNet.end = self.mousePressLoc
+                    # # self._newNet.splitNets()
+                    # # self._newNet.createDots()
                     self._newNet = None  # self.mergeNets()
-                    viewNets = {
-                        netItem
-                        for netItem in self.editorWindow.centralW.view.items()
-                        if isinstance(netItem, net.schematicNet)
-                    }
-                    [netItem.findDotPoints() for netItem in viewNets]
+                    # viewNets = {
+                    #     netItem
+                    #     for netItem in self.editorWindow.centralW.view.items()
+                    #     if isinstance(netItem, net.schematicNet)
+                    # }
+                    # [netItem.findDotPoints() for netItem in viewNets]
 
                 elif self.editModes.changeOrigin:  # change origin of the symbol
                     self.origin = self.mousePressLoc
@@ -3332,6 +3335,11 @@ class schematic_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse press error: {e}")
 
+    def removeSnapRect(self):
+        if self._snapPointRect:
+            self.removeItem(self._snapPointRect)
+            self._snapPointRect = None
+
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(mouse_event)
         self.mouseMoveLoc = mouse_event.scenePos().toPoint()
@@ -3358,13 +3366,13 @@ class schematic_scene(editor_scene):
                     self.mouseMoveLoc = self.findSnapPoint(
                         self.mouseMoveLoc, self.snapDistance, {self._newNet}
                     )
-                    if self.snapPointRect is None:
+                    if self._snapPointRect is None:
                         rect = QRectF(QPointF(-5, -5), QPointF(5, 5))
-                        self.snapPointRect = QGraphicsRectItem(rect)
-                        self.snapPointRect.setPen(schlyr.draftPen)
-                        self.addItem(self.snapPointRect)
-                    self.snapPointRect.setPos(self.mouseMoveLoc)
-                    self._newNet.end = self.mouseMoveLoc
+                        self._snapPointRect = QGraphicsRectItem(rect)
+                        self._snapPointRect.setPen(schlyr.draftPen)
+                        self.addItem(self._snapPointRect)
+                    self._snapPointRect.setPos(self.mouseMoveLoc)
+                    self._newNet.draftLine = QLineF(self.mousePressLoc, self.mouseMoveLoc)
                     if self._newNet.scene() is None:
                         self.addUndoStack(self._newNet)
             self.editorWindow.statusLine.showMessage(
@@ -3386,7 +3394,6 @@ class schematic_scene(editor_scene):
                 elif self.editModes.drawWire and self._newNet is None:
                     self.editorWindow.messageLine.setText("Wire Mode")
                     self._newNet = net.schematicNet(self.mouseReleaseLoc, self.mouseReleaseLoc)
-                    print(self._newNet)
                 elif self.editModes.drawText:
                     self.parent.parent.messageLine.setText("Note added.")
                     self.editModes.drawText = False
@@ -3403,6 +3410,7 @@ class schematic_scene(editor_scene):
                     self.selectionRectItem = None
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
+
 
     def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet: set):
         # sourcery skip: simplify-len-comparison
@@ -3432,22 +3440,22 @@ class schematic_scene(editor_scene):
                             (item.mapToScene(item.start) - eventLoc).manhattanLength()
                         )
                     elif isinstance(item, net.schematicNet):
-                        if snapRect.contains(item.line().p1().toPoint()):
+                        if snapRect.contains(item.draftLine.p1().toPoint()):
                             items.append(item)
 
-                            points.append(item.line().p1().toPoint())
+                            points.append(item.draftLine.p1().toPoint())
                             lengths.append(
                                 (
-                                    item.mapToScene(item.line().p1()) - eventLoc
+                                    item.mapToScene(item.draftLine.p1()) - eventLoc
                                 ).manhattanLength()
                             )
-                        elif snapRect.contains(item.line().p2().toPoint()):
+                        elif snapRect.contains(item.draftLine.p2().toPoint()):
                             items.append(item)
-                            points.append(item.line().p2().toPoint())
+                            points.append(item.draftLine.p2().toPoint())
                             # print(f'net end:{item.end}')
                             lengths.append(
                                 (
-                                    item.mapToScene(item.line().p2()) - eventLoc
+                                    item.mapToScene(item.draftLine.p2()) - eventLoc
                                 ).manhattanLength()
                             )
                 if len(lengths) > 0:
@@ -3881,19 +3889,7 @@ class schematic_scene(editor_scene):
             for item in self.selectedItems():
                 selectedItemJson = json.dumps(item, cls=schenc.schematicEncoder)
                 itemCopyDict = json.loads(selectedItemJson)
-                if isinstance(item, shp.schematicSymbol):
-                    self.itemCounter += 1
-                    itemCopyDict["name"] = f"I{self.itemCounter}"
-                    itemCopyDict["ic"] = int(self.itemCounter)
-                    itemCopyDict["ld"]["instName"][0] = f"I{self.itemCounter}"
-                    shape = lj.schematicItems(self).create(itemCopyDict)
-                    [label.labelDefs() for label in shape.labels.values()]
-                elif isinstance(item, net.schematicNet):
-                    shape = lj.createSchematicNets(itemCopyDict)
-                elif isinstance(item, shp.schematicPin):
-                    shape = lj.createSchematicPins(itemCopyDict)
-                elif isinstance(item, shp.text):
-                    shape = lj.createTextItem(itemCopyDict)
+                shape = lj.schematicItems(self).create(itemCopyDict)
                 if shape is not None:
                     self.addUndoStack(shape)
                     # shift position by four grid units to right and down
@@ -3903,6 +3899,11 @@ class schematic_scene(editor_scene):
                             item.pos().y() + 4 * self.snapTuple[1],
                         )
                     )
+                    if isinstance(shape, shp.schematicSymbol):
+                        self.itemCounter += 1
+                        shape.instanceName = f"I{self.itemCounter}"
+                        shape.counter = int(self.itemCounter)
+                        [label.labelDefs() for label in shape.labels.values()]
 
     def saveSchematic(self, file: pathlib.Path):
         try:
@@ -3934,10 +3935,13 @@ class schematic_scene(editor_scene):
                 and itemShape.counter > self.itemCounter
             ):
                 self.itemCounter = itemShape.counter
+                # increment item counter for next symbol
+                self.itemCounter += 1
             shapesList.append(itemShape)
+
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
-        # increment item counter for next symbol
-        self.itemCounter += 1
+        self.createNetDots()
+
 
     def reloadScene(self):
         topLevelItems = [item for item in self.items() if item.parentItem() is None]
@@ -3947,6 +3951,12 @@ class schematic_scene(editor_scene):
         items = json.loads(json.dumps(topLevelItems, cls=schenc.schematicEncoder))
         self.clear()
         self.loadSchematicItems(items)
+        self.createNetDots()
+
+    def createNetDots(self):
+        sceneNetsSet = self.findSceneNetsSet()
+        # there will be some duplication. We will see if it becomes a problem.
+        [netItem.createDots() for netItem in sceneNetsSet]
 
     def viewObjProperties(self):
         """
@@ -5560,6 +5570,12 @@ class schematic_view(editor_view):
         self.parent = parent
         super().__init__(self.scene, self.parent)
         self.visibleRect = None  # initialize to an empty rectangle
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key_Escape:
+            self.scene.removeSnapRect()
+            self.scene._newNet = None
+        super().keyPressEvent(event)
 
 
 class layout_view(editor_view):

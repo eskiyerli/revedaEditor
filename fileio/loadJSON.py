@@ -220,11 +220,11 @@ class schematicItems:
             case "schematicNet":
                 start = QPoint(item["st"][0], item["st"][1])
                 end = QPoint(item["end"][0], item["end"][1])
-                position = QPoint(item["loc"][0], item["loc"][1])
+                # position = QPoint(item["loc"][0], item["loc"][1])
                 netItem = net.schematicNet(start, end)
                 netItem.name = item["nam"]
                 netItem.nameSet = item["ns"]
-                netItem.setPos(position)
+                # netItem.setPos(position)
                 return netItem
             case "schematicPin":
                 start = QPoint(item["st"][0], item["st"][1])

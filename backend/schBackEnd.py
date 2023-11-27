@@ -155,7 +155,7 @@ def createLibrary(parent, model, libraryDir, libraryName) -> libraryItem:
             newLibraryItem.setData(libraryPath, Qt.UserRole + 2)
             newLibraryItem.setData("library", Qt.UserRole + 1)
             model.appendRow(newLibraryItem)
-            print(f"Created {libraryPath}")
+            parent.logger.info(f"Created {libraryPath}")
     return newLibraryItem
 
 
@@ -176,7 +176,7 @@ def createCell(parent, model, selectedLib, cellName) -> cellItem:
             #                                 flags=Qt.MatchExactly)[0]
             newCellItem = cellItem(cellPath)
             selectedLib.appendRow(newCellItem)
-            parent.logger.warning(f"Created {cellName} cell at {str(cellPath)}")
+            parent.logger.info(f"Created {cellName} cell at {str(cellPath)}")
             return newCellItem
 
 
