@@ -32,7 +32,7 @@ from PySide6.QtGui import (
     QStaticText,
     QPainterPath,
     QFont,
-    QTransform,
+    QKeyEvent,
 )
 from PySide6.QtWidgets import (
     QGraphicsLineItem,
@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
     QGraphicsSceneHoverEvent,
 )
 import pdk.schLayers as schlyr
-
+import math
 import itertools as itt
 
 
@@ -91,6 +91,7 @@ class schematicNet(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
+        self.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
         self.setAcceptHoverEvents(True)
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self._rectOffset = 10
@@ -100,7 +101,7 @@ class schematicNet(QGraphicsItem):
         self._nameConflict = False  # if a name conflict has been detected
         # self._touchingNets = set()
         self._dashedLines = dict()
-        self._newWires = list()
+        self._wiredNets = dict()
         self._connectedNetsSet = set()
         self._flightLinesSet = set()
         self._highlighted = False
@@ -109,7 +110,10 @@ class schematicNet(QGraphicsItem):
         self._netNameFont = QFont()
         self._netNameFont.setPointSize(8)
         self._stretch = False
-        self._rotateLine(abs(self._draftLine.angle()))
+        self._stretchSide = None
+        self._mousePressNetSet = set()
+        self._mouseReleaseNetSet = set()
+        self.rotateLine(abs(self._draftLine.angle()))
 
     def __repr__(self):
         return (
@@ -117,7 +121,7 @@ class schematicNet(QGraphicsItem):
             f"end={self.mapToScene(self._draftLine.p2().toPoint())}"
         )
 
-    def _rotateLine(self, angle: float):
+    def rotateLine(self, angle: float):
         match self._mode:
             case 0:  # manhattan
                 self._createManhattanPath(angle)
@@ -131,16 +135,15 @@ class schematicNet(QGraphicsItem):
                 self._createVerticalPath(angle)
 
         # now calculate the bounding rect
-        self._extractRects()
+        self.extractRects()
         # rotate around the first point.
 
-
-    def _extractRects(self):
+    def extractRects(self):
         # first set angle to 0 to calculate the correct bounding rect.
         self._draftLine.setAngle(0)
-
         self.setTransformOriginPoint(self._draftLine.p1())
-
+        if self.scene():
+            self._draftLine.setP2(self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple))
         self._rect = (
             QRectF(self._draftLine.p1(), self._draftLine.p2())
             .normalized()
@@ -162,14 +165,7 @@ class schematicNet(QGraphicsItem):
 
         :return: None
         """
-        if 0 <= angle <= 45 or 360 > angle > 315:
-            self._angle = 0
-        elif 45 < angle <= 135:
-            self._angle = 90
-        elif 135 < angle <= 225:
-            self._angle = 180
-        elif 225 < angle <= 315:
-            self._angle = 270
+        self._angle = 90 * math.floor(((angle + 45) % 360) / 90)
 
     def _createDiagonalPath(self, angle: float) -> None:
         """
@@ -179,42 +175,19 @@ class schematicNet(QGraphicsItem):
         Returns:
             None
         """
-        if 0 <= angle <= 22.5 or 360 > angle > 337.5:
-            self._angle = 0
-        elif 22.5 < angle <= 67.5:
-            self._angle = 45
-        elif 67.5 < angle <= 112.5:
-            self._angle = 90
-        elif 112.5 < angle <= 157.5:
-            self._angle = 135
-        elif 157.5 < angle <= 202.5:
-            self._angle = 180
-        elif 202.5 < angle <= 247.5:
-            self._angle = 225
-        elif 247.5 < angle <= 292.5:
-            self._angle = 270
-        elif 292.5 < angle <= 337.5:
-            self._angle = 315
+        self._angle = 45 * math.floor(((angle + 22.5) % 360) / 45)
 
     def _createAnyAnglePath(self, angle: float) -> None:
-        """
-        Creates a path for any given angle.
-
-        Args:
-            angle (float): The angle in degrees.
-        """
         self._angle = angle
 
     def _createHorizontalPath(self, angle: float) -> None:
-        if 0 <= angle <= 90 or 360 > angle > 270:
-            self._angle = 0
-        elif 90 < angle <= 270:
-            self._angle = 180
+        self._angle = 180 * math.floor(((angle + 90) % 360) / 180)
 
     def _createVerticalPath(self, angle: float) -> None:
+        angle = angle % 360
         if 0 <= angle < 180:
             self._angle = 90
-        elif 180 <= angle < 360:
+        else:
             self._angle = 270
 
     def boundingRect(self):
@@ -246,15 +219,15 @@ class schematicNet(QGraphicsItem):
                 pen = schlyr.errorWirePen
                 # if there is name conflict, draw the line and name in red.
             nameText = QStaticText(self.name)
-
             painter.setPen(schlyr.wirePen)
-
             painter.drawStaticText(textLoc, nameText)
         painter.setPen(pen)
         painter.drawLine(self._draftLine)
-        # pen = schlyr.errorWirePen
-        # painter.setPen(pen)
-        # painter.drawRect(self.overlapRect)
+        # painter.drawRect(self._rect)
+        painter.drawEllipse(self._draftLine.p1(), 5, 5)
+
+    def itemChange(self, change, value):
+        return super().itemChange(change, value)
 
     def sceneEvent(self, event):
         """
@@ -320,6 +293,53 @@ class schematicNet(QGraphicsItem):
             self._flightLinesSet = set()
         [netItem.unhighlight() for netItem in self._connectedNetsSet]
 
+    def contextMenuEvent(self, event):
+        # TODO: change this to its own context menu
+        self.scene().itemContextMenu.exec_(event.screenPos())
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self._mousePressNetSet = self.findOverlapNets()
+        self.clearDots()
+        if self._stretch:
+            eventPos = event.pos().toPoint()
+            self.setFlag(QGraphicsItem.ItemIsMovable, False)
+            if (
+                    eventPos - self._draftLine.p1().toPoint()
+            ).manhattanLength() <= self.scene().snapDistance:
+                self._stretchSide = 0
+                self.setCursor(Qt.SizeHorCursor)
+            elif (
+                    eventPos - self._draftLine.p2().toPoint()
+            ).manhattanLength() <= self.scene().snapDistance:
+                self._stretchSide = 1
+                self.setCursor(Qt.SizeHorCursor)
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if self.stretch:
+            eventPos = event.pos().toPoint()
+            self.prepareGeometryChange()
+            self.setRotation(self.angle)
+            if self._stretchSide == 0:
+                self._draftLine.setP1(self.mapFromScene(eventPos))
+            elif self._stretchSide == 1:
+                self._draftLine.setP2(self.mapFromScene(eventPos))
+            self.rotateLine(self._draftLine.angle())
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseReleaseEvent(event)
+        self._mouseReleaseNetSet = self.findOverlapNets()
+        self.mergeNets()
+
+        self.splitNets()
+        self.createDots()
+        if self.stretch:
+            self._stretch = False
+            self._stretchSide = None
+            self.setCursor(Qt.ArrowCursor)
+
+
     def highlight(self):
         self._highlighted = True
         self.update()
@@ -342,10 +362,12 @@ class schematicNet(QGraphicsItem):
 
     @angle.setter
     def angle(self, value: float):
-        self._angle = value
+
         self.prepareGeometryChange()
-        self.setTransformOriginPoint(self._draftLine.p1())
         self.setRotation(self._angle)
+        self._angle = value
+        self.setTransformOriginPoint(self._draftLine.p1())
+        self.setRotation(-self._angle)
 
     @property
     def stretch(self) -> bool:
@@ -439,6 +461,12 @@ class schematicNet(QGraphicsItem):
             self.mapToScene(self._draftLine.p2()).toPoint(),
         ]
 
+    def endPoint(self, value: int):
+        if value in [0, 1]:
+            return self.endPoints[value]
+        else:
+            self.scene().logger.error('Invalid end point index.')
+
     @property
     def innerRect(self) -> QRectF:
         return (
@@ -470,8 +498,9 @@ class schematicNet(QGraphicsItem):
     @draftLine.setter
     def draftLine(self, line: QLineF):
         self.prepareGeometryChange()
+        self.setRotation(self.angle)
         self._draftLine = line
-        self._rotateLine(abs(self._draftLine.angle()))
+        self.rotateLine(abs(self._draftLine.angle()))
 
     @property
     def mode(self):
@@ -481,7 +510,7 @@ class schematicNet(QGraphicsItem):
     def mode(self, value: int):
         self.prepareGeometryChange()
         self._mode = value
-        self._rotateLine(self._angle)
+        self.rotateLine(self._angle)
 
     def isParallel(self, otherNet: "schematicNet") -> bool:
         return abs((self.angle - otherNet.angle) % 180) < 1
@@ -497,74 +526,22 @@ class schematicNet(QGraphicsItem):
             return True
         return False
 
-    def itemChange(self, change, value):
-        if self.scene():
-            if change == QGraphicsItem.ItemPositionChange:
-                self.clearDots()
-                self.mergeNets()
-                otherOverlapNets = list(self.findOverlapNets())
-                if otherOverlapNets:
-                    otherOverlapNets[0].mergeNets()
-                self.splitNets()
-
-            elif change == QGraphicsItem.ItemPositionHasChanged:
-                self.splitNets()
-                self.createDots()
-        return super().itemChange(change, value)
-
-    def contextMenuEvent(self, event):
-        self.scene().itemContextMenu.exec_(event.screenPos())
-
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        self.clearDots()
-        self.mergeNets()
-
-        if self._stretch:
-            eventPos = event.pos().toPoint()
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if (
-                    eventPos - self._draftLine.p1().toPoint()
-            ).manhattanLength() <= self.scene().snapDistance:
-                self._stretchSide = "p1"
-                self.setCursor(Qt.SizeHorCursor)
-            elif (
-                    eventPos - self._draftLine.p2().toPoint()
-            ).manhattanLength() <= self.scene().snapDistance:
-                print("p2")
-                self._stretchSide = "p2"
-                self.setCursor(Qt.SizeHorCursor)
-
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-
-        if self.stretch:
-            eventPos = event.pos().toPoint()
-            self.prepareGeometryChange()
-            if self._stretchSide == "p1":
-                self._draftLine.setP1(self.mapFromScene(eventPos))
-            elif self._stretchSide == "p2":
-                self._draftLine.setP2(self.mapFromScene(eventPos))
-            print(self._draftLine.angle())
-            self._rotateLine(abs(self._draftLine.angle()))
-        else:
-            super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseReleaseEvent(event)
-        self.splitNets()
-        self.createDots()
-        self.findConnections()
-        if self.stretch:
-            self._stretch = False
-            self._stretchSide = None
-            self.setCursor(Qt.ArrowCursor)
-
     def findOverlapNets(self):
-        netsInOverlap = {
-            netItem
-            for netItem in self.scene().items(self.sceneOverlapRect)
-            if isinstance(netItem, schematicNet) and netItem is not self}
-        return netsInOverlap
+        """
+        Find all netItems in the scene that overlap with self.sceneOverlapRect.
+
+        Returns:
+            set: A set of netItems that overlap with self.sceneOverlapRect.
+        """
+        if self.scene():
+            overlapNets = {
+                netItem
+                for netItem in self.scene().items(self.sceneOverlapRect)
+                if isinstance(netItem, schematicNet) and netItem is not self
+            }
+        else:
+            overlapNets = set()
+        return overlapNets
 
     def mergeNets(self):
         otherNets = self.findOverlapNets()
@@ -574,21 +551,19 @@ class schematicNet(QGraphicsItem):
                 initialRect = self.sceneOverlapRect
                 for netItem in parallelNets:
                     initialRect = initialRect.united(netItem.sceneOverlapRect)
-                    netItem.scene().removeItem(netItem)
-                    del netItem
+                    # netItem.scene().removeItem(netItem)
+                    # del netItem
                 newNetPoints = initialRect.adjusted(1, 1, -1, -1)
                 x1, y1, x2, y2 = newNetPoints.getCoords()
-                self.prepareGeometryChange()
-                self._draftLine = QLineF(
-                    self.mapFromScene(QPointF(x1, y1)), self.mapFromScene(QPointF(x2, y2))
-                )
-                self._extractRects()
-                self.mergeNets()
-            else:
-                return False
+                # print(f'{x1}, {y1}, {x2}, {y2}')
+                print(self.mapFromScene(QPoint(x1, y1)))
+                print(self.mapFromScene(QPoint(x2, y2)))
+                # self.prepareGeometryChange()
+                # self._draftLine.setP1(self.mapFromScene(QPoint(x1,y1)))
+                # self._draftLine.setP2(self.mapFromScene(QPoint(x2,y2)))
+                # self.extractRects()
                 # self.mergeNets()
-        else:
-            return False
+
 
     def splitNets(self):
         otherNets = self.findOverlapNets()
@@ -602,7 +577,7 @@ class schematicNet(QGraphicsItem):
                         self.scene().addItem(newNet)
                         net.prepareGeometryChange()
                         net._draftLine = QLineF(net.draftLine.p1(), net.mapFromScene(end))
-                        net._extractRects()
+                        net.extractRects()
                 # if another net is dividing self.
                 for net in orthoNets:
                     for self, end in itt.product([self], net.sceneEndPoints):
@@ -611,7 +586,7 @@ class schematicNet(QGraphicsItem):
                             self.scene().addItem(newNet)
                             self.prepareGeometryChange()
                             self._draftLine = QLineF(self.draftLine.p1(), self.mapFromScene(end))
-                            self._extractRects()
+                            self.extractRects()
 
     def clearDots(self):
         [
@@ -634,6 +609,7 @@ class schematicNet(QGraphicsItem):
                         self.scene().addItem(newDot)
 
     def findConnections(self):
+        self._wiredNets = dict()  # empty the dict
         otherNets = self.findOverlapNets()
         if otherNets:
             orthoNets = list(filter(self.isOrthogonal, otherNets))
@@ -641,8 +617,21 @@ class schematicNet(QGraphicsItem):
                 for net in orthoNets:
                     for netEnd in net.sceneEndPoints:
                         if netEnd in self.sceneEndPoints:
-                            print(f'end point index: {self.sceneEndPoints.index(netEnd)}')
+                            netindex = net.sceneEndPoints.index(netEnd)
+                            selfindex = self.sceneEndPoints.index(netEnd)
+                            self._wiredNets[net] = [netindex, selfindex]
 
+    def stretchConnections(self):
+        for net, [netIndex, selfIndex] in self._wiredNets.items():
+            net.prepareGeometryChange()
+            net.setRotation(net.draftLine.angle())
+            point = net.mapFromScene(self.sceneEndPoints[selfIndex])
+            if netIndex == 0:
+                net._draftLine.setP1(point)
+            elif netIndex == 1:
+                net._draftLine.setP2(point)
+            # self.scene().logger.error('Invalid end point index.')
+            net.rotateLine(net.draftLine.angle())
 
 class netFlightLine(QGraphicsPathItem):
     wireHighlightPen = QPen(

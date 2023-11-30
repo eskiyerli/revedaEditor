@@ -61,6 +61,7 @@ class layoutShape(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
         self._pen = None
+        self._brush = None
         self._angle = 0  # rotation angle
         self._stretch: bool = False
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
@@ -131,7 +132,7 @@ class layoutShape(QGraphicsItem):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        if self.scene().editModeschangeOrigin or self.scene().drawMode:
+        if self.scene().editModes.changeOrigin or self.scene().drawMode:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             self.setFlag(QGraphicsItem.ItemIsSelectable, False)
         else:
@@ -143,7 +144,7 @@ class layoutShape(QGraphicsItem):
         Do not propagate event if shape needs to keep still.
         """
         if self.scene() and (
-            self.scene().editModes.changeOrigin or self.scene().drawMode
+                self.scene().editModes.changeOrigin or self.scene().drawMode
         ):
             return False
         else:
@@ -172,14 +173,15 @@ class layoutShape(QGraphicsItem):
     def contextMenuEvent(self, event):
         self.scene().itemContextMenu.exec_(event.screenPos())
 
+
 class layoutRect(layoutShape):
     sides = ["Left", "Right", "Top", "Bottom"]
 
     def __init__(
-        self,
-        start: QPoint,
-        end: QPoint,
-        layer: ddef.layLayer,
+            self,
+            start: QPoint,
+            end: QPoint,
+            layer: ddef.layLayer,
     ):
         super().__init__()
         self._rect = QRectF(start, end).normalized()
@@ -352,7 +354,7 @@ class layoutRect(layoutShape):
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[0]
-            elif eventPos.x() ==self._rect.right():
+            elif eventPos.x() == self._rect.right():
                 if self._rect.top() <= eventPos.y() <= self._rect.bottom():
                     self.setCursor(Qt.SizeHorCursor)
                     self._stretchSide = layoutRect.sides[1]
@@ -507,10 +509,10 @@ class layoutPcell(layoutInstance):
 
 class layoutLine(layoutShape):
     def __init__(
-        self,
-        draftLine: QLineF,
-        layer: ddef.layLayer,
-        width: float = 1.0,
+            self,
+            draftLine: QLineF,
+            layer: ddef.layLayer,
+            width: float = 1.0,
     ):
         super().__init__()
         self._draftLine = draftLine
@@ -543,13 +545,13 @@ class layoutLine(layoutShape):
 
 class layoutPath(layoutShape):
     def __init__(
-        self,
-        draftLine: QLineF,
-        layer: ddef.layLayer,
-        width: float = 1.0,
-        startExtend: int = 0,
-        endExtend: int = 0,
-        mode: int = 0,
+            self,
+            draftLine: QLineF,
+            layer: ddef.layLayer,
+            width: float = 1.0,
+            startExtend: int = 0,
+            endExtend: int = 0,
+            mode: int = 0,
     ):
         """
         Initialize the class instance.
@@ -599,61 +601,52 @@ class layoutPath(layoutShape):
     def _rectCorners(self, angle: float):
         match self._mode:
             case 0:  # manhattan
-                self.createManhattanPath(angle)
+                self._createManhattanPath(angle)
             case 1:  # diagonal
-                self.createDiagonalPath(angle)
+                self._createDiagonalPath(angle)
             case 2:
-                self.createAnyAnglePath(angle)
+                self._createAnyAnglePath(angle)
             case 3:
-                self.createHorizontalPath(angle)
+                self._createHorizontalPath(angle)
             case 4:
-                self.createVerticalPath(angle)
+                self._createVerticalPath(angle)
         self._draftLine.setAngle(0)
         self._rect = self._extractRect()
         self.setTransformOriginPoint(self.draftLine.p1())
         self.setRotation(-self._angle)
 
-    def createManhattanPath(self, angle):
-        if 0 <= angle <= 45 or 360 > angle > 315:
-            self._angle = 0
-        elif 45 < angle <= 135:
-            self._angle = 90
-        elif 135 < angle <= 225:
-            self._angle = 180
-        elif 225 < angle <= 315:
-            self._angle = 270
+    def _createManhattanPath(self, angle: float) -> None:
+        """
+        Creates a Manhattan path based on the given angle.
 
-    def createDiagonalPath(self, angle):
-        if 0 <= angle <= 22.5 or 360 > angle > 337.5:
-            self._angle = 0
-        elif 22.5 < angle <= 67.5:
-            self._angle = 45
-        elif 67.5 < angle <= 112.5:
-            self._angle = 90
-        elif 112.5 < angle <= 157.5:
-            self._angle = 135
-        elif 157.5 < angle <= 202.5:
-            self._angle = 180
-        elif 202.5 < angle <= 247.5:
-            self._angle = 225
-        elif 247.5 < angle <= 292.5:
-            self._angle = 270
-        elif 292.5 < angle <= 337.5:
-            self._angle = 315
+        :param angle: The angle in degrees.
+        :type angle: float
 
-    def createAnyAnglePath(self, angle):
+        :return: None
+        """
+        self._angle = 90 * math.floor(((angle + 45) % 360) / 90)
+
+    def _createDiagonalPath(self, angle: float) -> None:
+        """
+        Creates a manhattan or diagonal path based on the given angle.
+        Parameters:
+            angle (float): The angle in degrees.
+        Returns:
+            None
+        """
+        self._angle = 45 * math.floor(((angle + 22.5) % 360) / 45)
+
+    def _createAnyAnglePath(self, angle: float) -> None:
         self._angle = angle
 
-    def createHorizontalPath(self, angle):
-        if 0 <= angle <= 90 or 360 > angle > 270:
-            self._angle = 0
-        elif 90 < angle <= 270:
-            self._angle = 180
+    def _createHorizontalPath(self, angle: float) -> None:
+        self._angle = 180 * math.floor(((angle + 90) % 360) / 180)
 
-    def createVerticalPath(self, angle):
+    def _createVerticalPath(self, angle: float) -> None:
+        angle = angle % 360
         if 0 <= angle < 180:
             self._angle = 90
-        elif 180 <= angle < 360:
+        else:
             self._angle = 270
 
     def _extractRect(self):
@@ -668,14 +661,14 @@ class layoutPath(layoutShape):
             direction /= direction.manhattanLength()
             perpendicular = QPointF(-direction.y(), direction.x())
             point1 = (
-                self._draftLine.p1()
-                + perpendicular * self._width * 0.5
-                - direction * self._startExtend
+                    self._draftLine.p1()
+                    + perpendicular * self._width * 0.5
+                    - direction * self._startExtend
             ).toPoint()
             point2 = (
-                self._draftLine.p2()
-                - perpendicular * self._width * 0.5
-                + direction * self._endExtend
+                    self._draftLine.p2()
+                    - perpendicular * self._width * 0.5
+                    + direction * self._endExtend
             ).toPoint()
             rect = QRectF(point1, point2).normalized()
         return rect
@@ -788,12 +781,12 @@ class layoutPath(layoutShape):
         if self._stretch:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             if (
-                eventPos - self._draftLine.p1().toPoint()
+                    eventPos - self._draftLine.p1().toPoint()
             ).manhattanLength() <= self.scene().snapDistance:
                 self._stretchSide = "p1"
                 self.setCursor(Qt.SizeHorCursor)
             elif (
-                eventPos - self._draftLine.p2().toPoint()
+                    eventPos - self._draftLine.p2().toPoint()
             ).manhattanLength() <= self.scene().snapDistance:
                 print("p2")
                 self._stretchSide = "p2"
@@ -822,13 +815,13 @@ class layoutPath(layoutShape):
 
 class layoutRuler(layoutShape):
     def __init__(
-        self,
-        draftLine: QLineF,
-        width: float,
-        tickGap: float,
-        tickLength: int,
-        tickFont: QFont,
-        mode: int = 0,
+            self,
+            draftLine: QLineF,
+            width: float,
+            tickGap: float,
+            tickLength: int,
+            tickFont: QFont,
+            mode: int = 0,
     ):
         """
         Initialize the TickLine object.
@@ -853,7 +846,7 @@ class layoutRuler(layoutShape):
         penColour = QColor(255, 255, 40)
         # penColour.setAlpha(128)
         self._pen = QPen(penColour, self._width, Qt.SolidLine)
-        self._selectedPen = QPen(Qt.red, self._width+1, Qt.SolidLine)
+        self._selectedPen = QPen(Qt.red, self._width + 1, Qt.SolidLine)
         # self._pen.setCosmetic(True)
         self._tickTuples = list()
         self._tickFont = tickFont
@@ -868,8 +861,7 @@ class layoutRuler(layoutShape):
         # self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
         self.update(self.boundingRect())
-        
-        
+
     def __repr__(self):
         return f"layoutRuler({self._draftLine}, {self._width}, {self._tickGap}, {self._tickLength}, {self._tickFont}, {self._mode})"
 
@@ -924,7 +916,7 @@ class layoutRuler(layoutShape):
             numberOfTicks = math.ceil(self._draftLine.length() / self._tickGap)
             direction = self._draftLine.p2() - self._draftLine.p1()
             if direction != QPoint(
-                0, 0
+                    0, 0
             ):  # no need for a tick when the line is zero length
                 direction /= direction.manhattanLength()
                 perpendicular = QPointF(-direction.y(), direction.x())
@@ -955,12 +947,13 @@ class layoutRuler(layoutShape):
         )
         point1 = self._draftLine.p1().toPoint()
         point2 = (
-            self._draftLine.p2() + perpendicular * (self._tickLength + len(self._tickTuples[-1].text)*self._fm.maxWidth())
+                self._draftLine.p2() + perpendicular * (
+                self._tickLength + len(self._tickTuples[-1].text) * self._fm.maxWidth())
         ).toPoint()
         self._rect = QRectF(point1, point2).normalized()
 
     def boundingRect(self) -> QRectF:
-        return self._rect.adjusted(-4,-4,4,4)
+        return self._rect.adjusted(-4, -4, 4, 4)
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -978,7 +971,6 @@ class layoutRuler(layoutShape):
             painter.translate(-tickTuple.point)
             painter.drawText(tickTuple.point.x(), tickTuple.point.y(), tickTuple.text)
             painter.restore()
-
 
     @property
     def draftLine(self):
@@ -1011,26 +1003,26 @@ class layoutRuler(layoutShape):
     @property
     def tickFont(self):
         return self._tickFont
-    
+
     @property
     def tickGap(self):
         return self._tickGap
-    
+
 
 class layoutLabel(layoutShape):
     labelAlignments = ["Left", "Center", "Right"]
     labelOrients = ["R0", "R90", "R180", "R270", "MX", "MX90", "MY", "MY90"]
 
     def __init__(
-        self,
-        start: QPoint,
-        labelText: str,
-        fontFamily: str,
-        fontStyle: str,
-        fontHeight: str,
-        labelAlign: str,
-        labelOrient: str,
-        layer: ddef.layLayer,
+            self,
+            start: QPoint,
+            labelText: str,
+            fontFamily: str,
+            fontStyle: str,
+            fontHeight: str,
+            labelAlign: str,
+            labelOrient: str,
+            layer: ddef.layLayer,
     ):
         super().__init__()
         self._start = start
@@ -1107,7 +1099,7 @@ class layoutLabel(layoutShape):
             )
             .normalized()
             .adjusted(
-                -2,-2,2,2
+                -2, -2, 2, 2
             )
         )  #
 
@@ -1236,13 +1228,13 @@ class layoutPin(layoutShape):
     pinTypes = ["Signal", "Ground", "Power", "Clock", "Digital", "Analog"]
 
     def __init__(
-        self,
-        start,
-        end,
-        pinName: str,
-        pinDir: str,
-        pinType: str,
-        layer: ddef.layLayer,
+            self,
+            start,
+            end,
+            pinName: str,
+            pinDir: str,
+            pinType: str,
+            layer: ddef.layLayer,
     ):
         super().__init__()
 
@@ -1423,11 +1415,11 @@ class layoutPin(layoutShape):
 
 class layoutVia(layoutShape):
     def __init__(
-        self,
-        start: QPoint,
-        viaDefTuple: ddef.viaDefTuple,
-        width: int,
-        height: int,
+            self,
+            start: QPoint,
+            viaDefTuple: ddef.viaDefTuple,
+            width: int,
+            height: int,
     ):
         super().__init__()
         end = start + QPoint(width, height)
@@ -1534,12 +1526,12 @@ class layoutVia(layoutShape):
 
 class layoutViaArray(layoutShape):
     def __init__(
-        self,
-        start: QPoint,
-        via: layoutVia,
-        spacing: float,
-        xnum: int,
-        ynum: int,
+            self,
+            start: QPoint,
+            via: layoutVia,
+            spacing: float,
+            xnum: int,
+            ynum: int,
     ):
         super().__init__()
         self._start = start
