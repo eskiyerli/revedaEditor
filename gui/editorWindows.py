@@ -32,6 +32,7 @@ import shutil
 from copy import deepcopy
 import inspect
 from quantiphy import Quantity
+import itertools as itt
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -1267,6 +1268,7 @@ class editorWindow(QMainWindow):
         self.fitAction.setShortcut(Qt.Key_F)
         self.deleteAction.setShortcut(QKeySequence.Delete)
         self.selectAllAction.setShortcut("Ctrl+A")
+        self.stretchAction.setShortcut(Qt.Key_S)
 
     def _editorContextMenu(self):
         self.centralW.scene.itemContextMenu.addAction(self.copyAction)
@@ -2377,7 +2379,7 @@ class editor_scene(QGraphicsScene):
             panView=False,
         )
         self.readOnly = False  # if the scene is not editable
-        self.undoStack = QUndoStack()
+        self.undoStack = us.undoStack()
 
         self.origin = QPoint(0, 0)
         self.snapDistance = self.editorWindow.snapDistance
@@ -3272,7 +3274,6 @@ class schematic_scene(editor_scene):
             (self.editModes.drawPin, self.editModes.drawWire, self.editModes.drawText)
         )
 
-
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(mouse_event)
         try:
@@ -3288,6 +3289,10 @@ class schematic_scene(editor_scene):
                     self.newInstance = self.drawInstance(self.mousePressLoc)
                     self.newInstance.setSelected(True)
                 elif self.editModes.drawWire and self._newNet is not None:
+                    if self._newNet.draftLine.isNull():
+                        self.removeItem(self._newNet)
+                        self.undoStack.removeLastCommand()
+
                     self._newNet = None
                 elif self.editModes.changeOrigin:  # change origin of the symbol
                     self.origin = self.mousePressLoc
@@ -3642,19 +3647,17 @@ class schematic_scene(editor_scene):
         """
         Determine if a net is connected to another one. One net should end on the other net.
         """
-        netBRect = netItem.sceneBoundingRect().adjusted(-2, -2, 2, 2)
+
         if otherNetItem is not netItem:
-            otherBRect = otherNetItem.sceneBoundingRect().adjusted(-2, -2, 2, 2)
-            for endPoint in netItem.endPoints:
-                if otherBRect.contains(endPoint):
-                    return True
-            for endPoint in otherNetItem.endPoints:
-                if netBRect.contains(endPoint):
+            for netItemEnd, otherEnd in itt.product(netItem.sceneEndPoints,
+                                           otherNetItem.sceneEndPoints):
+                # not a very elegant solution to mistakes in net end points.
+                if (netItemEnd - otherEnd).manhattanLength() <= 1:
                     return True
         else:
             return False
 
-    def generatePinNetMap(self, sceneSymbolSet):
+    def generatePinNetMap(self, sceneSymbolSet: set):
         """
         For symbols in sceneSymbolSet, find which pin is connected to which net. If a
         pin is not connected, assign to it a default net starting with d prefix.
@@ -3734,21 +3737,9 @@ class schematic_scene(editor_scene):
         else:
             return set()
 
-    def addWires(self, start: QPoint) -> list[net.schematicNet]:
+    def addStretchWires(self, start: QPoint, end: QPoint) -> list[net.schematicNet]:
         """
-        Add a net or nets to the scene.
-        """
-        lines = [
-            net.schematicNet(start, start),
-            net.schematicNet(start, start),
-            net.schematicNet(start, start),
-        ]
-        return lines
-
-    def extendWires(self, lines: list, start: QPoint, end: QPoint):
-        """
-        This method is to shape the wires drawn using addWires method.
-        __|^^^
+        Add a trio of wires between two points
         """
         try:
             firstPointX = self.snapToBase(
@@ -3757,42 +3748,22 @@ class schematic_scene(editor_scene):
             firstPointY = start.y()
             firstPoint = QPoint(firstPointX, firstPointY)
             secondPoint = QPoint(firstPointX, end.y())
-            [self.addUndoStack(line) for line in lines if line.scene() is None]
-            lines[0].start = start
-            lines[0].end = firstPoint
-            lines[1].start = firstPoint
-            lines[1].end = secondPoint
-            lines[2].start = secondPoint
-            lines[2].end = end
+            lines = list()
+            lines.append(net.schematicNet(start, firstPoint))
+            lines.append(net.schematicNet(firstPoint, secondPoint))
+            lines.append(net.schematicNet(secondPoint, end))
+            for line in lines: # clear zero length wires
+                if line.draftLine.isNull():
+                    print(line.draftLine)
+                    lines.remove(line)
+            for line in lines:
+                print(f'draftline: {line.draftLine}')
+            self.undoStack.push(us.addShapesUndo(self,lines))
+            return  lines
         except Exception as e:
             self.logger.error(f"extend wires error{e}")
-
-    def pruneWires(self, lines, pen):
-        if lines[0].start == lines[2].end:  # if the first and last points are the same
-            for line in lines:
-                self.removeItem(line)
-                del line
             return None
-        # if the line is vertical or horizontal
-        elif (
-                lines[0].start.x() == lines[2].end.x()
-                or lines[0].start.y() == lines[2].end.y()
-        ):
-            newLine = net.schematicNet(lines[0].start, lines[2].end)
-            self.addUndoStack(newLine)
-            for line in lines:
-                self.removeItem(line)
-                del line
-            return [newLine]
-        else:
-            for line in lines:
-                if line.length == 0:
-                    self.removeItem(line)
-                    lines.remove(line)
-                    del line
-                else:
-                    self.addUndoStack(line)
-            return lines
+
 
     def addPin(self, pos: QPoint):
         try:
@@ -3989,7 +3960,13 @@ class schematic_scene(editor_scene):
                             ]
 
                     elif isinstance(item, net.schematicNet):
-                        dlg = pdlg.netProperties(self.editorWindow, item)
+                        dlg = pdlg.netProperties(self.editorWindow)
+                        dlg.netStartPointEditX.setText(str(round(item.mapToScene(item.draftLine.p1()).x())))
+                        dlg.netStartPointEditY.setText(str(round(item.mapToScene(item.draftLine.p1()).y())))
+                        dlg.netEndPointEditX.setText(str(round(item.mapToScene(item.draftLine.p2()).x())))
+                        dlg.netEndPointEditY.setText(str(round(item.mapToScene(item.draftLine.p2()).y())))
+                        if item.nameSet or item.nameAdded:
+                            dlg.netNameEdit.setText(item.name)
                         if dlg.exec() == QDialog.Accepted:
                             item.name = dlg.netNameEdit.text().strip()
                             if item.name != "":
@@ -5558,12 +5535,14 @@ class schematic_view(editor_view):
                 self.scene._newNet = None
         super().keyPressEvent(event)
 
+
 class layout_view(editor_view):
     def __init__(self, scene, parent):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
         self.visibleRect = None
+
 
 class xyceNetlist:
     def __init__(

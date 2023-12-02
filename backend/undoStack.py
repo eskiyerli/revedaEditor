@@ -28,9 +28,17 @@
 import revedaEditor.fileio.loadJSON as lj
 import revedaEditor.fileio.symbolEncoder as se
 from PySide6.QtCore import (QPoint, QRect)
-from PySide6.QtGui import (QUndoCommand,)
+from PySide6.QtGui import (QUndoCommand, QUndoStack)
 from PySide6.QtWidgets import (QGraphicsScene,QGraphicsItem)
 
+class undoStack(QUndoStack):
+    def __init__(self):
+        super().__init__()
+
+    def removeLastCommand(self):
+        # Remove the last command without undoing it
+        if self.canUndo():
+            self.setIndex(self.index() - 1)
 
 class addShapeUndo(QUndoCommand):
     def __init__(self, scene:QGraphicsScene, shape:QGraphicsItem):
@@ -57,6 +65,8 @@ class addShapesUndo(QUndoCommand):
 
     def redo(self):
         [self._scene.addItem(item) for item in self._shapes]
+
+
 
 class loadShapesUndo(addShapesUndo):
     """

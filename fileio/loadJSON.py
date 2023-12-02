@@ -32,7 +32,7 @@ from PySide6.QtCore import (QPoint, QLineF, QRect, )
 from PySide6.QtWidgets import (QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsRectItem,
                                QGraphicsItem, )
 
-import revedaEditor.common.net as net
+from revedaEditor.common.net import schematicNet
 import revedaEditor.common.shapes as shp
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.fileio.symbolEncoder as se
@@ -220,8 +220,7 @@ class schematicItems:
             case "schematicNet":
                 start = QPoint(item["st"][0], item["st"][1])
                 end = QPoint(item["end"][0], item["end"][1])
-                # position = QPoint(item["loc"][0], item["loc"][1])
-                netItem = net.schematicNet(start, end)
+                netItem = schematicNet(start, end)
                 netItem.name = item["nam"]
                 netItem.nameSet = item["ns"]
                 # netItem.setPos(position)

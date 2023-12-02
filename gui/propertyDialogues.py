@@ -489,7 +489,7 @@ class instanceProperties(QDialog):
 
 
 class netProperties(QDialog):
-    def __init__(self, parent, net: net.schematicNet = None):
+    def __init__(self, parent):
         # assert isinstance(instance, shp.symbolShape)
         super().__init__(parent)
         self.parent = parent
@@ -504,7 +504,14 @@ class netProperties(QDialog):
         netPointsBox = QGroupBox("Net Points")
         netPointsLayout = QFormLayout()
         netPointsBox.setLayout(netPointsLayout)
-        self.netStartPointEdit = edf.shortLineEdit()
+        self.netStartPointEditX = edf.shortLineEdit()
+        netPointsLayout.addRow(edf.boldLabel("Net Start X:"), self.netStartPointEditX)
+        self.netStartPointEditY = edf.shortLineEdit()
+        netPointsLayout.addRow(edf.boldLabel("Net Start Y:"), self.netStartPointEditY)
+        self.netEndPointEditX = edf.shortLineEdit()
+        netPointsLayout.addRow(edf.boldLabel("End Point X:"), self.netEndPointEditX)
+        self.netEndPointEditY = edf.shortLineEdit()
+        netPointsLayout.addRow(edf.boldLabel("End Point X:"), self.netEndPointEditY)
 
         formBox = QGroupBox("Net Properties")
         formLayout = QFormLayout()
@@ -513,6 +520,8 @@ class netProperties(QDialog):
         formLayout.addRow(edf.boldLabel("Net Name", self), self.netNameEdit)
         formBox.setLayout(formLayout)
         self.mainLayout.addWidget(formBox)
+        self.mainLayout.addSpacing(20)
+        self.mainLayout.addWidget(netPointsBox)
         self.mainLayout.addSpacing(40)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
@@ -575,7 +584,7 @@ class symbolNameDialog(QDialog):
 
 class symbolCreateDialog(QDialog):
     def __init__(
-        self, parent, inputPinNames: list, outputPinNames: list, inoutPinNames: list
+            self, parent, inputPinNames: list, outputPinNames: list, inoutPinNames: list
     ):
         super().__init__(parent)
         self.parent = parent
@@ -771,8 +780,9 @@ class selectConfigDialogue(QDialog):
         self.setLayout(vLayout)
         self.show()
 
+
 class moveByDialogue(QDialog):
-    def __init__(self,parent):
+    def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowTitle("Move By...")
         self.setMinimumWidth(250)
