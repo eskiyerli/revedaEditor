@@ -19,7 +19,6 @@
 #   License: Mozilla Public License 2.0
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
-# from ruamel.yaml import YAML
 import json
 # schematic editor backend
 import pathlib
@@ -67,7 +66,6 @@ class cellItem(QStandardItem):
     def __init__(self, cellPath: pathlib.Path) -> None:
         self.cellPath = cellPath
         self._cellName = cellPath.stem
-        # self._libName = self.parent.libraryName
         super().__init__(self.cellName)
         self.setEditable(False)
         self.setData("cell", Qt.UserRole + 1)
@@ -159,8 +157,7 @@ def createLibrary(parent, model, libraryDir, libraryName) -> libraryItem:
     return newLibraryItem
 
 
-def createCell(parent, model, selectedLib, cellName) -> cellItem:
-    # assert isinstance(selectedLib, libraryItem)
+def createCell(parent, model, selectedLib, cellName):
     if selectedLib.data(Qt.UserRole + 1) == "library":
         selectedLibPath = selectedLib.data(Qt.UserRole + 2)
         cellPath = selectedLibPath.joinpath(cellName)
@@ -172,15 +169,13 @@ def createCell(parent, model, selectedLib, cellName) -> cellItem:
             return None
         else:
             cellPath.mkdir()
-            # parentLibrary = model.findItems(selectedLibPath.stem,
-            #                                 flags=Qt.MatchExactly)[0]
             newCellItem = cellItem(cellPath)
             selectedLib.appendRow(newCellItem)
             parent.logger.info(f"Created {cellName} cell at {str(cellPath)}")
             return newCellItem
 
 
-def createCellView(parent, viewName, cellItem: cellItem) -> viewItem:
+def createCellView(parent, viewName, cellItem: cellItem):
     if viewName.strip() == "":
         QMessageBox.warning(parent, "Error", "Please enter a view name")
         return None

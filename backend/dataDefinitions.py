@@ -19,70 +19,11 @@
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
-from collections import namedtuple
+from typing import (NamedTuple, Union)
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import (Qt, QPoint, QPointF)
 from PySide6.QtGui import QColor
-
-viewTuple = namedtuple("viewTuple", ["libraryName", "cellName", "viewName"])
-cellTuple = namedtuple("cellTuple", ["libraryName", "cellName"])
-viewItemTuple = namedtuple("viewItemTuple", ["libraryItem", "cellItem", "viewItem"])
-pinNetTuple = namedtuple("pinNetTuple", ["pin", "net", "start"])
-netTuple = namedtuple("netTuple", ["net", "start"])
-# this namedtuple is used to collect information on dashed lines.
-# net is the dashed line
-# index is the index of the self (schematicNet) where dashed line ends,
-# 0: start,
-# 1: end
-# orient is True if self is horizontal, otherwise False
-netEndTuple = namedtuple("netEndTuple", ["net", "index", "orient"])
-
-layoutPathTuple = namedtuple(
-    "layoutPathTuple", ["layer", "name", "mode", "width", "startExtend", "endExtend"]
-)
-layoutPinTuple = namedtuple(
-    "layoutPinTuple", ["pinName", "pinDir", "pinType", "pinLayer"]
-)
-layoutLabelTuple = namedtuple(
-    "layoutLabelTuple",
-    [
-        "labelText",
-        "fontFamily",
-        "fontStyle",
-        "fontHeight",
-        "labelAlign",
-        "labelOrient",
-        "labelLayer",
-    ],
-)
-rulerTuple = namedtuple("rulerTuple", ["point", "line", "text"])
-
-# pdk related classes and namedtuples
-# this tuple defines the minimum dimensions of a via
-# This can be extended to define the maximum dimensions
-viaDefTuple = namedtuple(
-    "viaDefTuple",
-    [
-        "name",
-        "layer",
-        "type",
-        "minWidth",
-        "maxWidth",
-        "minHeight",
-        "maxHeight",
-        "minSpacing",
-        "maxSpacing",
-    ],
-)
-# Single and array via definitions
-singleViaTuple = namedtuple("singleViaTuple", ["viaDefTuple", "width", "height"])
-
-arrayViaTuple = namedtuple(
-    "arrayViaTuple", ["singleViaTuple", "spacing", "xnum", "ynum"]
-)
-
-rectCoords = namedtuple("rectCoords", ["left", "top", "w", "h"])
 
 
 @dataclass
@@ -167,3 +108,110 @@ class layoutModes(editModes):
     drawRuler: bool
     stretchItem: bool
     addInstance: bool
+
+
+# library editor related named tuples
+class viewTuple(NamedTuple):
+    libraryName: str
+    cellName: str
+    viewName: str
+
+
+class cellTuple(NamedTuple):
+    libraryName: str
+    cellName: str
+
+
+class viewItemTuple(NamedTuple):
+    libraryItem: object
+    cellItem: object
+    viewItem: object
+
+
+# schematic related tuples
+class pinNetIndexTuple(NamedTuple):
+    pin: object
+    net: object
+    netEndIndex: int
+
+
+class netTuple(NamedTuple):
+    net: object
+    start: int
+
+
+class netEndTuple(NamedTuple):
+    net: object
+    index: int  # type: ignore
+    orient: bool
+
+
+# layout related tuples
+class layoutPathTuple(NamedTuple):
+    layer: layLayer
+    name: str
+    mode: str
+    width: float
+    startExtend: bool
+    endExtend: bool
+
+
+class layoutPinTuple(NamedTuple):
+    pinName: str
+    pinDir: str
+    pinType: str
+    pinLayer: layLayer
+
+
+class layoutLabelTuple(NamedTuple):
+    labelText: str
+    fontFamily: str
+    fontStyle: str
+    fontHeight: float
+    labelAlign: str
+    labelOrient: str
+    labelLayer: str
+
+
+class rulerTuple(NamedTuple):
+    point: Union[QPoint, QPointF]
+    line: tuple
+    text: str
+
+
+# # pdk related classes and namedtuples
+# # this tuple defines the minimum dimensions of a via
+# # This can be extended to define the maximum dimensions
+
+class viaDefTuple(NamedTuple):
+    name: str
+    layer: layLayer
+    type: str
+    minWidth: float
+    maxWidth: float
+    minHeight: float
+    maxHeight: float
+    minSpacing: float
+    maxSpacing: float
+
+
+class singleViaTuple(NamedTuple):
+    viaDefTuple: viaDefTuple
+    width: float
+    height: float
+
+
+class arrayViaTuple(NamedTuple):
+    singleViaTuple: singleViaTuple
+    spacing: float
+    xnum: int
+    ynum: int
+
+
+# rectangle coordinates tuple
+
+class rectCoords(NamedTuple):
+    left: float
+    top: float
+    w: float
+    h: float

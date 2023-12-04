@@ -3650,7 +3650,7 @@ class schematic_scene(editor_scene):
 
         if otherNetItem is not netItem:
             for netItemEnd, otherEnd in itt.product(netItem.sceneEndPoints,
-                                           otherNetItem.sceneEndPoints):
+                                                    otherNetItem.sceneEndPoints):
                 # not a very elegant solution to mistakes in net end points.
                 if (netItemEnd - otherEnd).manhattanLength() <= 1:
                     return True
@@ -3749,21 +3749,17 @@ class schematic_scene(editor_scene):
             firstPoint = QPoint(firstPointX, firstPointY)
             secondPoint = QPoint(firstPointX, end.y())
             lines = list()
-            lines.append(net.schematicNet(start, firstPoint))
-            lines.append(net.schematicNet(firstPoint, secondPoint))
-            lines.append(net.schematicNet(secondPoint, end))
-            for line in lines: # clear zero length wires
-                if line.draftLine.isNull():
-                    print(line.draftLine)
-                    lines.remove(line)
-            for line in lines:
-                print(f'draftline: {line.draftLine}')
-            self.undoStack.push(us.addShapesUndo(self,lines))
-            return  lines
+            if start != firstPoint:
+                lines.append(net.schematicNet(start, firstPoint))
+            if firstPoint != secondPoint:
+                lines.append(net.schematicNet(firstPoint, secondPoint))
+            if secondPoint != end:
+                lines.append(net.schematicNet(secondPoint, end))
+            self.undoStack.push(us.addShapesUndo(self, lines))
+            return lines
         except Exception as e:
             self.logger.error(f"extend wires error{e}")
             return None
-
 
     def addPin(self, pos: QPoint):
         try:
@@ -5481,34 +5477,6 @@ class editor_view(QGraphicsView):
         self.render(painter)
         painter.end()
 
-    def move_view_left(self) -> None:
-        viewRect = self.scene.sceneRect()
-        newRect = QRectF(
-            viewRect.left() - viewRect.width() * 0.5,
-            viewRect.top(),
-            viewRect.width(),
-            viewRect.height(),
-        )
-        self.scene.setSceneRect(newRect)
-
-    def move_view_right(self) -> None:
-        """
-        Moves the view in the scene to the right by half of the scene's width.
-        """
-        # Get the current scene rectangle
-        viewRect = self.scene.sceneRect()
-
-        # Calculate the new rectangle for the scene
-        newRect = QRectF(
-            viewRect.left() + viewRect.width() * 0.5,
-            viewRect.top(),
-            viewRect.width(),
-            viewRect.height(),
-        )
-
-        # Set the new scene rectangle
-        self.scene.setSceneRect(newRect)
-
 
 class symbol_view(editor_view):
     def __init__(self, scene, parent):
@@ -5529,6 +5497,7 @@ class schematic_view(editor_view):
         if event.key() == Qt.Key_Escape:
             self.scene.removeSnapRect()
             if self.scene._newNet:
+                self.scene._newNet.clearDots()
                 self.scene._newNet.mergeNets()
                 self.scene._newNet.splitNets()
                 self.scene._newNet.createDots()
