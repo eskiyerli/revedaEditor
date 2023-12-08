@@ -1,34 +1,53 @@
-#   “Commons Clause” License Condition v1.0
-#  #
-#   The Software is provided to you by the Licensor under the License, as defined
-#   below, subject to the following condition.
-#  #
-#   Without limiting other conditions in the License, the grant of rights under the
-#   License will not include, and the License does not grant to you, the right to
-#   Sell the Software.
-#  #
-#   For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#   granted to you under the License to provide to third parties, for a fee or other
-#   consideration (including without limitation fees for hosting or consulting/
-#   support services related to the Software), a product or service whose value
-#   derives, entirely or substantially, from the functionality of the Software. Any
-#   license notice or attribution required by the License must also include this
-#   Commons Clause License Condition notice.
-#  #
-#   Software: Revolution EDA
-#   License: Mozilla Public License 2.0
-#   Licensor: Revolution Semiconductor (Registered in the Netherlands)
+#    “Commons Clause” License Condition v1.0
+#   #
+#    The Software is provided to you by the Licensor under the License, as defined
+#    below, subject to the following condition.
+#
+#    Without limiting other conditions in the License, the grant of rights under the
+#    License will not include, and the License does not grant to you, the right to
+#    Sell the Software.
+#
+#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
+#    granted to you under the License to provide to third parties, for a fee or other
+#    consideration (including without limitation fees for hosting or consulting/
+#    support services related to the Software), a product or service whose value
+#    derives, entirely or substantially, from the functionality of the Software. Any
+#    license notice or attribution required by the License must also include this
+#    Commons Clause License Condition notice.
+#
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
+#    Software: Revolution EDA
+#    License: Mozilla Public License 2.0
+#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
 # net class definition.
-from PySide6.QtCore import (QPoint, Qt, QLineF, QRectF, QPointF, )
-from PySide6.QtGui import (QPen, QStaticText, QPainterPath, QFont, )
-from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsItem, QGraphicsPathItem,
-                               QGraphicsEllipseItem, QGraphicsSceneMouseEvent,
-                               QGraphicsSceneHoverEvent, )
+from PySide6.QtCore import (
+    QPoint,
+    Qt,
+    QLineF,
+    QRectF,
+    QPointF,
+)
+from PySide6.QtGui import (
+    QPen,
+    QStaticText,
+    QPainterPath,
+    QFont,
+)
+from PySide6.QtWidgets import (
+    QGraphicsLineItem,
+    QGraphicsItem,
+    QGraphicsPathItem,
+    QGraphicsEllipseItem,
+    QGraphicsSceneMouseEvent,
+    QGraphicsSceneHoverEvent,
+)
 import pdk.schLayers as schlyr
 import math
 import itertools as itt
-from typing import (Union, Optional, )
+from typing import Union, Optional, NamedTuple
 
 
 class crossingDot(QGraphicsEllipseItem):
@@ -50,6 +69,12 @@ class crossingDot(QGraphicsEllipseItem):
         painter.drawEllipse(self.point, self.radius, self.radius)
 
 
+class selfIndNetIndTuple(NamedTuple):
+    selfIndex: int
+    net: QGraphicsItem
+    netEndIndex: int
+
+
 class schematicNet(QGraphicsItem):
     def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
         super().__init__()
@@ -65,8 +90,8 @@ class schematicNet(QGraphicsItem):
         self._highlighted: bool = False
         self._flightLinesSet: set[schematicNet] = set()
         self._connectedNetsSet: set[schematicNet] = set()
-        self._wiredEnds: set[int] = set()
-        self._snapGuideLines: dict[int, guideLine] = dict()
+        self._netIndexTupleSet: set[selfIndNetIndTuple] = set()
+        self._snapLines: dict[int, set[QGraphicsLineItem]] = {}
         self._stretch: bool = False
         self._nameFont = QFont()
         self._nameFont.setPointSize(8)
@@ -75,16 +100,22 @@ class schematicNet(QGraphicsItem):
         self._guideLine: Optional[guideLine] = None
         match self._mode:
             case 0:
-                self._angle = 90 * math.floor(((self._draftLine.angle() + 45) % 360) / 90)
+                self._angle = 90 * math.floor(
+                    ((self._draftLine.angle() + 45) % 360) / 90
+                )
             case 1:
-                self._angle = 45 * math.floor(((self._draftLine.angle() + 22.5) % 360) / 45)
+                self._angle = 45 * math.floor(
+                    ((self._draftLine.angle() + 22.5) % 360) / 45
+                )
         self._draftLine.setAngle(0)
         self.setTransformOriginPoint(self._draftLine.p1())
         if self.scene():
             self._draftLine.setP2(
-                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple))
-        self._shapeRect = QRectF(self._draftLine.p1(), self._draftLine.p2()).adjusted(-2,
-                                                                                      -2, 2, 2)
+                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple)
+            )
+        self._shapeRect = QRectF(self._draftLine.p1(), self._draftLine.p2()).adjusted(
+            -2, -2, 2, 2
+        )
         self._boundingRect = self._shapeRect.adjusted(-8, -8, 8, 8)
         self.setRotation(-self._angle)
 
@@ -98,16 +129,24 @@ class schematicNet(QGraphicsItem):
         self._draftLine = line
         match self._mode:
             case 0:
-                self._angle = 90 * math.floor(((self._draftLine.angle() + 45) % 360) / 90)
+                self._angle = 90 * math.floor(
+                    ((self._draftLine.angle() + 45) % 360) / 90
+                )
             case 1:
-                self._angle = 45 * math.floor(((self._draftLine.angle() + 22.5) % 360) / 45)
+                self._angle = 45 * math.floor(
+                    ((self._draftLine.angle() + 22.5) % 360) / 45
+                )
         self._draftLine.setAngle(0)
         self.setTransformOriginPoint(self._draftLine.p1())
         if self.scene():
             self._draftLine.setP2(
-                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple))
-        self._shapeRect = QRectF(self._draftLine.p1(),
-                                 self._draftLine.p2()).normalized().adjusted(-2, -2, 2, 2)
+                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple)
+            )
+        self._shapeRect = (
+            QRectF(self._draftLine.p1(), self._draftLine.p2())
+            .normalized()
+            .adjusted(-2, -2, 2, 2)
+        )
         self._boundingRect = self._shapeRect.adjusted(-8, -8, 8, 8)
         self.setRotation(-self._angle)
 
@@ -120,7 +159,6 @@ class schematicNet(QGraphicsItem):
         return self._boundingRect
 
     def paint(self, painter, option, widget=...):
-
         painter.setFont(self._nameFont)
         if self.isSelected():
             pen = schlyr.selectedWirePen
@@ -140,7 +178,6 @@ class schematicNet(QGraphicsItem):
         painter.drawStaticText(0, 0, self._nameItem)
         painter.restore()
 
-
     def sceneEvent(self, event):
         """
         Handle events related to the scene.
@@ -159,70 +196,125 @@ class schematicNet(QGraphicsItem):
             super().sceneEvent(event)
         return True
 
+    def __repr__(self):
+        return f"schematicNet({self.sceneEndPoints})"
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSceneChange and not value:
+            self.clearDots()
+
+        return super().itemChange(change, value)
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         self.clearDots()
-        self.mergeNets()
-        self.splitNets()
-        self.createDots()
-        self.findConnectedEndPoints()
-        if self._wiredEnds:
-            for netEndIndex in self._wiredEnds:
-                if self._snapGuideLines.get(netEndIndex) is None:
-                    sceneEndPoint = self.sceneEndPoints[netEndIndex]
-                    self._snapGuideLines[netEndIndex] = guideLine(sceneEndPoint,
-                                                                  sceneEndPoint)
+        # self.findNetConnections()
+        # self.createSnapLines()
         if self._stretch:
-            eventPos = event.scenePos().toPoint()
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if (eventPos - self.mapToScene(
-                    self._draftLine.p1()).toPoint()).manhattanLength() <= self.scene().snapDistance:
-                self.setCursor(Qt.SizeHorCursor)
-                self._guideLine = guideLine(self.mapToScene(self._draftLine.p1()), eventPos)
-            elif (eventPos - self.mapToScene(
-                    self._draftLine.p2()).toPoint()).manhattanLength() <= self.scene().snapDistance:
-                self.setCursor(Qt.SizeHorCursor)
-                self._guideLine = guideLine(self.mapToScene(self._draftLine.p2()), eventPos)
+            self.startStretch(event)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
-        if self._snapGuideLines:
-            for netEndIndex, guideLine in self._snapGuideLines.items():
-                if guideLine.scene() is None:
-                    self.scene().addItem(guideLine)
-                guideLine.setLine(QLineF(guideLine.line().p1(), guideLine.mapFromScene(
-                    self.sceneEndPoints[netEndIndex])))
-
-        elif self.stretch:
-            eventPos = event.scenePos().toPoint()
-            if self._guideLine is not None:
-                if self._guideLine.scene() is None:
-                    self.scene().addItem(self._guideLine)
-                self._guideLine.setLine(QLineF(self._guideLine.line().p1(),
-                                               self._guideLine.mapFromScene(eventPos)))
+        # if self._snapLines:
+        #     self.extendSnapLines()
+        if self.stretch:
+            self.extendStretch(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-        self.clearDots()
-        self.mergeNets()
-        self.splitNets()
-        self.createDots()
-        if self._snapGuideLines and self.scene():
-            for guideLine in self._snapGuideLines.values():
-                self.scene().addStretchWires(*guideLine.sceneEndPoints)
-                self.scene().removeItem(guideLine)
-            self._snapGuideLines = dict()
-            self._wiredEnds = set()
+        # self.removeSnapLines()
         if self.stretch:
-            self._stretch = False
-            self._stretchSide = None
-            if self._guideLine and self.scene():
-                lines = self.scene().addStretchWires(*self._guideLine.sceneEndPoints)
-                self.scene().removeItem(self._guideLine)
-            for line in lines:
-                line.mergeNets()
-            self._guideLine = None
-            self.setCursor(Qt.ArrowCursor)
+            self.endStretch()
+
+        self.createDots()
         super().mouseReleaseEvent(event)
+
+    def startStretch(self, event):
+        """
+        Handle the start of the stretch of the net using one of the end points.
+        """
+
+        eventPos = event.scenePos().toPoint()
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
+        if (
+            eventPos - self.mapToScene(self._draftLine.p1()).toPoint()
+        ).manhattanLength() <= self.scene().snapDistance:
+            self.setCursor(Qt.SizeHorCursor)
+            self._guideLine = guideLine(
+                self.mapToScene(self._draftLine.p1()), eventPos
+            )
+        elif (
+            eventPos - self.mapToScene(self._draftLine.p2()).toPoint()
+        ).manhattanLength() <= self.scene().snapDistance:
+            self.setCursor(Qt.SizeHorCursor)
+            self._guideLine = guideLine(
+                self.mapToScene(self._draftLine.p2()), eventPos
+            )
+
+    def createSnapLines(self):
+        for item in self._netIndexTupleSet:
+            if self._snapLines.get(item.selfIndex) is None:
+                self._snapLines[item.selfIndex] = set()
+            snapLine = guideLine(
+                self.sceneEndPoints[item.selfIndex],
+                item.net.sceneEndPoints[item.netEndIndex - 1],
+            )
+            self.scene().addItem(snapLine)
+            self._snapLines[item.selfIndex].add(snapLine)
+            self.scene().removeItem(item.net)
+
+    def extendSnapLines(self):
+        for selfIndex, snapLinesSet in self._snapLines.items():
+            for snapLine in snapLinesSet:
+                snapLine.setLine(
+                    QLineF(
+                        snapLine.mapFromScene(self.sceneEndPoints[selfIndex]),
+                        snapLine.line().p2(),
+                    )
+                )
+
+    def extendStretch(self, event):
+        eventPos = event.scenePos().toPoint()
+        if self._guideLine is not None:
+            if self._guideLine.scene() is None:
+                self.scene().addItem(self._guideLine)
+            self._guideLine.setLine(
+                QLineF(
+                    self._guideLine.line().p1(), self._guideLine.mapFromScene(eventPos)
+                )
+            )
+
+    def endStretch(self):
+        self._stretch = False
+        self._stretchSide = None
+        if self._guideLine and self.scene():
+            lines = self.scene().addStretchWires(*self._guideLine.sceneEndPoints)
+            self.scene().removeItem(self._guideLine)
+        for line in lines:
+            line.mergeNets()
+        self._guideLine = None
+        self.setCursor(Qt.ArrowCursor)
+
+    @property
+    def innerRect(self) -> QRectF:
+        return (
+            QRectF(self._draftLine.p1(), self._draftLine.p2())
+            .normalized()
+            .adjusted(2, 2, -2, -2)
+        )
+
+    @property
+    def sceneInnerRect(self) -> QRectF:
+        return self.mapRectToScene(self.innerRect)
+
+    def removeSnapLines(self):
+        for selfIndex, snapLinesSet in self._snapLines.items():
+            for snapLine in snapLinesSet:
+                self.scene().addStretchWires(
+                    self.sceneEndPoints[selfIndex],
+                    snapLine.mapToScene(snapLine.line().p2()).toPoint(),
+                )
+                self.scene().removeItem(snapLine)
+        self._snapLines = dict()
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """
@@ -239,9 +331,15 @@ class schematicNet(QGraphicsItem):
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
             # Create a set of connected netItems based on certain conditions
-            self._connectedNetsSet = {netItem for netItem in self.scene().items() if (
-                    isinstance(netItem, schematicNet) and (
-                    self.nameSet or self.nameAdded) and netItem.name == self.name)}
+            self._connectedNetsSet = {
+                netItem
+                for netItem in self.scene().items()
+                if (
+                    isinstance(netItem, schematicNet)
+                    and (self.nameSet or self.nameAdded)
+                    and netItem.name == self.name
+                )
+            }
 
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
@@ -249,8 +347,10 @@ class schematicNet(QGraphicsItem):
 
             # Create flight lines and add them to the scene
             for netItem in self._connectedNetsSet:
-                flightLine = netFlightLine(self.mapToScene(self._draftLine.center()),
-                                           netItem.mapToScene(netItem.draftLine.center()), )
+                flightLine = netFlightLine(
+                    self.mapToScene(self._draftLine.center()),
+                    netItem.mapToScene(netItem.draftLine.center()),
+                )
                 self._flightLinesSet.add(flightLine)
                 self.scene().addItem(flightLine)
 
@@ -272,11 +372,20 @@ class schematicNet(QGraphicsItem):
         return not self.isParallel(otherNet)
 
     def containsDot(self, dot: crossingDot) -> bool:
+        """
+        Check if the dot is contained within the scene shape rectangle.
+
+        Args:
+            dot: The dot to check.
+
+        Returns:
+            True if the dot is contained within the scene shape rectangle, False otherwise.
+        """
         if self.sceneShapeRect.contains(self.mapFromScene(dot.point)):
             return True
         return False
 
-    def findOverlapNets(self):
+    def findOverlapNets(self) -> set["schematicNet"]:
         """
         Find all netItems in the scene that overlap with self.sceneShapeRect.
 
@@ -284,75 +393,173 @@ class schematicNet(QGraphicsItem):
             set: A set of netItems that overlap with self.sceneShapeRect.
         """
         if self.scene():
-            overlapNets = {netItem for netItem in self.scene().items(self.sceneShapeRect) if
-                           isinstance(netItem, schematicNet) and netItem is not self}
+            overlapNets = {
+                netItem
+                for netItem in self.scene().items(self.sceneShapeRect)
+                if isinstance(netItem, schematicNet) and netItem is not self
+            }
         else:
             overlapNets = set()
         return overlapNets
 
-    def splitNets(self):
-        otherNets = self.findOverlapNets()
-        if otherNets:
-            orthoNets = list(filter(self.isOrthogonal, otherNets))
-            if orthoNets:
-                # if self is dividing another net
-                self.createSplitNets(orthoNets)
+    def findCrossingNets(self, otherNets: set) -> dict[int, list["schematicNet"]]:
+        """
+        Finds the crossing nets in the scene.
 
-                # if another net is dividing self.
-                for orthoNet in orthoNets:
-                    orthoNet.createSplitNets([self])
+        Returns:
+            dict: A dictionary with the index of each scene end point as the key, and a list
+            of nets that cross that end point as the value.
+        """
 
-    def createSplitNets(self, orthoNets: list):
-        for orthoNet, end in itt.product(orthoNets, self.sceneEndPoints):
-            if orthoNet.sceneInnerRect.contains(end):
-                newNet1 = schematicNet(end, orthoNet.mapToScene(orthoNet.draftLine.p2()))
-                self.scene().addItem(newNet1)
-                newNet2 = schematicNet(orthoNet.mapToScene(orthoNet.draftLine.p1()), end)
-                self.scene().addItem(newNet2)
+        orthoNets = list(filter(self.isOrthogonal, otherNets))
+        crossingNets = dict()
+        for netEnd in self.sceneEndPoints:
+            crossingNets[self.sceneEndPoints.index(netEnd)] = list()
+            for netItem in orthoNets:
+                if netItem.sceneInnerRect.contains(netEnd):
+                    crossingNets[self.sceneEndPoints.index(netEnd)].append(
+                        netItem
+                    )
+        return crossingNets
+
+
+    def createSplitNets(self, crossingNets: dict) -> set:
+        """
+        Create split nets based on the net connections.
+
+        Args:
+            crossingNets (dict): A dictionary containing the net connections. Keys are
+            netEnds. Values are lists of netItems that are connected to the netEnd.
+
+        Returns:
+            set: A set of tuples representing netEnd they are connected,
+            themselves and their connected end.
+        """
+        splitNetTuples = set()
+
+        for endIndex, orthoNets in crossingNets.items():
+            for orthoNet in orthoNets:
+                # Create new net from endIndex to orthoNet draftLine.p2()
+                newNet1 = schematicNet(
+                    self.sceneEndPoints[endIndex],
+                    orthoNet.mapToScene(orthoNet.draftLine.p2()),
+                )
+
+                # Create new net from orthoNet draftLine.p1() to endIndex
+                newNet2 = schematicNet(
+                    orthoNet.mapToScene(orthoNet.draftLine.p1()),
+                    self.sceneEndPoints[endIndex],
+                )
+                # Set name and nameSet properties of newNet1 and newNet2
+                if self._nameSet or self._nameAdded:
+                    newNet1.name = self._name
+                    newNet2.name = self._name
+                    newNet1.nameSet = self._nameSet
+                    newNet2.nameSet = self._nameSet
+                    newNet1.nameAdded = self._nameAdded
+                    newNet2.nameAdded = self._nameAdded
                 self.scene().removeItem(orthoNet)
-                if self._nameSet:
-                    newNet1.name, newNet2.name = self._name, self._name
-                    newNet1.nameSet, newNet2.nameSet = self._nameSet, self._nameSet
-                if self._nameAdded:
-                    newNet1.name, newNet2.name = self._name, self._name
-                    newNet1.nameAdded, newNet2.nameAdded = self._nameAdded, self._nameAdded
+                splitNetTuples.add(selfIndNetIndTuple(endIndex, newNet1, 0))
+                splitNetTuples.add(selfIndNetIndTuple(endIndex, newNet2, 1))
+        return splitNetTuples
 
-    def mergeNets(self):
+    def mergeNets(self) -> tuple["schematicNet", "schematicNet"]:
+        """
+        Merges overlapping nets and returns the merged net.
+
+        Returns:
+            Optional[schematicNet]: The merged net if there are overlapping nets, otherwise returns self.
+        """
+        # Find other nets that overlap with self
         otherNets = self.findOverlapNets()
+
+        # If there are other nets
         if otherNets:
-            parallelNets = list(filter(self.isParallel, otherNets))
+            # Filter the other nets to find the parallel ones
+            parallelNets = [netItem for netItem in otherNets if self.isParallel(netItem)]
+
+            # If there are parallel nets
             if parallelNets:
+                # Create an initialRect variable and set it to self's sceneShapeRect
                 initialRect = self.sceneShapeRect
+
+                # Iterate over the parallel nets
                 for netItem in parallelNets:
+                    # Update the initialRect by uniting it with each parallel net's
+                    # sceneShapeRect
                     initialRect = initialRect.united(netItem.sceneShapeRect)
+
+                    # Remove each parallel net from the scene
                     netItem.scene().removeItem(netItem)
+
+                # Adjust the initialRect by 2 pixels on each side
                 newNetPoints = initialRect.adjusted(2, 2, -2, -2)
+
+                # Get the coordinates of the adjusted rectangle
                 x1, y1, x2, y2 = newNetPoints.getCoords()
-                newNet = schematicNet(self.snapToGrid(QPoint(x1, y1)),
-                                      self.snapToGrid(QPoint(x2, y2)))
-                if self._nameSet:
+
+                # Create a new schematicNet with the snapped coordinates
+                newNet = schematicNet(
+                    self.snapToGrid(QPoint(x1, y1)), self.snapToGrid(QPoint(x2, y2))
+                )
+
+                # If self has a name, set the name and nameSet of the newNet
+                if self._nameSet or self._nameAdded:
                     newNet.name = self._name
                     newNet.nameSet = self._nameSet
-                if self._nameAdded:
-                    newNet.name = self._name
                     newNet.nameAdded = self._nameAdded
-                self.scene().addItem(newNet)
-                self.scene().removeItem(self)
-                newNet.mergeNets()
+                # Return the newNet
+                return self, newNet
+
+        # If there are no other nets or no parallel nets, return self
+        return self, self
 
     def clearDots(self):
-        [self.scene().removeItem(item) for item in self.scene().items(self.sceneShapeRect)
-         if isinstance(item, crossingDot)]
+        """
+        Clears all crossingDot items from the net's scene shape area.
+        """
+        if self.scene():
+            crossing_dots = [
+                item
+                for item in self.scene().items(self.sceneShapeRect)
+                if isinstance(item, crossingDot)
+            ]
+            for dot in crossing_dots:
+                self.scene().removeItem(dot)
 
     def createDots(self):
+        """
+        Create crossing dots at the intersection of nets.
+
+        This function finds overlapping nets, generates combinations of two nets,
+        and checks if they intersect at the same endpoints. If they do, a crossing
+        dot is created at that intersection point.
+
+        Parameters:
+        - self: The instance of the class.
+
+        Returns:
+        - None
+        """
+        # Find overlapping nets
         otherNets = self.findOverlapNets()
+
+        # Generate combinations of two nets
         netCombinations = set(itt.combinations(otherNets, 2))
+
+        # Iterate over net combinations
         for netCombination in netCombinations:
             net2, net3 = netCombination
+
+            # Check if both nets exist
             if net2 and net3:
-                for netEnd1, netEnd2, netEnd3 in itt.product(self.sceneEndPoints,
-                                                             net2.sceneEndPoints, net3.sceneEndPoints):
+                # Iterate over all possible combinations of endpoints
+                for netEnd1, netEnd2, netEnd3 in itt.product(
+                    self.sceneEndPoints, net2.sceneEndPoints, net3.sceneEndPoints
+                ):
+                    # Check if all endpoints are the same
                     if netEnd1 == netEnd2 and netEnd2 == netEnd3:
+                        # Create a crossing dot at the intersection point
                         newDot = crossingDot(netEnd1, 5)
                         self.scene().addItem(newDot)
 
@@ -417,8 +624,10 @@ class schematicNet(QGraphicsItem):
 
     @property
     def sceneEndPoints(self):
-        return [self.mapToScene(self._draftLine.p1()).toPoint(),
-                self.mapToScene(self._draftLine.p2()).toPoint(), ]
+        return [
+            self.mapToScene(self._draftLine.p1()).toPoint(),
+            self.mapToScene(self._draftLine.p2()).toPoint(),
+        ]
 
     def highlight(self):
         self._highlighted = True
@@ -450,9 +659,9 @@ class schematicNet(QGraphicsItem):
 
     @property
     def stretchSide(self):
-        '''
+        """
         The end where the net is stretched.
-        '''
+        """
         return self._stretchSide
 
     @stretchSide.setter
@@ -464,26 +673,34 @@ class schematicNet(QGraphicsItem):
     def angle(self):
         return self._angle
 
-    @property
-    def innerRect(self) -> QRectF:
-        return (
-            QRectF(self._draftLine.p1(), self._draftLine.p2()).normalized().adjusted(2, 2,
-                                                                                     -2,
-                                                                                     -2))
+    def findNetConnections(self):
+        """
+        Find net connections between self and other net items. This is used after the nets
+        are split so that the nets are connected at their end points.
 
-    @property
-    def sceneInnerRect(self) -> QRectF:
-        return self.mapRectToScene(self.innerRect)
+        Returns:
+            set: A set of pin-net-index tuples representing the connections.
+        """
+        # Create an empty set to store pin-net-index tuples
+        self._netIndexTupleSet = set()
 
-    def findConnectedEndPoints(self):
-        self._wiredEnds = set()  # empty wired ends set
-        otherNets = self.findOverlapNets()
-        for otherNet in otherNets:
-            for selfEnd, otherEnd in itt.product(self.sceneEndPoints,
-                                                 otherNet.sceneEndPoints):
-                # not a very elegant solution to mistakes in net end points.
-                if (selfEnd - otherEnd).manhattanLength() <= 1:
-                    self._wiredEnds.add(self.sceneEndPoints.index(selfEnd))
+        # Find the overlap nets
+        overlapNets = self.findOverlapNets()
+
+        # Iterate over each pin in the collection
+        for selfEnd in self.sceneEndPoints:
+            # Find all the net items connected to the pin
+            for netItem in overlapNets:
+                for netEnd in netItem.sceneEndPoints:
+                    if selfEnd == netEnd:
+                        # Create a pin-net-index tuple and add it to the set
+                        self._netIndexTupleSet.add(
+                            selfIndNetIndTuple(
+                                self.sceneEndPoints.index(selfEnd),
+                                netItem,
+                                netItem.sceneEndPoints.index(netEnd),
+                            )
+                        )
 
     def snapToGrid(self, point: Union[QPoint, QPointF]) -> QPoint:
         if self.scene():
@@ -493,8 +710,11 @@ class schematicNet(QGraphicsItem):
 
 
 class netFlightLine(QGraphicsPathItem):
-    wireHighlightPen = QPen(schlyr.wireHilightLayer.pcolor, schlyr.wireHilightLayer.pwidth,
-                            schlyr.wireHilightLayer.pstyle, )
+    wireHighlightPen = QPen(
+        schlyr.wireHilightLayer.pcolor,
+        schlyr.wireHilightLayer.pwidth,
+        schlyr.wireHilightLayer.pstyle,
+    )
 
     def __init__(self, start: QPoint, end: QPoint):
         self._start = start
@@ -504,8 +724,9 @@ class netFlightLine(QGraphicsPathItem):
     def paint(self, painter, option, widget) -> None:
         painter.setPen(netFlightLine.wireHighlightPen)
         line = QLineF(self._start, self._end)
-        perpendicularLine = QLineF(line.center(),
-                                   line.center() + QPointF(-line.dy(), line.dx()))
+        perpendicularLine = QLineF(
+            line.center(), line.center() + QPointF(-line.dy(), line.dx())
+        )
         perpendicularLine.setLength(100)
 
         path = QPainterPath()
@@ -523,5 +744,7 @@ class guideLine(QGraphicsLineItem):
 
     @property
     def sceneEndPoints(self) -> list[QPoint]:
-        return [self.mapToScene(self.line().p1()).toPoint(),
-                self.mapToScene(self.line().p2()).toPoint()]
+        return [
+            self.mapToScene(self.line().p1()).toPoint(),
+            self.mapToScene(self.line().p2()).toPoint(),
+        ]

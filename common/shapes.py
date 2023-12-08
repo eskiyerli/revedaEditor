@@ -49,12 +49,13 @@ from PySide6.QtWidgets import (
     QGraphicsSceneHoverEvent,
 )
 from quantiphy import Quantity
-from typing import (Union, )
+from typing import (Union, NamedTuple,)
 import pdk.schLayers as schlyr
 import pdk.symLayers as symlyr
 import pdk.callbacks as cb
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.common.net as net
+
 
 
 class symbolShape(QGraphicsItem):
@@ -1545,6 +1546,10 @@ class symbolLabel(symbolShape):
                 )
                 self.scene().logger.error(e)
 
+class pinNetIndexTuple(NamedTuple):
+    pin: symbolPin
+    net: net.schematicNet
+    netEndIndex: int
 
 class schematicSymbol(symbolShape):
     def __init__(self, shapes: list, attr: dict):
@@ -1564,7 +1569,7 @@ class schematicSymbol(symbolShape):
         self._draft: bool = False
         self._pinLocations: dict[str, Union[QRect, QRectF]] = dict()  # pinName: pinRect
         self._pinNetMap: dict[str, str] = dict()  # pinName: netName
-        self._pinNetIndexTupleSet: set[ddef.pinNetIndexTuple] = set()
+        self._pinNetIndexTupleSet: set[pinNetIndexTuple] = set()
         self._snapLines: dict[symbolPin, set[net.schematicNet]] = dict()
         self.addShapes()
         self.setFiltersChildEvents(True)
@@ -1613,20 +1618,29 @@ class schematicSymbol(symbolShape):
         except AttributeError:
             return False
 
-    #
     def findPinNetIndexTuples(self):
+        # Create an empty set to store pin-net-index tuples
         self._pinNetIndexTupleSet = set()
+
+        # Iterate over each pin in the collection
         for pinItem in self._pins.values():
-            netsConnected = [netItem for netItem in
-                             self.scene().items(pinItem.sceneBoundingRect())
-                             if
-                             isinstance(netItem, net.schematicNet) and pinItem.mapToScene(
-                                 pinItem.start).toPoint() in netItem.sceneEndPoints]
+            # Find all the net items connected to the pin
+            netsConnected = [
+                netItem for netItem in self.scene().items(pinItem.sceneBoundingRect())
+                if isinstance(netItem, net.schematicNet) and pinItem.mapToScene(
+                    pinItem.start).toPoint() in netItem.sceneEndPoints
+            ]
+
+            # Iterate over each connected net item
             for netItem in netsConnected:
-                endIndex = netItem.sceneEndPoints.index(pinItem.mapToScene(
-                    pinItem.start).toPoint())
+                # Find the index of the pin in the net item's scene end points
+                endIndex = netItem.sceneEndPoints.index(
+                    pinItem.mapToScene(pinItem.start).toPoint())
+
+                # Create a pin-net-index tuple and add it to the set
                 self._pinNetIndexTupleSet.add(
-                    ddef.pinNetIndexTuple(pinItem, netItem, endIndex))
+                    pinNetIndexTuple(pinItem, netItem, endIndex))
+
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
@@ -1657,6 +1671,7 @@ class schematicSymbol(symbolShape):
                                              snapLine.mapToScene(
                     snapLine.line().p2()).toPoint())
                 self.scene().removeItem(snapLine)
+        self._snapLines = dict()
         super().mouseReleaseEvent(event)
 
     @property

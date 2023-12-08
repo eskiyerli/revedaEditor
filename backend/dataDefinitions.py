@@ -129,21 +129,8 @@ class viewItemTuple(NamedTuple):
 
 
 # schematic related tuples
-class pinNetIndexTuple(NamedTuple):
-    pin: object
-    net: object
-    netEndIndex: int
 
 
-class netTuple(NamedTuple):
-    net: object
-    start: int
-
-
-class netEndTuple(NamedTuple):
-    net: object
-    index: int  # type: ignore
-    orient: bool
 
 
 # layout related tuples

@@ -2395,7 +2395,6 @@ class editor_scene(QGraphicsScene):
         self.logger = self.appMainW.logger
         self.messageLine = self.editorWindow.messageLine
         self.statusLine = self.editorWindow.statusLine
-        self.itemsAtMousePress = list()
         self.installEventFilter(self)
 
     def mousePressEvent(self, event):
@@ -3223,7 +3222,6 @@ class schematic_scene(editor_scene):
         self.instCounter = 0
         self.start = QPoint(0, 0)
         self.current = QPoint(0, 0)
-        self.itemsAtMousePress = list()
         self.editModes = ddef.schematicModes(
             selectItem=True,
             deleteItem=False,
@@ -3289,10 +3287,7 @@ class schematic_scene(editor_scene):
                     self.newInstance = self.drawInstance(self.mousePressLoc)
                     self.newInstance.setSelected(True)
                 elif self.editModes.drawWire and self._newNet is not None:
-                    if self._newNet.draftLine.isNull():
-                        self.removeItem(self._newNet)
-                        self.undoStack.removeLastCommand()
-
+                    self.checkNewNet(self._newNet)
                     self._newNet = None
                 elif self.editModes.changeOrigin:  # change origin of the symbol
                     self.origin = self.mousePressLoc
@@ -3321,11 +3316,6 @@ class schematic_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse press error: {e}")
 
-    def removeSnapRect(self):
-        if self._snapPointRect:
-            self.removeItem(self._snapPointRect)
-            self._snapPointRect = None
-
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(mouse_event)
         self.mouseMoveLoc = mouse_event.scenePos().toPoint()
@@ -3335,7 +3325,6 @@ class schematic_scene(editor_scene):
                 if self.editModes.addInstance:
                     # TODO: think how to do it with mapFromScene
                     self.newInstance.setPos(self.mouseMoveLoc - self.mousePressLoc)
-
 
                 elif self.editModes.drawPin and self.newPin.isSelected():
                     self.newPin.setPos(self.mouseMoveLoc - self.mousePressLoc)
@@ -3380,6 +3369,7 @@ class schematic_scene(editor_scene):
                 elif self.editModes.drawWire and self._newNet is None:
                     self.editorWindow.messageLine.setText("Wire Mode")
                     self._newNet = net.schematicNet(self.mouseReleaseLoc, self.mouseReleaseLoc)
+                    self._newNet.setSelected(True)
                 elif self.editModes.drawText:
                     self.parent.parent.messageLine.setText("Note added.")
                     self.editModes.drawText = False
@@ -3388,14 +3378,57 @@ class schematic_scene(editor_scene):
                     self.parent.parent.messageLine.setText("Pin added")
                     self.editModes.drawPin = False
                     self.newPin = None
-                elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
-                    self.selectInRectItems(
-                        self.selectionRectItem.rect(), self.partialSelection
-                    )
-                    self.removeItem(self.selectionRectItem)
-                    self.selectionRectItem = None
+                elif self.editModes.selectItem:
+                    if modifiers == Qt.ShiftModifier:
+                        self.selectInRectItems(
+                            self.selectionRectItem.rect(), self.partialSelection
+                        )
+                        self.removeItem(self.selectionRectItem)
+                        self.selectionRectItem = None
+                    selectedNets = [netItem for netItem in self.selectedItems() if
+                                    isinstance(netItem, net.schematicNet)]
+                    if selectedNets:
+                        [self.mergeSplitNets(netItem) for netItem in selectedNets]
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
+
+    def checkNewNet(self, newNet):
+        if newNet.draftLine.isNull():
+            self.removeItem(newNet)
+            self.undoStack.removeLastCommand()
+        else:
+            self.mergeSplitNets(newNet)
+
+    def removeSnapRect(self):
+        if self._snapPointRect:
+            self.removeItem(self._snapPointRect)
+            self._snapPointRect = None
+
+    def mergeSplitNets(self, inputNet: net.schematicNet):
+        inputNet.clearDots()
+        (origNet, mergedNet) = inputNet.mergeNets()
+        self.removeItem(origNet)
+        self.addItem(mergedNet)
+        mergedNet.createDots()
+        # first find the nets mergedNet can split.
+        self.splitCrossingNet(mergedNet)
+        overlapNets = list(mergedNet.findOverlapNets())
+        if overlapNets:
+            for netItem in overlapNets:
+                self.splitCrossingNet(netItem)
+
+    def splitCrossingNet(self, splittingNet):
+        outputNets = set()
+        crossingNetsDict = splittingNet.findCrossingNets(splittingNet.findOverlapNets())
+        if crossingNetsDict:
+            splitNetTuples = splittingNet.createSplitNets(crossingNetsDict)
+            if splitNetTuples:  # mergedNet split some nets
+                for netTuple in splitNetTuples:
+                    self.addItem(netTuple.net)
+                    netTuple.net.clearDots()
+                    netTuple.net.createDots()
+                    outputNets.add(netTuple.net)
+        return outputNets
 
     def findSnapPoint(self, eventLoc: QPoint, snapDistance: int, ignoredNetSet: set):
         # sourcery skip: simplify-len-comparison
@@ -3410,7 +3443,6 @@ class schematic_scene(editor_scene):
             for item in self.items(snapRect)
             if isinstance(item, (shp.symbolPin, net.schematicNet))
         }
-
         try:
             snapItems -= ignoredNetSet
             lengths = list()
@@ -5497,10 +5529,7 @@ class schematic_view(editor_view):
         if event.key() == Qt.Key_Escape:
             self.scene.removeSnapRect()
             if self.scene._newNet:
-                self.scene._newNet.clearDots()
-                self.scene._newNet.mergeNets()
-                self.scene._newNet.splitNets()
-                self.scene._newNet.createDots()
+                self.scene.checkNewNet(self.scene._newNet)
                 self.scene._newNet = None
         super().keyPressEvent(event)
 
