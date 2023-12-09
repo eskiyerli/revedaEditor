@@ -224,31 +224,8 @@ class schematicNet(QGraphicsItem):
         # self.removeSnapLines()
         if self.stretch:
             self.endStretch()
-
         self.createDots()
         super().mouseReleaseEvent(event)
-
-    def startStretch(self, event):
-        """
-        Handle the start of the stretch of the net using one of the end points.
-        """
-
-        eventPos = event.scenePos().toPoint()
-        self.setFlag(QGraphicsItem.ItemIsMovable, False)
-        if (
-            eventPos - self.mapToScene(self._draftLine.p1()).toPoint()
-        ).manhattanLength() <= self.scene().snapDistance:
-            self.setCursor(Qt.SizeHorCursor)
-            self._guideLine = guideLine(
-                self.mapToScene(self._draftLine.p1()), eventPos
-            )
-        elif (
-            eventPos - self.mapToScene(self._draftLine.p2()).toPoint()
-        ).manhattanLength() <= self.scene().snapDistance:
-            self.setCursor(Qt.SizeHorCursor)
-            self._guideLine = guideLine(
-                self.mapToScene(self._draftLine.p2()), eventPos
-            )
 
     def createSnapLines(self):
         for item in self._netIndexTupleSet:
@@ -272,6 +249,24 @@ class schematicNet(QGraphicsItem):
                     )
                 )
 
+    def startStretch(self, event):
+        """
+        Handle the start of the stretch of the net using one of the end points.
+        """
+
+        eventPos = event.scenePos().toPoint()
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
+        if (
+                eventPos - self.mapToScene(self._draftLine.p1()).toPoint()
+        ).manhattanLength() <= self.scene().snapDistance:
+            self.setCursor(Qt.SizeHorCursor)
+            self._guideLine = guideLine(self.mapToScene(self._draftLine.p1()), eventPos)
+        elif (
+                eventPos - self.mapToScene(self._draftLine.p2()).toPoint()
+        ).manhattanLength() <= self.scene().snapDistance:
+            self.setCursor(Qt.SizeHorCursor)
+            self._guideLine = guideLine(self.mapToScene(self._draftLine.p2()), eventPos)
+
     def extendStretch(self, event):
         eventPos = event.scenePos().toPoint()
         if self._guideLine is not None:
@@ -289,8 +284,8 @@ class schematicNet(QGraphicsItem):
         if self._guideLine and self.scene():
             lines = self.scene().addStretchWires(*self._guideLine.sceneEndPoints)
             self.scene().removeItem(self._guideLine)
-        for line in lines:
-            line.mergeNets()
+        if lines:
+            self.scene().addListUndoStack(lines)
         self._guideLine = None
         self.setCursor(Qt.ArrowCursor)
 
@@ -335,9 +330,9 @@ class schematicNet(QGraphicsItem):
                 netItem
                 for netItem in self.scene().items()
                 if (
-                    isinstance(netItem, schematicNet)
-                    and (self.nameSet or self.nameAdded)
-                    and netItem.name == self.name
+                        isinstance(netItem, schematicNet)
+                        and (self.nameSet or self.nameAdded)
+                        and netItem.name == self.name
                 )
             }
 
@@ -417,11 +412,8 @@ class schematicNet(QGraphicsItem):
             crossingNets[self.sceneEndPoints.index(netEnd)] = list()
             for netItem in orthoNets:
                 if netItem.sceneInnerRect.contains(netEnd):
-                    crossingNets[self.sceneEndPoints.index(netEnd)].append(
-                        netItem
-                    )
+                    crossingNets[self.sceneEndPoints.index(netEnd)].append(netItem)
         return crossingNets
-
 
     def createSplitNets(self, crossingNets: dict) -> set:
         """
@@ -476,7 +468,9 @@ class schematicNet(QGraphicsItem):
         # If there are other nets
         if otherNets:
             # Filter the other nets to find the parallel ones
-            parallelNets = [netItem for netItem in otherNets if self.isParallel(netItem)]
+            parallelNets = [
+                netItem for netItem in otherNets if self.isParallel(netItem)
+            ]
 
             # If there are parallel nets
             if parallelNets:
@@ -508,8 +502,8 @@ class schematicNet(QGraphicsItem):
                     newNet.name = self._name
                     newNet.nameSet = self._nameSet
                     newNet.nameAdded = self._nameAdded
-                # Return the newNet
-                return self, newNet
+
+                return self, newNet  # original net, new net
 
         # If there are no other nets or no parallel nets, return self
         return self, self
@@ -555,7 +549,7 @@ class schematicNet(QGraphicsItem):
             if net2 and net3:
                 # Iterate over all possible combinations of endpoints
                 for netEnd1, netEnd2, netEnd3 in itt.product(
-                    self.sceneEndPoints, net2.sceneEndPoints, net3.sceneEndPoints
+                        self.sceneEndPoints, net2.sceneEndPoints, net3.sceneEndPoints
                 ):
                     # Check if all endpoints are the same
                     if netEnd1 == netEnd2 and netEnd2 == netEnd3:

@@ -1,4 +1,3 @@
-
 #    “Commons Clause” License Condition v1.0
 #   #
 #    The Software is provided to you by the Licensor under the License, as defined
@@ -25,11 +24,10 @@
 #
 
 
-import revedaEditor.fileio.loadJSON as lj
-import revedaEditor.fileio.symbolEncoder as se
-from PySide6.QtCore import (QPoint, QRect)
-from PySide6.QtGui import (QUndoCommand, QUndoStack)
-from PySide6.QtWidgets import (QGraphicsScene,QGraphicsItem)
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QUndoCommand, QUndoStack
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsItem
+
 
 class undoStack(QUndoStack):
     def __init__(self):
@@ -40,8 +38,9 @@ class undoStack(QUndoStack):
         if self.canUndo():
             self.setIndex(self.index() - 1)
 
+
 class addShapeUndo(QUndoCommand):
-    def __init__(self, scene:QGraphicsScene, shape:QGraphicsItem):
+    def __init__(self, scene: QGraphicsScene, shape: QGraphicsItem):
         super().__init__()
         self._scene = scene
         self._shape = shape
@@ -53,8 +52,9 @@ class addShapeUndo(QUndoCommand):
     def redo(self):
         self._scene.addItem(self._shape)
 
+
 class addShapesUndo(QUndoCommand):
-    def __init__(self, scene:QGraphicsScene, shapes:list[QGraphicsItem]):
+    def __init__(self, scene: QGraphicsScene, shapes: list[QGraphicsItem]):
         super().__init__()
         self._scene = scene
         self._shapes = shapes
@@ -67,19 +67,20 @@ class addShapesUndo(QUndoCommand):
         [self._scene.addItem(item) for item in self._shapes]
 
 
-
 class loadShapesUndo(addShapesUndo):
     """
     A hack to load the file but disallow the undo
     """
-    def __init__(self, scene:QGraphicsScene, shapes:list[QGraphicsItem]):
+
+    def __init__(self, scene: QGraphicsScene, shapes: list[QGraphicsItem]):
         super().__init__(scene, shapes)
 
     def undo(self):
         pass
 
+
 class deleteShapeUndo(QUndoCommand):
-    def __init__(self, scene:QGraphicsScene, shape:QGraphicsItem):
+    def __init__(self, scene: QGraphicsScene, shape: QGraphicsItem):
         super().__init__()
         self._scene = scene
         self._shape = shape
@@ -90,6 +91,7 @@ class deleteShapeUndo(QUndoCommand):
 
     def redo(self):
         self._scene.removeItem(self._shape)
+
 
 class updateSymUndo(QUndoCommand):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
@@ -104,9 +106,10 @@ class updateSymUndo(QUndoCommand):
     def redo(self):
         pass
 
+
 class updateSymRectUndo(updateSymUndo):
-    def __init__(self,item: QGraphicsItem, oldItemList:list, newItemList:list):
-        super().__init__(item,oldItemList,newItemList)
+    def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
+        super().__init__(item, oldItemList, newItemList)
 
     def undo(self):
         self._item.prepareGeometryChange()
@@ -116,31 +119,34 @@ class updateSymRectUndo(updateSymUndo):
         self._item.prepareGeometryChange()
         self._item.rect.setRect(*self._newItemList)
 
+
 class updateSymCircleUndo(updateSymUndo):
-    def __init__(self,item: QGraphicsItem, oldItemList:list, newItemList:list):
-        super().__init__(item,oldItemList,newItemList)
+    def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
+        super().__init__(item, oldItemList, newItemList)
 
     def undo(self):
-        self._item.centre= QPoint(self._oldItemList[0], self._oldItemList[1])
+        self._item.centre = QPoint(self._oldItemList[0], self._oldItemList[1])
         self._item.radius = self._oldItemList[2]
 
     def redo(self):
-        self._item.centre= QPoint(self._newItemList[0], self._newItemList[1])
+        self._item.centre = QPoint(self._newItemList[0], self._newItemList[1])
         self._item.radius = self._newItemList[2]
 
+
 class updateSymArcUndo(updateSymUndo):
-    def __init__(self,item: QGraphicsItem, oldItemList:list, newItemList:list):
-        super().__init__(item,oldItemList,newItemList)
+    def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
+        super().__init__(item, oldItemList, newItemList)
 
     def undo(self):
-        self._item.start= QPoint(self._oldItemList[0], self._oldItemList[1])
+        self._item.start = QPoint(self._oldItemList[0], self._oldItemList[1])
         self._item.width = self._oldItemList[2]
         self._item.height = self._oldItemList[3]
 
     def redo(self):
-        self._item.start= QPoint(self._newItemList[0], self._newItemList[1])
+        self._item.start = QPoint(self._newItemList[0], self._newItemList[1])
         self._item.width = self._newItemList[2]
         self._item.height = self._newItemList[3]
+
 
 class updateSymLineUndo(updateSymUndo):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
@@ -148,11 +154,12 @@ class updateSymLineUndo(updateSymUndo):
 
     def undo(self):
         self._item.start = QPoint(self._oldItemList[0], self._oldItemList[1])
-        self._item.end = QPoint(self._oldItemList[2],self._oldItemList[3])
+        self._item.end = QPoint(self._oldItemList[2], self._oldItemList[3])
 
     def redo(self):
         self._item.start = QPoint(self._newItemList[0], self._newItemList[1])
-        self._item.end = QPoint(self._newItemList[2],self._newItemList[3])
+        self._item.end = QPoint(self._newItemList[2], self._newItemList[3])
+
 
 class updateSymPinUndo(updateSymUndo):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
@@ -161,15 +168,15 @@ class updateSymPinUndo(updateSymUndo):
     def undo(self):
         self._item.start = QPoint(self._oldItemList[0], self._oldItemList[1])
         self._item.pinName = self._oldItemList[2]
-        self._item.pinType =  self._oldItemList[3]
-        self._item.pinDir =  self._oldItemList[4]
+        self._item.pinType = self._oldItemList[3]
+        self._item.pinDir = self._oldItemList[4]
 
     def redo(self):
-
         self._item.pinName = self._newItemList[2]
         self._item.pinType = self._newItemList[3]
         self._item.pinDir = self._newItemList[4]
         self._item.start = QPoint(self._newItemList[0], self._newItemList[1])
+
 
 class updateSymLabelUndo(updateSymUndo):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
@@ -195,23 +202,31 @@ class updateSymLabelUndo(updateSymUndo):
         self._item.labelUse = self._newItemList[7]
         self._item.labelDefs()
 
+
 class moveShapeUndo(QUndoCommand):
-    def __init__(self,scene,item: QGraphicsItem, attribute:str, oldPosition:QPoint,
-                 newPosition:QPoint):
+    def __init__(
+        self,
+        scene,
+        item: QGraphicsItem,
+        attribute: str,
+        oldPosition: QPoint,
+        newPosition: QPoint,
+    ):
         self._scene = scene
-        self._item  = item
-        self._attribute= attribute
+        self._item = item
+        self._attribute = attribute
         self._oldPosition = oldPosition
         self._newPosition = newPosition
 
     def undo(self):
-        setattr(self._item,self._attribute, self._oldPosition)
+        setattr(self._item, self._attribute, self._oldPosition)
 
     def redo(self):
         setattr(self._item, self._attribute, self._newPosition)
 
+
 class undoRotateShape(QUndoCommand):
-    def __init__(self,scene,shape, angle, parent=None):
+    def __init__(self, scene, shape, angle, parent=None):
         super().__init__()
         self._scene = scene
         self._shape = shape
@@ -219,7 +234,7 @@ class undoRotateShape(QUndoCommand):
         self.setText("Undo Shape rotation")
 
     def undo(self) -> None:
-        self._shape.setRotation(self._angle-90)
+        self._shape.setRotation(self._angle - 90)
 
     def redo(self) -> None:
         # self.angle += 90
