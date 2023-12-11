@@ -49,13 +49,12 @@ from PySide6.QtWidgets import (
     QGraphicsSceneHoverEvent,
 )
 from quantiphy import Quantity
-from typing import (Union, NamedTuple,)
+from typing import (Union, NamedTuple, )
 import pdk.schLayers as schlyr
 import pdk.symLayers as symlyr
 import pdk.callbacks as cb
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.common.net as net
-
 
 
 class symbolShape(QGraphicsItem):
@@ -66,7 +65,7 @@ class symbolShape(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
-        self._angle :float = 0.0  # rotation angle
+        self._angle: float = 0.0  # rotation angle
         self._stretch: bool = False
         self._pen = symlyr.defaultPen
         self._draft: bool = False
@@ -690,7 +689,6 @@ class symbolLine(symbolShape):
         path = QPainterPath()
         path.addRect(self._rect.adjusted(-2, -2, 2, 2))
         return path
-
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1546,10 +1544,12 @@ class symbolLabel(symbolShape):
                 )
                 self.scene().logger.error(e)
 
+
 class pinNetIndexTuple(NamedTuple):
     pin: symbolPin
     net: net.schematicNet
     netEndIndex: int
+
 
 class schematicSymbol(symbolShape):
     def __init__(self, shapes: list, attr: dict):
@@ -1641,7 +1641,6 @@ class schematicSymbol(symbolShape):
                 self._pinNetIndexTupleSet.add(
                     pinNetIndexTuple(pinItem, netItem, endIndex))
 
-
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
         self._snapLines = dict()
@@ -1651,7 +1650,7 @@ class schematicSymbol(symbolShape):
                 self._snapLines[item.pin] = set()
             snapLine = net.guideLine(
                 item.pin.mapToScene(item.pin.start), item.net.sceneEndPoints[
-                    item.netEndIndex-1])
+                    item.netEndIndex - 1])
             self.scene().addItem(snapLine)
             self._snapLines[item.pin].add(snapLine)
             self.scene().removeItem(item.net)
@@ -1665,12 +1664,15 @@ class schematicSymbol(symbolShape):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        lines = []
         for pin, snapLinesSet in self._snapLines.items():
             for snapLine in snapLinesSet:
-                self.scene().addStretchWires(pin.mapToScene(pin.start).toPoint(),
-                                             snapLine.mapToScene(
-                    snapLine.line().p2()).toPoint())
+                lines = self.scene().addStretchWires(pin.mapToScene(pin.start).toPoint(),
+                                                     snapLine.mapToScene(snapLine.line().p2()).toPoint())
+                self.scene().mergeSplitNets(lines[0])
                 self.scene().removeItem(snapLine)
+        if lines:
+            self.scene().addListUndoStack(lines)
         self._snapLines = dict()
         super().mouseReleaseEvent(event)
 

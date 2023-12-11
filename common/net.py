@@ -75,6 +75,11 @@ class selfIndNetIndTuple(NamedTuple):
     netEndIndex: int
 
 
+class pointSelfIndex(NamedTuple):
+    point: QPoint
+    selfIndex: int
+
+
 class schematicNet(QGraphicsItem):
     def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
         super().__init__()
@@ -91,13 +96,13 @@ class schematicNet(QGraphicsItem):
         self._flightLinesSet: set[schematicNet] = set()
         self._connectedNetsSet: set[schematicNet] = set()
         self._netIndexTupleSet: set[selfIndNetIndTuple] = set()
-        self._snapLines: dict[int, set[QGraphicsLineItem]] = {}
+        self._snapLines: dict[int, set[guideLine]] = {}
         self._stretch: bool = False
         self._nameFont = QFont()
         self._nameFont.setPointSize(8)
         self._nameItem = QStaticText(self._name)
         self._draftLine = QLineF(start, end)
-        self._guideLine: Optional[guideLine] = None
+        self._stretchLine: Optional[guideLine] = None
         match self._mode:
             case 0:
                 self._angle = 90 * math.floor(
@@ -207,47 +212,61 @@ class schematicNet(QGraphicsItem):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         self.clearDots()
-        # self.findNetConnections()
-        # self.createSnapLines()
+        self.findNetConnections()
+        print(self._pinLocIndexSet)
+        self.createSnapLines()
         if self._stretch:
             self.startStretch(event)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
-        # if self._snapLines:
-        #     self.extendSnapLines()
+        if self._snapLines:
+            self.extendSnapLines()
         if self.stretch:
             self.extendStretch(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-        # self.removeSnapLines()
+        self.removeSnapLines()
         if self.stretch:
             self.endStretch()
         self.createDots()
         super().mouseReleaseEvent(event)
 
     def createSnapLines(self):
-        for item in self._netIndexTupleSet:
-            if self._snapLines.get(item.selfIndex) is None:
-                self._snapLines[item.selfIndex] = set()
-            snapLine = guideLine(
-                self.sceneEndPoints[item.selfIndex],
-                item.net.sceneEndPoints[item.netEndIndex - 1],
-            )
-            self.scene().addItem(snapLine)
-            self._snapLines[item.selfIndex].add(snapLine)
-            self.scene().removeItem(item.net)
+        for tupleItem in self._pinLocIndexSet:
+            if not self._snapLines.get(tupleItem.selfIndex):
+                self._snapLines[tupleItem.selfIndex] = {
+                    guideLine(tupleItem.point, tupleItem.point)
+                }
 
     def extendSnapLines(self):
-        for selfIndex, snapLinesSet in self._snapLines.items():
-            for snapLine in snapLinesSet:
+        for index, lineSet in self._snapLines.items():
+            for snapLine in lineSet:
+                if not snapLine.scene():
+                    self.scene().addItem(snapLine)
                 snapLine.setLine(
                     QLineF(
-                        snapLine.mapFromScene(self.sceneEndPoints[selfIndex]),
+                        snapLine.mapFromScene(self.sceneEndPoints[index]),
                         snapLine.line().p2(),
                     )
                 )
+
+    def removeSnapLines(self):
+        for snapLineSet in self._snapLines.values():
+            lines = []
+            for snapLine in snapLineSet:
+                lines = self.scene().addStretchWires(
+                    snapLine.mapToScene(snapLine.line().p1()).toPoint(),
+                    snapLine.mapToScene(snapLine.line().p2()).toPoint(),
+                )
+
+                self.scene().removeItem(snapLine)
+                if lines:
+                    self.scene().addListUndoStack(lines)
+                    self.scene().mergeSplitNets(lines[0])
+
+        self._snapLines = dict()
 
     def startStretch(self, event):
         """
@@ -260,33 +279,39 @@ class schematicNet(QGraphicsItem):
                 eventPos - self.mapToScene(self._draftLine.p1()).toPoint()
         ).manhattanLength() <= self.scene().snapDistance:
             self.setCursor(Qt.SizeHorCursor)
-            self._guideLine = guideLine(self.mapToScene(self._draftLine.p1()), eventPos)
+            self._stretchLine = guideLine(
+                self.mapToScene(self._draftLine.p1()), eventPos
+            )
         elif (
                 eventPos - self.mapToScene(self._draftLine.p2()).toPoint()
         ).manhattanLength() <= self.scene().snapDistance:
             self.setCursor(Qt.SizeHorCursor)
-            self._guideLine = guideLine(self.mapToScene(self._draftLine.p2()), eventPos)
+            self._stretchLine = guideLine(
+                self.mapToScene(self._draftLine.p2()), eventPos
+            )
 
     def extendStretch(self, event):
         eventPos = event.scenePos().toPoint()
-        if self._guideLine is not None:
-            if self._guideLine.scene() is None:
-                self.scene().addItem(self._guideLine)
-            self._guideLine.setLine(
+        if self._stretchLine is not None:
+            if self._stretchLine.scene() is None:
+                self.scene().addItem(self._stretchLine)
+            self._stretchLine.setLine(
                 QLineF(
-                    self._guideLine.line().p1(), self._guideLine.mapFromScene(eventPos)
+                    self._stretchLine.line().p1(),
+                    self._stretchLine.mapFromScene(eventPos),
                 )
             )
 
     def endStretch(self):
         self._stretch = False
         self._stretchSide = None
-        if self._guideLine and self.scene():
-            lines = self.scene().addStretchWires(*self._guideLine.sceneEndPoints)
-            self.scene().removeItem(self._guideLine)
+        if self._stretchLine and self.scene():
+            lines = self.scene().addStretchWires(*self._stretchLine.sceneEndPoints)
+            self.scene().removeItem(self._stretchLine)
         if lines:
             self.scene().addListUndoStack(lines)
-        self._guideLine = None
+            self.scene().mergeSplitNets(lines[0])
+        self._stretchLine = None
         self.setCursor(Qt.ArrowCursor)
 
     @property
@@ -300,16 +325,6 @@ class schematicNet(QGraphicsItem):
     @property
     def sceneInnerRect(self) -> QRectF:
         return self.mapRectToScene(self.innerRect)
-
-    def removeSnapLines(self):
-        for selfIndex, snapLinesSet in self._snapLines.items():
-            for snapLine in snapLinesSet:
-                self.scene().addStretchWires(
-                    self.sceneEndPoints[selfIndex],
-                    snapLine.mapToScene(snapLine.line().p2()).toPoint(),
-                )
-                self.scene().removeItem(snapLine)
-        self._snapLines = dict()
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """
@@ -557,6 +572,43 @@ class schematicNet(QGraphicsItem):
                         newDot = crossingDot(netEnd1, 5)
                         self.scene().addItem(newDot)
 
+    def findNetConnections(self):
+        """
+        Find net connections between self and other net items. This is used after the nets
+        are split so that the nets are connected at their end points.
+
+        Returns:
+            set: A set of pin-net-index tuples representing the connections.
+        """
+        # Create an empty set to store pin-net-index tuples
+        self._pinLocIndexSet = set()
+        connectedPins = self.scene().findRectSymbolPin(self.sceneShapeRect)
+        for end, pin in itt.product(self.sceneEndPoints, connectedPins):
+            if pin.sceneBoundingRect().contains(end):
+                self._pinLocIndexSet.add(pointSelfIndex(end, self.sceneEndPoints.index(end)))
+
+        # self._pointSelfIndexSet = set()
+        #
+        # # Find the overlap nets
+        # overlapNets = self.findOverlapNets()
+        #
+        # # Iterate over each pin in the collection
+        # for selfEnd in self.sceneEndPoints:
+        #     # Find all the net items connected to the pin
+        #     for netItem in overlapNets:
+        #         for netEnd in netItem.sceneEndPoints:
+        #             if selfEnd == netEnd:
+        #                 # Create a pin-net-index tuple and add it to the set
+        #                 self._pointSelfIndexSet.add(
+        #                     pointSelfIndex(selfEnd, self.sceneEndPoints.index(selfEnd)))
+        # print(self._pointSelfIndexSet)
+
+    def snapToGrid(self, point: Union[QPoint, QPointF]) -> QPoint:
+        if self.scene():
+            return self.scene().snapToGrid(point, self.scene().snapTuple)
+        else:
+            return point
+
     @property
     def name(self):
         return self._name
@@ -667,41 +719,6 @@ class schematicNet(QGraphicsItem):
     def angle(self):
         return self._angle
 
-    def findNetConnections(self):
-        """
-        Find net connections between self and other net items. This is used after the nets
-        are split so that the nets are connected at their end points.
-
-        Returns:
-            set: A set of pin-net-index tuples representing the connections.
-        """
-        # Create an empty set to store pin-net-index tuples
-        self._netIndexTupleSet = set()
-
-        # Find the overlap nets
-        overlapNets = self.findOverlapNets()
-
-        # Iterate over each pin in the collection
-        for selfEnd in self.sceneEndPoints:
-            # Find all the net items connected to the pin
-            for netItem in overlapNets:
-                for netEnd in netItem.sceneEndPoints:
-                    if selfEnd == netEnd:
-                        # Create a pin-net-index tuple and add it to the set
-                        self._netIndexTupleSet.add(
-                            selfIndNetIndTuple(
-                                self.sceneEndPoints.index(selfEnd),
-                                netItem,
-                                netItem.sceneEndPoints.index(netEnd),
-                            )
-                        )
-
-    def snapToGrid(self, point: Union[QPoint, QPointF]) -> QPoint:
-        if self.scene():
-            return self.scene().snapToGrid(point, self.scene().snapTuple)
-        else:
-            return point
-
 
 class netFlightLine(QGraphicsPathItem):
     wireHighlightPen = QPen(
@@ -714,6 +731,9 @@ class netFlightLine(QGraphicsPathItem):
         self._start = start
         self._end = end
         super().__init__()
+
+    def __repr__(self):
+        return f"netFlightLine({self.mapToScene(self._start)},{self.mapToScene(self._end)})"
 
     def paint(self, painter, option, widget) -> None:
         painter.setPen(netFlightLine.wireHighlightPen)
@@ -742,3 +762,6 @@ class guideLine(QGraphicsLineItem):
             self.mapToScene(self.line().p1()).toPoint(),
             self.mapToScene(self.line().p2()).toPoint(),
         ]
+
+    def __repr__(self):
+        return f"guideLine({self.mapToScene(self.line().p1()), self.mapToScene(self.line().p2())}"

@@ -33,6 +33,7 @@ from copy import deepcopy
 import inspect
 from quantiphy import Quantity
 import itertools as itt
+from typing import (Union, Optional, NamedTuple)
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -2796,14 +2797,13 @@ class symbol_scene(editor_scene):
         super().mouseDoubleClickEvent(event)
         self.mouseDoubleClickLoc = event.scenePos().toPoint()
         try:
-            if event.button() == Qt.LeftButton:
-                if self.editModes.drawPolygon:
-                    self.newPolygon.polygon.remove(0)
-                    self.newPolygon.points.pop(0)
-                    self.editModes.setMode("selectItem")
-                    self.newPolygon = None
-                    self.removeItem(self.polygonGuideLine)
-                    self.polygonGuideLine = None
+            if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
+                self.newPolygon.polygon.remove(0)
+                self.newPolygon.points.pop(0)
+                self.editModes.setMode("selectItem")
+                self.newPolygon = None
+                self.removeItem(self.polygonGuideLine)
+                self.polygonGuideLine = None
         except Exception as e:
             self.logger.error(f"Error in mouse Double Click Event: {e}")
 
@@ -3020,8 +3020,6 @@ class symbol_scene(editor_scene):
         )
         topLeftPoint = item.mapFromScene(QPoint(left, top))
         newItemList = [topLeftPoint.x(), topLeftPoint.y(), width, height]
-        # topLeft = item.mapFromScene(QPoint(left, top))
-        # item.rect = QRect(topLeft.x(), topLeft.y(), width, height)
         undoCommand = us.updateSymRectUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
@@ -3773,6 +3771,12 @@ class schematic_scene(editor_scene):
     def findSceneNetsSet(self) -> set[net.schematicNet]:
         return {item for item in self.items() if isinstance(item, net.schematicNet)}
 
+    def findRectSymbolPin(self, rect: Union[QRect, QRectF]) -> set[shp.symbolPin]:
+        pinsRectSet = {
+            item for item in self.items(rect) if isinstance(item, shp.symbolPin)
+        }
+        return pinsRectSet
+
     def findSceneSchemPinsSet(self) -> set[shp.schematicPin]:
         pinsSceneSet = {
             item for item in self.items() if isinstance(item, shp.schematicPin)
@@ -3910,9 +3914,9 @@ class schematic_scene(editor_scene):
             with file.open(mode="w") as f:
                 json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
             if self.editorWindow.parentEditor is not None:
-                if type(self.editorWindow.parentEditor) == schematicEditor:
+                if isinstance(self.editorWindow.parentEditor, schematicEditor):
                     self.editorWindow.parentEditor.loadSchematic()
-                elif type(self.editorWindow.parentEditor) == symbolEditor:
+                elif isinstance(self.editorWindow.parentEditor, symbolEditor):
                     self.editorWindow.parentEditor.loadSymbol()
         except Exception as e:
             self.logger.error(e)
@@ -4125,7 +4129,6 @@ class schematic_scene(editor_scene):
         )
 
     def generateSymbol(self, symbolViewName: str):
-        # openPath = pathlib.Path(cellItem.data(Qt.UserRole + 2))
         libName = self.editorWindow.libName
         cellName = self.editorWindow.cellName
         libItem = libm.getLibItem(self.editorWindow.libraryView.libraryModel, libName)
@@ -4744,7 +4747,7 @@ class layout_scene(editor_scene):
         Add an instance of a symbol to the scene.
         """
         try:
-            instance = self.instLayout(pos)
+            instance = self.instLayout()
             self.itemCounter += 1
             undoCommand = us.addShapeUndo(self, instance)
             self.undoStack.push(undoCommand)
@@ -5663,7 +5666,7 @@ class xyceNetlist:
                     cirFile.write(f"*{item.instanceName} is marked to be ignored\n")
                 elif not item.symattrs.get("XyceNetlistPass", False):
                     cirFile.write(
-                        f"*{item.instanceName} has no " f"XyceNetlistLine attribute\n"
+                        f"*{item.instanceName} has no XyceNetlistLine attribute\n"
                     )
 
         except Exception as e:
@@ -5743,7 +5746,7 @@ class xyceNetlist:
         except Exception as e:
             self._scene.logger.error(e)
             self._scene.logger.error(
-                f"Netlist line is not defined for" f" {item.instanceName}"
+                f"Netlist line is not defined for {item.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
             return f"*Netlist line is not defined for symbol of {item.instanceName}\n"
@@ -5876,7 +5879,7 @@ class configModel(QStandardItemModel):
         column = 4
         super().__init__(row, column)
         self.setHorizontalHeaderLabels(
-            ["Library", "Cell Name", "View Found", "View To " "Use"]
+            ["Library", "Cell Name", "View Found", "View To ", "Use"]
         )
         for i, (k, v) in enumerate(configDict.items()):
             item = QStandardItem(v[0])
