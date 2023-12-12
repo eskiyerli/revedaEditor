@@ -52,6 +52,10 @@ class crossingDot(QGraphicsEllipseItem):
             painter.setBrush(schlyr.wireBrush)
         painter.drawEllipse(self.point, self.radius, self.radius)
 
+    def findNets(self) -> set["schematicNet"]:
+        return {netItem for netItem in self.scene().items(self.sceneBoundingRect()) if
+                isinstance(netItem, schematicNet)}
+
 
 class selfIndNetIndTuple(NamedTuple):
     selfIndex: int
@@ -180,50 +184,55 @@ class schematicNet(QGraphicsItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemSceneChange and not value:
+            self.mergeOrthoNets()
             self.clearDots()
-        # elif change == QGraphicsItem.ItemPositionChange and self.scene():
-        #     self.scene().mergeNets(self)
         return super().itemChange(change, value)
 
+    def mergeOrthoNets(self):
+        cdots = self.findDots()
+        for dot in cdots:
+            orthoNets = list(filter(self.isOrthogonal, dot.findNets()))
+            self.scene().mergeNets(orthoNets[0])
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
+        self.mergeOrthoNets()
         self.clearDots()
-        # self.scene().mergeNets(self)
         # self.findSymPinConnections()
-        # # self.findNetConnections()
+        self.findNetConnections()
         # self.createPinSnapLines()
-        # # self.createNetSnapLines()
-        # if self._stretch:
-        #     self.startStretch(event)
+        self.createNetSnapLines()
+        if self._stretch:
+            self.startStretch(event)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
         # if self._pinSnapLines:
         #     self.extendPinSnapLines()
-        # if self._netSnapLines:
-        #     self.extendNetSnapLines()
-        # if self.stretch:
-        #     self.extendStretch(event)
+        if self._netSnapLines:
+            self.extendNetSnapLines()
+        if self.stretch:
+            self.extendStretch(event)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         # self.removePinSnapLines()
-        # # self.removeNetSnapLines()
-        # if self.stretch:
-        #     self.endStretch()
+        self.removeNetSnapLines()
+        if self.stretch:
+            self.endStretch()
         # self.createDots()
         super().mouseReleaseEvent(event)
 
     def createPinSnapLines(self):
         for tupleItem in self._pinLocIndexSet:
             lineSet = self._pinSnapLines.setdefault(tupleItem.selfIndex, set())
-            lineSet.add({guideLine(tupleItem.point, tupleItem.point)})
+            lineSet.add(guideLine(tupleItem.point, tupleItem.point))
 
     def createNetSnapLines(self):
         for tupleItem in self._netStretchTupleSet:
             lineSet = self._netSnapLines.setdefault(tupleItem.selfIndex, set())
-            lineSet.add(guideLine(tupleItem.net.mapToScene(
-                tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1]),
+            lineSet.add(guideLine(
+                tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1],
                 self.sceneEndPoints[tupleItem.selfIndex]))
             if tupleItem.net.scene():
                 self.scene().removeItem(tupleItem.net)
@@ -540,10 +549,20 @@ class schematicNet(QGraphicsItem):
                                                              net3.sceneEndPoints):
                     # Check if all endpoints are the same
                     if netEnd1 == netEnd2 and netEnd2 == netEnd3:
-                        # print(f'net1: {self}, net2: {net2}, net3: {net3}')
                         # Create a crossing dot at the intersection point
                         newDot = crossingDot(netEnd1, 5)
                         self.scene().addItem(newDot)
+
+    def findDots(self) -> list[crossingDot]:
+        """
+        Find all crossingDot items in the net shape.
+
+        Returns:
+            set: A set of crossingDot items.
+        """
+        crossing_dots = [item for item in self.scene().items(self.sceneShapeRect) if
+                         isinstance(item, crossingDot)]
+        return crossing_dots
 
     def findSymPinConnections(self):
         """
