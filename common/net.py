@@ -53,8 +53,11 @@ class crossingDot(QGraphicsEllipseItem):
         painter.drawEllipse(self.point, self.radius, self.radius)
 
     def findNets(self) -> set["schematicNet"]:
-        return {netItem for netItem in self.scene().items(self.sceneBoundingRect()) if
-                isinstance(netItem, schematicNet)}
+        if self.scene():
+            return {netItem for netItem in self.scene().items(self.sceneBoundingRect()) if
+                    isinstance(netItem, schematicNet)}
+        else:
+            return set()
 
 
 class selfIndNetIndTuple(NamedTuple):
@@ -85,6 +88,7 @@ class schematicNet(QGraphicsItem):
         self._flightLinesSet: set[schematicNet] = set()
         self._connectedNetsSet: set[schematicNet] = set()
         self._netIndexTupleSet: set[selfIndNetIndTuple] = set()
+        self._pinLocIndexSet: set[pointSelfIndex] = set()
         self._pinSnapLines: dict[int, set[guideLine]] = {}
         self._netSnapLines: dict[int, set[guideLine]] = {}
         self._stretch: bool = False
@@ -192,14 +196,15 @@ class schematicNet(QGraphicsItem):
         cdots = self.findDots()
         for dot in cdots:
             orthoNets = list(filter(self.isOrthogonal, dot.findNets()))
-            self.scene().mergeNets(orthoNets[0])
+            if orthoNets:
+                self.scene().mergeNets(orthoNets[0])
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         self.mergeOrthoNets()
         self.clearDots()
-        # self.findSymPinConnections()
+        self.findSymPinConnections()
         self.findNetConnections()
-        # self.createPinSnapLines()
+        self.createPinSnapLines()
         self.createNetSnapLines()
         if self._stretch:
             self.startStretch(event)
@@ -207,8 +212,8 @@ class schematicNet(QGraphicsItem):
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
-        # if self._pinSnapLines:
-        #     self.extendPinSnapLines()
+        if self._pinSnapLines:
+            self.extendPinSnapLines()
         if self._netSnapLines:
             self.extendNetSnapLines()
         if self.stretch:
@@ -216,7 +221,7 @@ class schematicNet(QGraphicsItem):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-        # self.removePinSnapLines()
+        self.removePinSnapLines()
         self.removeNetSnapLines()
         if self.stretch:
             self.endStretch()
@@ -560,8 +565,10 @@ class schematicNet(QGraphicsItem):
         Returns:
             set: A set of crossingDot items.
         """
-        crossing_dots = [item for item in self.scene().items(self.sceneShapeRect) if
-                         isinstance(item, crossingDot)]
+        crossing_dots = []
+        if self.scene():
+            crossing_dots = [item for item in self.scene().items(self.sceneShapeRect) if
+                             isinstance(item, crossingDot)]
         return crossing_dots
 
     def findSymPinConnections(self):
@@ -571,17 +578,18 @@ class schematicNet(QGraphicsItem):
 
         # Set to store the index of pin locations
         self._pinLocIndexSet = set()
-
-        # Find the connected pins in the scene
-        connectedPins = self.scene().findRectSymbolPin(self.sceneShapeRect)
-
-        # Iterate over the end points and connected pins
-        for end, pin in itt.product(self.sceneEndPoints, connectedPins):
-            # Check if the pin's bounding rectangle contains the end point
-            if pin.sceneBoundingRect().contains(end):
-                # Add the index of the end point to the set
-                self._pinLocIndexSet.add(
-                    pointSelfIndex(end, self.sceneEndPoints.index(end)))
+        connectedPins = []
+        if self.scene():
+            # Find the connected pins in the scene
+            connectedPins = self.scene().findRectSymbolPin(self.sceneShapeRect)
+        if connectedPins:
+            # Iterate over the end points and connected pins
+            for end, pin in itt.product(self.sceneEndPoints, connectedPins):
+                # Check if the pin's bounding rectangle contains the end point
+                if pin.sceneBoundingRect().contains(end):
+                    # Add the index of the end point to the set
+                    self._pinLocIndexSet.add(
+                        pointSelfIndex(end, self.sceneEndPoints.index(end)))
 
     def findNetConnections(self):
         # Find the overlap nets
