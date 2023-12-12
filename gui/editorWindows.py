@@ -3402,7 +3402,9 @@ class schematic_scene(editor_scene):
                         if isinstance(netItem, net.schematicNet)
                     ]
                     if selectedNets:
-                        [self.mergeSplitNets(netItem) for netItem in selectedNets]
+                        for netItem in selectedNets:
+                            if netItem.scene():
+                                self.mergeSplitNets(netItem)
 
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
@@ -3415,12 +3417,7 @@ class schematic_scene(editor_scene):
             self.mergeSplitNets(newNet)
 
     def mergeSplitNets(self, inputNet: net.schematicNet):
-        # inputNet.clearDots()
-        (origNet, mergedNet) = inputNet.mergeNets()
-        while origNet.sceneShapeRect != mergedNet.sceneShapeRect:
-            (origNet, mergedNet) = mergedNet.mergeNets()
-            self.removeItem(origNet)
-            self.addItem(mergedNet)
+        mergedNet = self.mergeNets(inputNet)
         mergedNet.clearDots()
         mergedNet.createDots()
         # first find the nets mergedNet can split.
@@ -3429,6 +3426,15 @@ class schematic_scene(editor_scene):
         if overlapNets:
             for netItem in overlapNets:
                 self.splitCrossingNet(netItem)
+
+    def mergeNets(self, inputNet):
+        (origNet, mergedNet) = inputNet.mergeNets()
+        if origNet.sceneShapeRect != mergedNet.sceneShapeRect:
+            self.removeItem(origNet)
+            self.addItem(mergedNet)
+            return self.mergeNets(mergedNet)
+        else:
+            return origNet
 
     def splitCrossingNet(self, splittingNet):
         outputNets = set()
@@ -3799,19 +3805,22 @@ class schematic_scene(editor_scene):
         Add a trio of wires between two points
         """
         try:
-            firstPointX = self.snapToBase(
-                (end.x() - start.x()) / 3 + start.x(), self.snapTuple[0]
-            )
-            firstPointY = start.y()
-            firstPoint = QPoint(firstPointX, firstPointY)
-            secondPoint = QPoint(firstPointX, end.y())
-            lines = list()
-            if start != firstPoint:
-                lines.append(net.schematicNet(start, firstPoint))
-            if firstPoint != secondPoint:
-                lines.append(net.schematicNet(firstPoint, secondPoint))
-            if secondPoint != end:
-                lines.append(net.schematicNet(secondPoint, end))
+            if start.y() == end.y() or start.x() == end.x():  # horizontal or verticalline
+                lines = [net.schematicNet(start, end)]
+            else:
+                firstPointX = self.snapToBase(
+                    (end.x() - start.x()) / 3 + start.x(), self.snapTuple[0]
+                )
+                firstPointY = start.y()
+                firstPoint = QPoint(firstPointX, firstPointY)
+                secondPoint = QPoint(firstPointX, end.y())
+                lines = list()
+                if start != firstPoint:
+                    lines.append(net.schematicNet(start, firstPoint))
+                if firstPoint != secondPoint:
+                    lines.append(net.schematicNet(firstPoint, secondPoint))
+                if secondPoint != end:
+                    lines.append(net.schematicNet(secondPoint, end))
             return lines
         except Exception as e:
             self.logger.error(f"extend wires error{e}")
