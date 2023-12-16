@@ -123,6 +123,7 @@ import revedaEditor.gui.lsw as lsw
 import revedaEditor.fileio.gdsExport as gdse
 import revedaEditor.gui.helpBrowser as hlp
 import revedaEditor.resources.resources
+import revedaEditor.common.labels as lbl
 
 
 class libraryBrowser(QMainWindow):
@@ -1970,7 +1971,6 @@ class schematicEditor(editorWindow):
     def checkSaveCell(self):
         self.centralW.scene.groupAllNets()
         self.centralW.scene.saveSchematic(self.file)
-        self.centralW.scene.createNetDots()
 
     def saveCell(self):
         self.centralW.scene.saveSchematic(self.file)
@@ -2624,10 +2624,10 @@ class symbol_scene(editor_scene):
         self.pinType = shp.symbolPin.pinTypes[0]
         self.pinDir = shp.symbolPin.pinDirs[0]
         self.labelDefinition = ""
-        self.labelType = shp.symbolLabel.labelTypes[0]
-        self.labelOrient = shp.symbolLabel.labelOrients[0]
-        self.labelAlignment = shp.symbolLabel.labelAlignments[0]
-        self.labelUse = shp.symbolLabel.labelUses[0]
+        self.labelType = lbl.symbolLabel.labelTypes[0]
+        self.labelOrient = lbl.symbolLabel.labelOrients[0]
+        self.labelAlignment = lbl.symbolLabel.labelAlignments[0]
+        self.labelUse = lbl.symbolLabel.labelUses[0]
         self.labelVisible = False
         self.labelHeight = "12"
         self.labelOpaque = True
@@ -2861,7 +2861,7 @@ class symbol_scene(editor_scene):
             labelOrient,
             labelUse,
     ):
-        label = shp.symbolLabel(
+        label = lbl.symbolLabel(
             current,
             labelDefinition,
             labelType,
@@ -2873,7 +2873,7 @@ class symbol_scene(editor_scene):
         label.labelVisible = self.labelOpaque
         label.labelDefs()
         label.setOpacity(1)
-        # self.addItem(label)
+        print(label)
         undoCommand = us.addShapeUndo(self, label)
         self.undoStack.push(undoCommand)
         return label
@@ -2978,7 +2978,7 @@ class symbol_scene(editor_scene):
                 self.queryDlg.pinYLine.setText(str(sceneStartPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updatePinShape(item)
-            elif isinstance(item, shp.symbolLabel):
+            elif isinstance(item, lbl.symbolLabel):
                 self.queryDlg = pdlg.labelPropertyDialog(self.editorWindow)
                 self.queryDlg.labelDefinition.setText(str(item.labelDefinition))
                 self.queryDlg.labelHeightEdit.setText(str(item.labelHeight))
@@ -3102,7 +3102,7 @@ class symbol_scene(editor_scene):
         undoCommand = us.updateSymPinUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
-    def updateLabelShape(self, item: shp.symbolLabel):
+    def updateLabelShape(self, item: lbl.symbolLabel):
         """
         update label with new values.
         """
@@ -3130,11 +3130,11 @@ class symbol_scene(editor_scene):
         labelUse = self.queryDlg.labelUseCombo.currentText()
         labelVisible = self.queryDlg.labelVisiCombo.currentText() == "Yes"
         if self.queryDlg.normalType.isChecked():
-            labelType = shp.symbolLabel.labelTypes[0]
+            labelType = lbl.symbolLabel.labelTypes[0]
         elif self.queryDlg.NLPType.isChecked():
-            labelType = shp.symbolLabel.labelTypes[1]
+            labelType = lbl.symbolLabel.labelTypes[1]
         elif self.queryDlg.pyLType.isChecked():
-            labelType = shp.symbolLabel.labelTypes[2]
+            labelType = lbl.symbolLabel.labelTypes[2]
         # set opacity to 1 so that the label is still visible on symbol editor
         item.setOpacity(1)
         newItemList = [
@@ -3160,7 +3160,7 @@ class symbol_scene(editor_scene):
                 if item["type"] in self.symbolShapes:
                     itemShape = lj.symbolItems(self).create(item)
                     # items should be always visible in symbol view
-                    if isinstance(itemShape, shp.symbolLabel):
+                    if isinstance(itemShape, lbl.symbolLabel):
                         itemShape.setOpacity(1)
                     self.addItem(itemShape)
                 elif item["type"] == "attr":
@@ -3916,12 +3916,12 @@ class schematic_scene(editor_scene):
     def saveSchematic(self, file: pathlib.Path):
         try:
             topLevelItems = [item for item in self.items() if item.parentItem() is None]
-
-            # Insert a layout item at the beginning of the list
+            # Insert a cellview item at the beginning of the list
             topLevelItems.insert(0, {"cellView": "schematic"})
             topLevelItems.insert(1, {"snapGrid": self.snapTuple})
             with file.open(mode="w") as f:
                 json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
+            # if there is a parent editor, to reload the changes.
             if self.editorWindow.parentEditor is not None:
                 if isinstance(self.editorWindow.parentEditor, schematicEditor):
                     self.editorWindow.parentEditor.loadSchematic()
@@ -3948,7 +3948,6 @@ class schematic_scene(editor_scene):
             shapesList.append(itemShape)
 
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
-        self.createNetDots()
 
     def reloadScene(self):
         topLevelItems = [item for item in self.items() if item.parentItem() is None]
@@ -3959,11 +3958,6 @@ class schematic_scene(editor_scene):
         self.clear()
         self.loadSchematicItems(items)
 
-    def createNetDots(self):
-        sceneNetsSet = self.findSceneNetsSet()
-        # there will be some duplication. We will see if it becomes a problem.
-        [netItem.createDots() for netItem in sceneNetsSet]
-
     def viewObjProperties(self):
         """
         Display the properties of the selected object.
@@ -3971,111 +3965,161 @@ class schematic_scene(editor_scene):
         try:
             if self.selectedItems() is not None:
                 for item in self.selectedItems():
+                    item.prepareGeometryChange()
                     if isinstance(item, shp.schematicSymbol):
-                        dlg = pdlg.instanceProperties(self.editorWindow, item)
-                        if dlg.exec() == QDialog.Accepted:
-                            item.instanceName = dlg.instNameEdit.text().strip()
-                            item.angle = float(dlg.angleEdit.text().strip())
-
-                            location = QPoint(
-                                float(dlg.xLocationEdit.text().strip()),
-                                float(dlg.yLocationEdit.text().strip()),
-                            )
-                            item.setPos(
-                                self.snapToGrid(location - self.origin, self.snapTuple)
-                            )
-                            tempDoc = QTextDocument()
-                            for i in range(dlg.instanceLabelsLayout.rowCount()):
-                                # first create label name document with HTML annotations
-                                tempDoc.setHtml(
-                                    dlg.instanceLabelsLayout.itemAtPosition(i, 0)
-                                    .widget()
-                                    .text()
-                                )
-                                # now strip html annotations
-                                tempLabelName = tempDoc.toPlainText().strip()
-                                # check if label name is in label dictionary of item.
-                                if item.labels.get(tempLabelName):
-                                    item.labels[tempLabelName].labelValue = (
-                                        dlg.instanceLabelsLayout.itemAtPosition(i, 1)
-                                        .widget()
-                                        .text()
-                                    )
-                                    visible = (
-                                        dlg.instanceLabelsLayout.itemAtPosition(i, 2)
-                                        .widget()
-                                        .currentText()
-                                    )
-                                    if visible == "True":
-                                        item.labels[tempLabelName].labelVisible = True
-                                    else:
-                                        item.labels[tempLabelName].labelVisible = False
-                            [
-                                labelItem.labelDefs()
-                                for labelItem in item.labels.values()
-                            ]
+                        self.setInstanceProperties(item)
 
                     elif isinstance(item, net.schematicNet):
-                        dlg = pdlg.netProperties(self.editorWindow)
-                        dlg.netStartPointEditX.setText(
-                            str(round(item.mapToScene(item.draftLine.p1()).x()))
-                        )
-                        dlg.netStartPointEditY.setText(
-                            str(round(item.mapToScene(item.draftLine.p1()).y()))
-                        )
-                        dlg.netEndPointEditX.setText(
-                            str(round(item.mapToScene(item.draftLine.p2()).x()))
-                        )
-                        dlg.netEndPointEditY.setText(
-                            str(round(item.mapToScene(item.draftLine.p2()).y()))
-                        )
-                        if item.nameSet or item.nameAdded:
-                            dlg.netNameEdit.setText(item.name)
-                        if dlg.exec() == QDialog.Accepted:
-                            item.name = dlg.netNameEdit.text().strip()
-                            if item.name != "":
-                                item.nameSet = True
+                        self.setNetProperties(item)
 
                     elif isinstance(item, shp.text):
-                        dlg = pdlg.noteTextEditProperties(self.editorWindow, item)
-                        if dlg.exec() == QDialog.Accepted:
-                            # item.prepareGeometryChange()
-                            start = item.start
-                            self.removeItem(item)
-                            item = shp.text(
-                                start,
-                                dlg.plainTextEdit.toPlainText(),
-                                dlg.familyCB.currentText(),
-                                dlg.fontStyleCB.currentText(),
-                                dlg.fontsizeCB.currentText(),
-                                dlg.textAlignmCB.currentText(),
-                                dlg.textOrientCB.currentText(),
-                            )
-                            self.rotateAnItem(start, item, float(item.textOrient[1:]))
-                            self.addItem(item)
+                        item = self.setTextProperties(item)
                     elif isinstance(item, shp.schematicPin):
-                        dlg = pdlg.schematicPinPropertiesDialog(self.editorWindow, item)
-                        dlg.pinName.setText(item.pinName)
-                        dlg.pinDir.setCurrentText(item.pinDir)
-                        dlg.pinType.setCurrentText(item.pinType)
-                        dlg.angleEdit.setText(str(item.angle))
-                        dlg.xlocationEdit.setText(str(item.mapToScene(item.start).x()))
-                        dlg.ylocationEdit.setText(str(item.mapToScene(item.start).y()))
-                        if dlg.exec() == QDialog.Accepted:
-                            item.pinName = dlg.pinName.text().strip()
-                            item.pinDir = dlg.pinDir.currentText()
-                            item.pinType = dlg.pinType.currentText()
-                            itemStartPos = QPoint(
-                                int(float(dlg.xlocationEdit.text().strip())),
-                                int(float(dlg.ylocationEdit.text().strip())),
-                            )
-                            item.start = self.snapToGrid(
-                                itemStartPos - self.origin, self.snapTuple
-                            )
-                            item.angle = float(dlg.angleEdit.text().strip())
-                item.update()
+                        self.setSchematicPinProperties(item)
         except Exception as e:
             self.logger.error(e)
+
+    def setInstanceProperties(self, item):
+        dlg = pdlg.instanceProperties(self.editorWindow)
+        dlg.libNameEdit.setText(item.libraryName)
+        dlg.cellNameEdit.setText(item.cellName)
+        dlg.viewNameEdit.setText(item.viewName)
+        dlg.instNameEdit.setText(item.instanceName)
+        location = (item.scenePos() - self.origin).toTuple()
+        dlg.xLocationEdit.setText(str(location[0]))
+        dlg.yLocationEdit.setText(str(location[1]))
+        dlg.angleEdit.setText(str(item.angle))
+        row_index = 0
+        # iterate through the item labels.
+        for label in item.labels.values():
+            if label.labelDefinition not in lbl.symbolLabel.predefinedLabels:
+                dlg.instanceLabelsLayout.addWidget(
+                    edf.boldLabel(label.labelName, dlg), row_index, 0
+                )
+                labelValueEdit = edf.longLineEdit()
+                labelValueEdit.setText(str(label.labelValue))
+                dlg.instanceLabelsLayout.addWidget(labelValueEdit, row_index, 1)
+                visibleCombo = QComboBox(dlg)
+                visibleCombo.setInsertPolicy(QComboBox.NoInsert)
+                visibleCombo.addItems(["True", "False"])
+                if label.labelVisible:
+                    visibleCombo.setCurrentIndex(0)
+                else:
+                    visibleCombo.setCurrentIndex(1)
+                dlg.instanceLabelsLayout.addWidget(visibleCombo, row_index, 2)
+                row_index += 1
+        # now list instance attributes
+        for counter, name in enumerate(item._symattrs.keys()):
+            dlg.instanceAttributesLayout.addWidget(edf.boldLabel(name, dlg), counter, 0)
+            labelType = edf.longLineEdit()
+            labelType.setReadOnly(True)
+            labelNameEdit = edf.longLineEdit()
+            labelNameEdit.setText(item._symattrs.get(name))
+            labelNameEdit.setToolTip(f"{name} attribute (Read Only)")
+            dlg.instanceAttributesLayout.addWidget(labelNameEdit, counter, 1)
+        if dlg.exec() == QDialog.Accepted:
+            item.instanceName = dlg.instNameEdit.text().strip()
+            item.angle = float(dlg.angleEdit.text().strip())
+
+            location = QPoint(
+                float(dlg.xLocationEdit.text().strip()),
+                float(dlg.yLocationEdit.text().strip()),
+            )
+            item.setPos(
+                self.snapToGrid(location - self.origin, self.snapTuple)
+            )
+            tempDoc = QTextDocument()
+            for i in range(dlg.instanceLabelsLayout.rowCount()):
+                # first create label name document with HTML annotations
+                tempDoc.setHtml(
+                    dlg.instanceLabelsLayout.itemAtPosition(i, 0)
+                    .widget()
+                    .text()
+                )
+                # now strip html annotations
+                tempLabelName = tempDoc.toPlainText().strip()
+                # check if label name is in label dictionary of item.
+                if item.labels.get(tempLabelName):
+                    # this is where the label value is set.
+                    item.labels[tempLabelName].labelValue = (
+                        dlg.instanceLabelsLayout.itemAtPosition(i, 1)
+                        .widget()
+                        .text()
+                    )
+                    visible = (
+                        dlg.instanceLabelsLayout.itemAtPosition(i, 2)
+                        .widget()
+                        .currentText()
+                    )
+                    if visible == "True":
+                        item.labels[tempLabelName].labelVisible = True
+                    else:
+                        item.labels[tempLabelName].labelVisible = False
+            [
+                labelItem.labelDefs()
+                for labelItem in item.labels.values()
+            ]
+
+    def setNetProperties(self, item):
+        dlg = pdlg.netProperties(self.editorWindow)
+        dlg.netStartPointEditX.setText(
+            str(round(item.mapToScene(item.draftLine.p1()).x()))
+        )
+        dlg.netStartPointEditY.setText(
+            str(round(item.mapToScene(item.draftLine.p1()).y()))
+        )
+        dlg.netEndPointEditX.setText(
+            str(round(item.mapToScene(item.draftLine.p2()).x()))
+        )
+        dlg.netEndPointEditY.setText(
+            str(round(item.mapToScene(item.draftLine.p2()).y()))
+        )
+        if item.nameSet or item.nameAdded:
+            dlg.netNameEdit.setText(item.name)
+        if dlg.exec() == QDialog.Accepted:
+            item.name = dlg.netNameEdit.text().strip()
+            if item.name != "":
+                item.nameSet = True
+
+    def setTextProperties(self, item):
+        dlg = pdlg.noteTextEditProperties(self.editorWindow, item)
+        if dlg.exec() == QDialog.Accepted:
+            # item.prepareGeometryChange()
+            start = item.start
+            self.removeItem(item)
+            item = shp.text(
+                start,
+                dlg.plainTextEdit.toPlainText(),
+                dlg.familyCB.currentText(),
+                dlg.fontStyleCB.currentText(),
+                dlg.fontsizeCB.currentText(),
+                dlg.textAlignmCB.currentText(),
+                dlg.textOrientCB.currentText(),
+            )
+            self.rotateAnItem(start, item, float(item.textOrient[1:]))
+            self.addItem(item)
+        return item
+
+    def setSchematicPinProperties(self, item):
+        dlg = pdlg.schematicPinPropertiesDialog(self.editorWindow, item)
+        dlg.pinName.setText(item.pinName)
+        dlg.pinDir.setCurrentText(item.pinDir)
+        dlg.pinType.setCurrentText(item.pinType)
+        dlg.angleEdit.setText(str(item.angle))
+        dlg.xlocationEdit.setText(str(item.mapToScene(item.start).x()))
+        dlg.ylocationEdit.setText(str(item.mapToScene(item.start).y()))
+        if dlg.exec() == QDialog.Accepted:
+            item.pinName = dlg.pinName.text().strip()
+            item.pinDir = dlg.pinDir.currentText()
+            item.pinType = dlg.pinType.currentText()
+            itemStartPos = QPoint(
+                int(float(dlg.xlocationEdit.text().strip())),
+                int(float(dlg.ylocationEdit.text().strip())),
+            )
+            item.start = self.snapToGrid(
+                itemStartPos - self.origin, self.snapTuple
+            )
+            item.angle = float(dlg.angleEdit.text().strip())
 
     def netNameEdit(self):
         """

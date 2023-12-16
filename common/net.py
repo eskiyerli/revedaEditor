@@ -35,10 +35,14 @@ from typing import Union, Optional, NamedTuple
 
 
 class crossingDot(QGraphicsEllipseItem):
-    def __init__(self, point: QPoint, radius: int):
-        self.radius = radius
+    dotDiameter = schlyr.crossingDotDiameter
+
+    def __init__(self, point: QPoint):
+
         self.point = point
-        super().__init__(point.x() - radius, point.y() - radius, 2 * radius, 2 * radius)
+        self._radius = crossingDot.dotDiameter
+        super().__init__(point.x() - self._radius, point.y() - self._radius,
+                         2 * self._radius, 2 * self._radius)
         self.setPen(schlyr.wirePen)
         self.setBrush(schlyr.wireBrush)
         self._name = None
@@ -50,7 +54,10 @@ class crossingDot(QGraphicsEllipseItem):
         else:
             painter.setPen(schlyr.wirePen)
             painter.setBrush(schlyr.wireBrush)
-        painter.drawEllipse(self.point, self.radius, self.radius)
+        painter.drawEllipse(self.point, self._radius, self._radius)
+
+    def __repr__(self):
+        return f"crossingDot({self.point},{self._radius})"
 
     def findNets(self) -> set["schematicNet"]:
         if self.scene():
@@ -155,15 +162,15 @@ class schematicNet(QGraphicsItem):
             pen = schlyr.hilightPen
         else:
             pen = schlyr.wirePen
-        painter.setPen(pen)
 
+        painter.setPen(pen)
         painter.drawLine(self._draftLine)
-        # painter.drawRect(self.innerRect)
-        painter.save()
-        painter.translate(self._draftLine.center().x(), self._draftLine.center().y())
-        painter.rotate(self._angle)
-        painter.drawStaticText(0, 0, self._nameItem)
-        painter.restore()
+        if self._nameSet:
+            painter.save()
+            painter.translate(self._draftLine.center().x(), self._draftLine.center().y())
+            painter.rotate(self._angle)
+            painter.drawStaticText(0, 0, self._nameItem)
+            painter.restore()
 
     def sceneEvent(self, event):
         """
@@ -202,45 +209,56 @@ class schematicNet(QGraphicsItem):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         self.mergeOrthoNets()
         self.clearDots()
-        self.findSymPinConnections()
-        self.findNetConnections()
-        self.createPinSnapLines()
-        self.createNetSnapLines()
+
         if self._stretch:
             self.startStretch(event)
+        else:
+            self.findSymPinConnections()
+            self.findNetConnections()
+            self.createPinSnapLines()
+            self.createNetSnapLines()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
-        if self._pinSnapLines:
-            self.extendPinSnapLines()
-        if self._netSnapLines:
-            self.extendNetSnapLines()
         if self.stretch:
             self.extendStretch(event)
+        else:
+            if self._pinSnapLines:
+                self.extendPinSnapLines()
+            if self._netSnapLines:
+                self.extendNetSnapLines()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-        self.removePinSnapLines()
-        self.removeNetSnapLines()
+
         if self.stretch:
             self.endStretch()
+        else:
+            self.removePinSnapLines()
+            self.removeNetSnapLines()
         # self.createDots()
         super().mouseReleaseEvent(event)
 
     def createPinSnapLines(self):
         for tupleItem in self._pinLocIndexSet:
             lineSet = self._pinSnapLines.setdefault(tupleItem.selfIndex, set())
-            lineSet.add(guideLine(tupleItem.point, tupleItem.point))
+            stretchLine = guideLine(tupleItem.point, tupleItem.point)
+            lineSet.add(stretchLine)
 
     def createNetSnapLines(self):
         for tupleItem in self._netStretchTupleSet:
             lineSet = self._netSnapLines.setdefault(tupleItem.selfIndex, set())
-            lineSet.add(guideLine(
+            stretchLine = guideLine(
                 tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1],
-                self.sceneEndPoints[tupleItem.selfIndex]))
+                self.sceneEndPoints[tupleItem.selfIndex])
+            if tupleItem.net.nameSet:
+                stretchLine.name = tupleItem.net.name
+                stretchLine.nameSet = True
+            lineSet.add(stretchLine)
             if tupleItem.net.scene():
                 self.scene().removeItem(tupleItem.net)
+                self.scene().addItem(stretchLine)
 
     def extendPinSnapLines(self):
         for index, lineSet in self._pinSnapLines.items():
@@ -253,8 +271,6 @@ class schematicNet(QGraphicsItem):
     def extendNetSnapLines(self):
         for index, lineSet in self._netSnapLines.items():
             for snapLine in lineSet:
-                if not snapLine.scene():
-                    self.scene().addItem(snapLine)
                 snapLine.setLine(QLineF(snapLine.line().p1(),
                                         snapLine.mapFromScene(self.sceneEndPoints[index])))
 
@@ -274,15 +290,17 @@ class schematicNet(QGraphicsItem):
 
     def removeNetSnapLines(self):
         for snapLineSet in self._netSnapLines.values():
-            lines = []
             for snapLine in snapLineSet:
                 lines = self.scene().addStretchWires(
                     snapLine.mapToScene(snapLine.line().p1()).toPoint(),
                     snapLine.mapToScene(snapLine.line().p2()).toPoint())
-
-                self.scene().removeItem(snapLine)
                 if lines:
                     self.scene().addListUndoStack(lines)
+                    for line in lines:
+                        if snapLine.nameSet:
+                            line.name = snapLine.name
+                            line.nameSet = True
+                self.scene().removeItem(snapLine)
 
         self._netSnapLines = dict()
 
@@ -554,9 +572,15 @@ class schematicNet(QGraphicsItem):
                                                              net3.sceneEndPoints):
                     # Check if all endpoints are the same
                     if netEnd1 == netEnd2 and netEnd2 == netEnd3:
-                        # Create a crossing dot at the intersection point
-                        newDot = crossingDot(netEnd1, 5)
-                        self.scene().addItem(newDot)
+                        # Create a crossing dot at the intersection point if there is no dot
+                        # there.
+                        dots = [dotItem for dotItem in self.scene().items(QRectF(netEnd1,
+                                                                                 netEnd1).adjusted(
+                            -2, -2, 2, 2)) if isinstance(dotItem,
+                                                         crossingDot)]
+                        if not dots:
+                            newDot = crossingDot(netEnd1)
+                            self.scene().addItem(newDot)
 
     def findDots(self) -> list[crossingDot]:
         """
@@ -749,6 +773,8 @@ class guideLine(QGraphicsLineItem):
         self._end = end
         super().__init__(QLineF(self._start, self._end))
         self.setPen(schlyr.guideLinePen)
+        self._name: str = ""
+        self._nameSet: bool = False
 
     @property
     def sceneEndPoints(self) -> list[QPoint]:
@@ -757,3 +783,24 @@ class guideLine(QGraphicsLineItem):
 
     def __repr__(self):
         return f"guideLine({self.mapToScene(self.line().p1()), self.mapToScene(self.line().p2())}"
+
+    def __repr__(self):
+        return f"guideLine({self.mapToScene(self.line().p1()), self.mapToScene(self.line().p2())}"
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        if name != "":  # net name should not be an empty string
+            self._name = name
+
+    @property
+    def nameSet(self) -> bool:
+        return self._nameSet
+
+    @nameSet.setter
+    def nameSet(self, value: bool):
+        assert isinstance(value, bool)
+        self._nameSet = value

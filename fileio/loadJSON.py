@@ -32,8 +32,9 @@ from PySide6.QtCore import (QPoint, QLineF, QRect, )
 from PySide6.QtWidgets import (QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsRectItem,
                                QGraphicsItem, )
 
-from revedaEditor.common.net import schematicNet
+from revedaEditor.common.net import schematicNet, crossingDot
 import revedaEditor.common.shapes as shp
+import revedaEditor.common.labels as lbl
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.fileio.symbolEncoder as se
 import pdk.layoutLayers as laylyr
@@ -123,10 +124,9 @@ class symbolItems:
 
     def createLabelItem(self, item: dict):
         start = QPoint(item["st"][0], item["st"][1])
-        label = shp.symbolLabel(start, item["def"], item["lt"], item["ht"], item["al"],
-                                item["or"], item["use"] )
+        label = lbl.symbolLabel(start, item["def"], item["lt"], item["ht"], item["al"],
+                                item["or"], item["use"])
         label.setPos(QPoint(item["loc"][0], item["loc"][1]))
-        label.angle = item["ang"]
         label.labelName = item["nam"]
         label.labelText = item["txt"]
         label.labelVisible = item["vis"]
@@ -157,7 +157,7 @@ class schematicItems:
 
     def create(self, item: dict):
         match item["type"]:
-            case "symbolShape":
+            case "sys":
                 itemShapes = list()
                 symbolAttributes = dict()
                 symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes)
@@ -217,29 +217,31 @@ class schematicItems:
                             except json.decoder.JSONDecodeError:
                                 self.scene.logger.error("Error: Invalid Symbol file")
 
-            case "schematicNet":
+            case "scn":
                 start = QPoint(item["st"][0], item["st"][1])
                 end = QPoint(item["end"][0], item["end"][1])
                 netItem = schematicNet(start, end)
                 netItem.name = item["nam"]
                 netItem.nameSet = item["ns"]
-                # netItem.setPos(position)
                 return netItem
-            case "schematicPin":
+            case "scp":
                 start = QPoint(item["st"][0], item["st"][1])
                 pinName = item["pn"]
                 pinDir = item["pd"]
                 pinType = item["pt"]
-                pinItem = shp.schematicPin(start, pinName, pinDir, pinType,)
-                pinItem.setPos(QPoint(item["loc"][0], item["loc"][1]))
+                pinItem = shp.schematicPin(start, pinName, pinDir, pinType, )
                 pinItem.angle = item["ang"]
                 return pinItem
-            case "text":
+            case "txt":
                 start = QPoint(item["st"][0], item["st"][1])
-                text = shp.text(start, item["tc"], item["ff"], item["fs"], item["th"], item["ta"],
-                                item["to"] )
-                text.setPos(QPoint(item["loc"][0], item["loc"][1]))
+                text = shp.text(start, item["tc"], item["ff"], item["fs"], item["th"],
+                                item["ta"],
+                                item["to"])
                 return text
+            case "dot":
+                start = QPoint(item["pt"][0], item["pt"][1])
+                dot = crossingDot(start)
+                return dot
 
     def createDraftSymbol(self, item: dict, symbolInstance: shp.schematicSymbol):
         rectItem = shp.symbolRectangle(QPoint(item["br"][0], item["br"][1]),
@@ -353,7 +355,7 @@ class layoutItems:
     def createPathShape(self, item):
         path = lshp.layoutPath(QLineF(QPoint(item["dfl1"][0], item["dfl1"][1]),
                                       QPoint(item["dfl2"][0], item["dfl2"][1]), ),
-                               laylyr.pdkDrawingLayers[item["ln"]],item["w"], item["se"],
+                               laylyr.pdkDrawingLayers[item["ln"]], item["w"], item["se"],
                                item["ee"], item["md"], )
         path.name = item.get("nam", "")
         path.angle = item.get("ang", 0)
@@ -361,7 +363,8 @@ class layoutItems:
 
     def createRulerShape(self, item):
         ruler = lshp.layoutRuler(QLineF(QPoint(item["dfl1"][0], item["dfl1"][1]),
-                                        QPoint(item["dfl2"][0], item["dfl2"][1]), ), self.rulerWidth, self.rulerTickGap,
+                                        QPoint(item["dfl2"][0], item["dfl2"][1]), ),
+                                 self.rulerWidth, self.rulerTickGap,
                                  self.rulerTickLength, self.rulerFont, item["md"], )
         ruler.angle = item.get("ang", 0)
         return ruler
@@ -369,15 +372,17 @@ class layoutItems:
     def createLabelShape(self, item):
         layoutLayer = laylyr.pdkTextLayers[item["ln"]]
         item = lshp.layoutLabel(QPoint(item["st"][0], item["st"][1]), item["lt"],
-                                item["ff"], item["fs"], item["fh"], item["la"], item["lo"], layoutLayer, )
+                                item["ff"], item["fs"], item["fh"], item["la"], item["lo"],
+                                layoutLayer, )
         item.angle = item.get("ang", 0)
         return item
 
     def createPinShape(self, item):
         layoutLayer = laylyr.pdkPinLayers[item["ln"]]
         item = lshp.layoutPin(QPoint(item["tl"][0], item["tl"][1]),
-                              QPoint(item["br"][0], item["br"][1]), item["pn"], item["pd"], item["pt"],
-                              layoutLayer,)
+                              QPoint(item["br"][0], item["br"][1]), item["pn"], item["pd"],
+                              item["pt"],
+                              layoutLayer, )
         item.angle = item.get("ang", 0)
         return item
 
@@ -393,6 +398,6 @@ class layoutItems:
         via = lshp.layoutVia(QPoint(item["via"]["st"][0], item["via"]["st"][1]),
                              viaDefTuple, item["via"]["w"], item["via"]["h"], )
         item = lshp.layoutViaArray(QPoint(item["st"][0], item["st"][1]), via, item["sp"],
-                                   item["xn"], item["yn"] )
+                                   item["xn"], item["yn"])
         item.angle = item.get("ang", 0)
         return item

@@ -26,6 +26,7 @@
 import json
 
 import revedaEditor.common.shapes as shp
+import revedaEditor.common.labels as lbl
 
 
 class symbolAttribute(object):
@@ -102,7 +103,7 @@ class symbolEncoder(json.JSONEncoder):
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle, }
                 return itemDict
-            case shp.symbolLabel:
+            case lbl.symbolLabel:
                 itemDict = {"type": "label", "st": item.start.toTuple(), "nam": item.labelName,
                             "def": item.labelDefinition,  # label as entered
                             "txt": item.labelText,  # shown label
@@ -110,8 +111,7 @@ class symbolEncoder(json.JSONEncoder):
                             "vis": item.labelVisible,  # label visibility
                             "lt": item.labelType, "ht": item.labelHeight, "al": item.labelAlign,
                             "or": item.labelOrient, "use": item.labelUse,
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                            "loc": (item.scenePos() - item.scene().origin).toTuple(), }
                 return itemDict
             case symbolAttribute:
                 itemDict = {"type": "attr", "nam": item.name, "def": item.definition, }

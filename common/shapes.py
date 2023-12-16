@@ -52,9 +52,10 @@ from quantiphy import Quantity
 from typing import (Union, NamedTuple, )
 import pdk.schLayers as schlyr
 import pdk.symLayers as symlyr
-import pdk.callbacks as cb
+
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.common.net as net
+from revedaEditor.common.labels import symbolLabel
 
 
 class symbolShape(QGraphicsItem):
@@ -1181,368 +1182,389 @@ class text(symbolShape):
             self.scene().logger.error(f"Not a valid text orientation: {value}")
 
 
-class symbolLabel(symbolShape):
-    """
-    label: text class definition for symbol drawing.
-    labelText is what is shown on the symbol in a schematic
-    """
+# class symbolLabel(symbolShape):
+#     """
+#     label: text class definition for symbol drawing.
+#     labelText is what is shown on the symbol in a schematic
+#     """
 
-    labelAlignments = ["Left", "Center", "Right"]
-    labelOrients = ["R0", "R90", "R180", "R270", "MX", "MX90", "MY", "MY90"]
-    labelUses = ["Normal", "Instance", "Pin", "Device", "Annotation"]
-    labelTypes = ["Normal", "NLPLabel", "PyLabel"]
-    predefinedLabels = [
-        "[@libName]",
-        "[@cellName]",
-        "[@viewName]",
-        "[@instName]",
-        "[@modelName]",
-        "[@elementNum]",
-    ]
+#     labelAlignments = ["Left", "Center", "Right"]
+#     labelOrients = ["R0", "R90", "R180", "R270", "MX", "MX90", "MY", "MY90"]
+#     labelUses = ["Normal", "Instance", "Pin", "Device", "Annotation"]
+#     labelTypes = ["Normal", "NLPLabel", "PyLabel"]
+#     predefinedLabels = [
+#         "[@libName]",
+#         "[@cellName]",
+#         "[@viewName]",
+#         "[@instName]",
+#         "[@modelName]",
+#         "[@elementNum]",
+#     ]
 
-    def __init__(
-            self,
-            start: QPoint,
-            labelDefinition: str,
-            labelType: str,
-            labelHeight: str,
-            labelAlign: str,
-            labelOrient: str,
-            labelUse: str,
-    ):
-        super().__init__()
-        self._start = start  # top left corner
-        self._labelDefinition = labelDefinition  # label definition is what is
-        # entered in the symbol editor
-        self._labelName = None  # label Name
-        self._labelValue = None  # label value
-        self._labelText = None  # Displayed label
-        self._labelHeight = labelHeight
-        self._labelAlign = labelAlign
-        self._labelOrient = labelOrient
-        self._labelUse = labelUse
-        self._labelType = labelType
-        self._labelFont = QFont("Arial")
-        self._labelFont.setPointSize(int(float(self._labelHeight)))
-        self._labelFont.setKerning(False)
-        self._labelVisible: bool = False
-        self._labelValueSet: bool = False
-        # labels are visible by default
-        self._fm = QFontMetrics(self._labelFont)
-        self._rect = self._fm.boundingRect(self._labelDefinition)
+#     def __init__(
+#             self,
+#             start: QPoint,
+#             labelDefinition: str,
+#             labelType: str,
+#             labelHeight: str,
+#             labelAlign: str,
+#             labelOrient: str,
+#             labelUse: str,
+#     ):
+#         super().__init__()
+#         self._start = start  # top left corner
+#         self._labelDefinition = labelDefinition  # label definition is what is
+#         # entered in the symbol editor
+#         self._labelName = ""  # label Name
+#         self._labelValue = ""  # label value
+#         self._labelText = ""  # Displayed label
+#         self._labelHeight = labelHeight
+#         self._labelAlign = labelAlign
+#         self._labelOrient = labelOrient
+#         self._labelUse = labelUse
+#         self._labelType = labelType
+#         self._labelFont = QFont("Arial")
+#         self._labelFont.setPointSize(int(float(self._labelHeight)))
+#         self._labelFont.setKerning(False)
+#         self._labelVisible: bool = False
+#         self._labelValueSet: bool = False
+#         # labels are visible by default
+#         self._fm = QFontMetrics(self._labelFont)
+#         self._rect = self._fm.boundingRect(self._labelDefinition)
 
-    def __repr__(self):
-        return (
-            f"symbolLabel({self._start},{self._labelDefinition},"
-            f" {self._labelType}, {self._labelHeight}, {self._labelAlign}, {self._labelOrient},"
-            f" {self._labelUse})"
-        )
+#     def __repr__(self):
+#         return (
+#             f"symbolLabel({self._start},{self._labelDefinition},"
+#             f" {self._labelType}, {self._labelHeight}, {self._labelAlign}, {self._labelOrient},"
+#             f" {self._labelUse})"
+#         )
 
-    def boundingRect(self):
-        return (
-            QRect(
-                self._start.x(),
-                self._start.y(),
-                self._rect.width(),
-                self._rect.height(),
-            )
-            .normalized()
-            .adjusted(
-                -2,
-                -2,
-                2,
-                2,
-            )
-        )  #
+#     def boundingRect(self):
+#         return (
+#             QRect(
+#                 self._start.x(),
+#                 self._start.y(),
+#                 self._rect.width(),
+#                 self._rect.height(),
+#             )
+#             .normalized()
+#             .adjusted(
+#                 -2,
+#                 -2,
+#                 2,
+#                 2,
+#             )
+#         )  #
 
-    def shape(self) -> QPainterPath:
-        path = QPainterPath()
-        path.addRect(self.boundingRect())
-        return path
+#     def shape(self) -> QPainterPath:
+#         path = QPainterPath()
+#         path.addRect(self.boundingRect())
+#         return path
 
-    def paint(self, painter, option, widget):
-        # self._rect = self.fm.boundingRect(self.labelName)
-        self._labelFont.setPointSize(int(self._labelHeight))
-        painter.setFont(self._labelFont)
-        if self.isSelected():
-            painter.setPen(symlyr.selectedLabelPen)
-            painter.drawRect(self.boundingRect())
-            self.setZValue(symlyr.selectedLabelLayer.z)
-        else:
-            painter.setPen(symlyr.labelPen)
-            self.setZValue(symlyr.labelLayer.z)
-        if self._labelText:
-            painter.drawText(
-                QPoint(self._start.x(), self._start.y() + self._rect.height()),
-                self._labelText,
-            )
-        else:
-            painter.drawText(
-                QPoint(self._start.x(), self._start.y() + self._rect.height()),
-                self._labelDefinition,
-            )
+#     def paint(self, painter, option, widget):
+#         # self._rect = self.fm.boundingRect(self.labelName)
+#         self._labelFont.setPointSize(int(self._labelHeight))
+#         painter.setFont(self._labelFont)
+#         if self.isSelected():
+#             painter.setPen(symlyr.selectedLabelPen)
+#             painter.drawRect(self.boundingRect())
+#             self.setZValue(symlyr.selectedLabelLayer.z)
+#         else:
+#             painter.setPen(symlyr.labelPen)
+#             self.setZValue(symlyr.labelLayer.z)
+#         if self._labelText:
+#             painter.drawText(
+#                 QPoint(self._start.x(), self._start.y() + self._rect.height()),
+#                 self._labelText,
+#             )
+#         else:
+#             painter.drawText(
+#                 QPoint(self._start.x(), self._start.y() + self._rect.height()),
+#                 self._labelDefinition,
+#             )
 
-    @property
-    def start(self):
-        return self._start
+#     @property
+#     def start(self):
+#         return self._start
 
-    @start.setter
-    def start(self, value: QPoint):
-        self._start = value
+#     @start.setter
+#     def start(self, value: QPoint):
+#         self._start = value
 
-    @property
-    def left(self):
-        return self._start.x()
+#     @property
+#     def left(self):
+#         return self._start.x()
 
-    @property
-    def right(self):
-        return self._start.x() + self.boundingRect().width()
+#     @property
+#     def right(self):
+#         return self._start.x() + self.boundingRect().width()
 
-    @property
-    def top(self):
-        return self._start.y()
+#     @property
+#     def top(self):
+#         return self._start.y()
 
-    @property
-    def bottom(self):
-        return self._start.y() + self.boundingRect().height()
+#     @property
+#     def bottom(self):
+#         return self._start.y() + self.boundingRect().height()
 
-    @property
-    def width(self):
-        return self.boundingRect().width()
+#     @property
+#     def width(self):
+#         return self.boundingRect().width()
 
-    @property
-    def height(self):
-        return self.boundingRect().height()
+#     @property
+#     def height(self):
+#         return self.boundingRect().height()
 
-    @property
-    def labelName(self):
-        return self._labelName
+#     @property
+#     def labelName(self):
+#         return self._labelName
 
-    @labelName.setter
-    def labelName(self, labelName: str):
-        self._labelName = labelName
+#     @labelName.setter
+#     def labelName(self, labelName: str):
+#         self._labelName = labelName
 
-    @property
-    def labelDefinition(self):
-        return self._labelDefinition
+#     @property
+#     def labelDefinition(self):
+#         return self._labelDefinition
 
-    @labelDefinition.setter
-    def labelDefinition(self, labelDefinition: str):
-        if isinstance(labelDefinition, str):
-            self._labelDefinition = labelDefinition.strip()
+#     @labelDefinition.setter
+#     def labelDefinition(self, labelDefinition: str):
+#         if isinstance(labelDefinition, str):
+#             self._labelDefinition = labelDefinition.strip()
 
-    @property
-    def labelValue(self):
-        return self._labelValue
+#     @property
+#     def labelValue(self):
+#         return self._labelValue
 
-    @labelValue.setter
-    def labelValue(self, labelValue):
-        self._labelValue = labelValue
-        self._labelValueSet = True  # self.labelDefs()
+#     @labelValue.setter
+#     def labelValue(self, labelValue):
+#         self._labelValue = labelValue
+#         self._labelValueSet = True  # self.labelDefs()
 
-    @property
-    def labelValueSet(self) -> bool:
-        return self._labelValueSet
+#     @property
+#     def labelValueSet(self) -> bool:
+#         return self._labelValueSet
 
-    @labelValueSet.setter
-    def labelValueSet(self, value: bool):
-        if isinstance(value, bool):
-            self._labelValueSet = value
+#     @labelValueSet.setter
+#     def labelValueSet(self, value: bool):
+#         if isinstance(value, bool):
+#             self._labelValueSet = value
 
-    @property
-    def labelHeight(self):
-        return self._labelHeight
+#     @property
+#     def labelHeight(self):
+#         return self._labelHeight
 
-    @labelHeight.setter
-    def labelHeight(self, value: int):
-        self._labelHeight = value
+#     @labelHeight.setter
+#     def labelHeight(self, value: int):
+#         self._labelHeight = value
 
-    @property
-    def labelText(self):
-        return self._labelText
+#     @property
+#     def labelText(self):
+#         return self._labelText
 
-    @labelText.setter
-    def labelText(self, labelText):
-        self._labelText = labelText
-        self._rect = (
-            self._fm.boundingRect(self._labelText).normalized().adjusted(0, 0, 0, 5)
-        )
+#     @labelText.setter
+#     def labelText(self, labelText):
+#         self._labelText = labelText
+#         self._rect = (
+#             self._fm.boundingRect(self._labelText).normalized().adjusted(0, 0, 0, 5)
+#         )
 
-    def objName(self):
-        return "LABEL"
+#     def objName(self):
+#         return "LABEL"
 
-    @property
-    def labelType(self):
-        return self._labelType
+#     @property
+#     def labelType(self):
+#         return self._labelType
 
-    @labelType.setter
-    def labelType(self, labelType):
-        if labelType in self.labelTypes:
-            self._labelType = labelType
-        elif self.scene():
-            self.scene().logger.error("Invalid label type")
+#     @labelType.setter
+#     def labelType(self, labelType):
+#         if labelType in self.labelTypes:
+#             self._labelType = labelType
+#         elif self.scene():
+#             self.scene().logger.error("Invalid label type")
 
-    @property
-    def labelAlign(self):
-        return self._labelAlign
+#     @property
+#     def labelAlign(self):
+#         return self._labelAlign
 
-    @labelAlign.setter
-    def labelAlign(self, labelAlignment):
-        if labelAlignment in self.labelAlignments:
-            self._labelAlign = labelAlignment
-        elif self.scene():
-            self.scene().logger.error("Invalid label alignment")
+#     @labelAlign.setter
+#     def labelAlign(self, labelAlignment):
+#         if labelAlignment in self.labelAlignments:
+#             self._labelAlign = labelAlignment
+#         elif self.scene():
+#             self.scene().logger.error("Invalid label alignment")
 
-    @property
-    def labelOrient(self):
-        return self._labelOrient
+#     @property
+#     def labelOrient(self):
+#         return self._labelOrient
 
-    @labelOrient.setter
-    def labelOrient(self, labelOrient):
-        if labelOrient in self.labelOrients:
-            self._labelOrient = labelOrient
-        else:
-            self.scene().logger.error("Invalid label orientation")
+#     @labelOrient.setter
+#     def labelOrient(self, labelOrient):
+#         if labelOrient in self.labelOrients:
+#             self._labelOrient = labelOrient
+#         else:
+#             self.scene().logger.error("Invalid label orientation")
 
-    @property
-    def labelUse(self):
-        return self._labelUse
+#     @property
+#     def labelUse(self):
+#         return self._labelUse
 
-    @labelUse.setter
-    def labelUse(self, labelUse):
-        if labelUse in self.labelUses:
-            self._labelUse = labelUse
-        elif self.scene():
-            self.scene().logger.error("Invalid label use")
+#     @labelUse.setter
+#     def labelUse(self, labelUse):
+#         if labelUse in self.labelUses:
+#             self._labelUse = labelUse
+#         elif self.scene():
+#             self.scene().logger.error("Invalid label use")
 
-    @property
-    def labelFont(self):
-        return self._labelFont
+#     @property
+#     def labelFont(self):
+#         return self._labelFont
 
-    @labelFont.setter
-    def labelFont(self, labelFont: QFont):
-        self._labelFont = labelFont
+#     @labelFont.setter
+#     def labelFont(self, labelFont: QFont):
+#         self._labelFont = labelFont
 
-    @property
-    def labelVisible(self) -> bool:
-        return self._labelVisible
+#     @property
+#     def labelVisible(self) -> bool:
+#         return self._labelVisible
 
-    @labelVisible.setter
-    def labelVisible(self, value: bool):
-        assert isinstance(value, bool)
-        if value:
-            self.setOpacity(1)
-            self._labelVisible = True
-        else:
-            self.setOpacity(0.001)
-            self._labelVisible = False
+#     @labelVisible.setter
+#     def labelVisible(self, value: bool):
+#         assert isinstance(value, bool)
+#         if value:
+#             self.setOpacity(1)
+#             self._labelVisible = True
+#         else:
+#             self.setOpacity(0.001)
+#             self._labelVisible = False
 
-    def moveBy(self, delta: QPoint):
-        self._start += delta
+#     def moveBy(self, delta: QPoint):
+#         self._start += delta
 
-    def labelDefs(self):
-        """
-        This method creates label name, value, and text from a label definition.
-        It should be called when a label is defined or redefined.
-        """
-        self.prepareGeometryChange()
+#     def labelDefs(self):
+#         """
+#         This method creates label name, value, and text from a label definition.
+#         It should be called when a label is defined or redefined.
+#         """
+#         self.prepareGeometryChange()
 
-        if self._labelType == symbolLabel.labelTypes[0]:
-            # Set label name, value, and text to label definition
-            self._labelName = self._labelDefinition
-            self._labelValue = self._labelDefinition
-            self._labelText = self._labelDefinition
-            self._labelValueSet = True
+#         if self._labelType == symbolLabel.labelTypes[0]:  # normal label
+#             # Set label name, value, and text to label definition
+#             self._labelName = self._labelDefinition
+#             self._labelValue = self._labelDefinition
+#             self._labelText = self._labelDefinition
+#             self._labelValueSet = True
 
-        elif self._labelType == symbolLabel.labelTypes[1]:
-            try:
-                if self._labelDefinition in symbolLabel.predefinedLabels:
-                    self._labelValueSet = True
-                    match self._labelDefinition:
-                        case "[@cellName]":
-                            # Set label name to "cellName" and value and text to parent item's cell name
-                            self._labelName = "cellName"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = self.parentItem().cellName
-                            self._labelText = self._labelValue
-                        case "[@instName]":
-                            # Set label name to "instName" and value and text to parent item's counter with prefix "I"
-                            self._labelName = "instName"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = f"I{self.parentItem().counter}"
-                            self._labelText = self._labelValue
+#         elif self._labelType == symbolLabel.labelTypes[1]:  # NLPLabel
+#             self.createNLPLabel()
+#         elif self._labelType == symbolLabel.labelTypes[2]:  # pyLabel
+#             self.createPyLabel()
 
-                        case "[@libName]":
-                            # Set label name to "libName" and value and text to parent item's library name
-                            self._labelName = "libName"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = self.parentItem().libraryName
-                            self._labelText = self._labelValue
-                        case "[@viewName]":
-                            # Set label name to "viewName" and value and text to parent item's view name
-                            self._labelName = "viewName"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = self.parentItem().viewName
-                            self._labelText = self._labelValue
-                        case "[@modelName]":
-                            # Set label name to "modelName" and value and text to parent item's "modelName" attribute
-                            self._labelName = "modelName"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = self.parentItem().attr.get("modelName", "")
+#     def createNLPLabel(self):
+#         try:
+#             if self._labelDefinition in symbolLabel.predefinedLabels:
+#                 self._labelValueSet = True
+#                 match self._labelDefinition:
+#                     case "[@cellName]":
+#                         # Set label name to "cellName" and value and text to parent item's cell name
+#                         self._labelName = "cellName"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = self.parentItem().cellName
+#                         self._labelText = self._labelValue
+#                     case "[@instName]":
+#                         # Set label name to "instName" and value and text to parent item's counter with prefix "I"
+#                         self._labelName = "instName"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = f"I{self.parentItem().counter}"
+#                         self._labelText = self._labelValue
 
-                            self._labelText = self._labelValue
-                        case "[@elementNum]":
-                            # Set label name to "elementNum" and value and text to parent item's counter
-                            self._labelName = "elementNum"
-                            if self.parentItem() is None:
-                                self._labelValue = self._labelDefinition
-                            else:
-                                self._labelValue = f"{self.parentItem().counter}"
-                            self._labelText = self._labelValue
-                else:
-                    labelFields = (
-                        self._labelDefinition.lstrip("[@")
-                        .rstrip("]")
-                        .rstrip(":")
-                        .split(":")
-                    )
-                    self._labelName = labelFields[0].strip()
-                    match len(labelFields):
-                        case 1:
-                            if not self._labelValueSet:
-                                self._labelValue = "?"
-                            self._labelText = self._labelValue
-                        case 2:
-                            if self._labelValueSet:
-                                # Set label text to the second field of label definition with "%" replaced by label value
-                                self._labelText = labelFields[1].strip().replace("%", self._labelValue)
-                            else:
-                                self._labelValue = "?"
-                        case 3:
-                            tempLabelValue = (
-                                labelFields[2].strip().split("=")[-1].split()[-1]
-                            )
-                            if self._labelValueSet:
-                                # Set label text to the third field of label definition with temp label value replaced by label value
-                                self._labelText = labelFields[2].replace(tempLabelValue, self._labelValue)
-                            else:
-                                self._labelText = labelFields[2]
-                                self._labelValue
-            except Exception as e:
-                self.scene().logger.error(
-                    f"Error parsing label definition: {self._labelDefinition}"
-                )
-                self.scene().logger.error(e)
+#                     case "[@libName]":
+#                         # Set label name to "libName" and value and text to parent item's library name
+#                         self._labelName = "libName"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = self.parentItem().libraryName
+#                         self._labelText = self._labelValue
+#                     case "[@viewName]":
+#                         # Set label name to "viewName" and value and text to parent item's view name
+#                         self._labelName = "viewName"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = self.parentItem().viewName
+#                         self._labelText = self._labelValue
+#                     case "[@modelName]":
+#                         # Set label name to "modelName" and value and text to parent item's "modelName" attribute
+#                         self._labelName = "modelName"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = self.parentItem().attr.get("modelName", "")
+
+#                         self._labelText = self._labelValue
+#                     case "[@elementNum]":
+#                         # Set label name to "elementNum" and value and text to parent item's counter
+#                         self._labelName = "elementNum"
+#                         if self.parentItem() is None:
+#                             self._labelValue = self._labelDefinition
+#                         else:
+#                             self._labelValue = f"{self.parentItem().counter}"
+#                         self._labelText = self._labelValue
+#             else:
+#                 labelFields = (
+#                     self._labelDefinition.lstrip("[@")
+#                     .rstrip("]")
+#                     .rstrip(":")
+#                     .split(":")
+#                 )
+#                 self._labelName = labelFields[0].strip()
+#                 match len(labelFields):
+#                     case 1:
+#                         if not self._labelValueSet:
+#                             self._labelValue = "?"
+#                         self._labelText = self._labelValue
+#                     case 2:
+#                         if self._labelValueSet:
+#                             # Set label text to the second field of label definition with "%" replaced by label value
+#                             self._labelText = labelFields[1].strip().replace("%",
+#                                                                              self._labelValue)
+#                         else:
+#                             self._labelValue = "?"
+#                     case 3:
+#                         tempLabelValue = (
+#                             labelFields[2].strip().split("=")[-1].split()[-1]
+#                         )
+#                         if self._labelValueSet:
+#                             # Set label text to the third field of label definition with temp label value replaced by label value
+#                             self._labelText = labelFields[2].replace(tempLabelValue,
+#                                                                      self._labelValue)
+#                         else:
+#                             self._labelText = labelFields[2]
+#                             self._labelValue = tempLabelValue
+#         except Exception as e:
+#             self.scene().logger.error(
+#                 f"Error parsing label definition: {self._labelDefinition}, {e}"
+#             )
+
+#     def createPyLabel(self):
+#         try:
+#             labelFields = self._labelDefinition.strip().split("=")
+#             self._labelName = labelFields[0].strip()
+#             labelFunction = labelFields[1].strip()
+#             expression = (
+#                 f"cb.{self.parentItem().cellName}(self.parentItem().labels).{labelFunction}")
+#             print(f'expression: {expression}')
+#             self._labelValue = Quantity(eval(expression)).render(prec=3)
+#             print(f'labelValue: {self._labelValue}')
+#             self._labelText = f"{self._labelName}={self._labelValue}"
+#         except Exception as e:
+#             if self.scene():
+#                 self.scene().logger.error(f'PyLabel Error:{e}')
 
 
 class pinNetIndexTuple(NamedTuple):
@@ -1568,7 +1590,7 @@ class schematicSymbol(symbolShape):
         self._netlistIgnore: bool = False
         self._draft: bool = False
         self._pinLocations: dict[str, Union[QRect, QRectF]] = dict()  # pinName: pinRect
-        self._pinNetMap: dict[str, str] = dict()  # pinName: netName
+        self.pinNetMap: dict[str, str] = dict()  # pinName: netName
         self._pinNetIndexTupleSet: set[pinNetIndexTuple] = set()
         self._snapLines: dict[symbolPin, set[net.schematicNet]] = dict()
         self.addShapes()
@@ -1646,8 +1668,7 @@ class schematicSymbol(symbolShape):
         self._snapLines = dict()
         self.findPinNetIndexTuples()
         for item in self._pinNetIndexTupleSet:
-            if self._snapLines.get(item.pin) is None:
-                self._snapLines[item.pin] = set()
+            self._snapLines.setdefault(item.pin, set())
             snapLine = net.guideLine(
                 item.pin.mapToScene(item.pin.start), item.net.sceneEndPoints[
                     item.netEndIndex - 1])
@@ -1668,11 +1689,11 @@ class schematicSymbol(symbolShape):
         for pin, snapLinesSet in self._snapLines.items():
             for snapLine in snapLinesSet:
                 lines = self.scene().addStretchWires(pin.mapToScene(pin.start).toPoint(),
-                                                     snapLine.mapToScene(snapLine.line().p2()).toPoint())
-                self.scene().mergeSplitNets(lines[0])
+                                                     snapLine.mapToScene(
+                                                         snapLine.line().p2()).toPoint())
                 self.scene().removeItem(snapLine)
-        if lines:
-            self.scene().addListUndoStack(lines)
+            if lines:
+                self.scene().addListUndoStack(lines)
         self._snapLines = dict()
         super().mouseReleaseEvent(event)
 

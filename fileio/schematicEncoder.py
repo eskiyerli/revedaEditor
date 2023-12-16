@@ -41,7 +41,7 @@ class schematicEncoder(json.JSONEncoder):
                     for label in item.labels.values()
                 }
             itemDict = {
-                "type": "symbolShape",
+                "type": "sys",
                 "lib": item.libraryName,
                 "cell": item.cellName,
                 "view": item.viewName,
@@ -56,36 +56,41 @@ class schematicEncoder(json.JSONEncoder):
             return itemDict
         elif isinstance(item, net.schematicNet):
             itemDict = {
-                "type": "schematicNet",
-                "st": item.mapToScene(item.draftLine.p1()).toPoint().toTuple(),
-                "end": item.mapToScene(item.draftLine.p2()).toPoint().toTuple(),
-                # "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "type": "scn",
+                "st": (item.mapToScene(item.draftLine.p1()) -
+                       item.scene().origin).toPoint().toTuple(),
+                "end": (item.mapToScene(item.draftLine.p2()) -
+                        item.scene().origin).toPoint().toTuple(),
                 "nam": item.name,
                 "ns": item.nameSet,
             }
             return itemDict
         elif isinstance(item, shp.schematicPin):
             itemDict = {
-                "type": "schematicPin",
-                "st": item.start.toTuple(),
+                "type": "scp",
+                "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
                 "pn": item.pinName,
                 "pd": item.pinDir,
                 "pt": item.pinType,
-                "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
             }
             return itemDict
         elif isinstance(item, shp.text):
             itemDict = {
-                "type": "text",
-                "st": item.start.toTuple(),
+                "type": "txt",
+                "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
                 "tc": item.textContent,
                 "ff": item.fontFamily,
                 "fs": item.fontStyle,
                 "th": item.textHeight,
                 "ta": item.textAlignment,
                 "to": item.textOrient,
-                "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+            }
+            return itemDict
+        elif isinstance(item, net.crossingDot):
+            itemDict = {
+                "type": "dot",
+                "pt": (item.mapToScene(item.point) - item.scene().origin).toTuple(),
             }
             return itemDict

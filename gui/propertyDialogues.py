@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
 
 import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp
+import revedaEditor.common.labels as lbl
 import revedaEditor.gui.editFunctions as edf
 
 
@@ -227,13 +228,13 @@ class createSymbolLabelDialog(QDialog):
         self.labelHeightEdit.setToolTip("Enter label Height")
         self.fLayout.addRow(QLabel("Label Height"), self.labelHeightEdit)
         self.labelAlignCombo = QComboBox()
-        self.labelAlignCombo.addItems(shp.symbolLabel.labelAlignments)
+        self.labelAlignCombo.addItems(lbl.symbolLabel.labelAlignments)
         self.fLayout.addRow(QLabel("Label Alignment"), self.labelAlignCombo)
         self.labelOrientCombo = QComboBox()
-        self.labelOrientCombo.addItems(shp.symbolLabel.labelOrients)
+        self.labelOrientCombo.addItems(lbl.symbolLabel.labelOrients)
         self.fLayout.addRow(QLabel("Label Orientation"), self.labelOrientCombo)
         self.labelUseCombo = QComboBox()
-        self.labelUseCombo.addItems(shp.symbolLabel.labelUses)
+        self.labelUseCombo.addItems(lbl.symbolLabel.labelUses)
         self.fLayout.addRow(QLabel("Label Use"), self.labelUseCombo)
         self.labelVisiCombo = QComboBox()
         self.labelVisiCombo.addItems(["Yes", "No"])
@@ -241,10 +242,10 @@ class createSymbolLabelDialog(QDialog):
         self.mainLayout.addLayout(self.fLayout)
         self.labelTypeGroup = QGroupBox("Label Type")
         self.labelTypeLayout = QHBoxLayout()
-        self.normalType = QRadioButton(shp.symbolLabel.labelTypes[0])
+        self.normalType = QRadioButton(lbl.symbolLabel.labelTypes[0])
         self.normalType.setChecked(True)
-        self.NLPType = QRadioButton(shp.symbolLabel.labelTypes[1])
-        self.pyLType = QRadioButton(shp.symbolLabel.labelTypes[2])
+        self.NLPType = QRadioButton(lbl.symbolLabel.labelTypes[1])
+        self.pyLType = QRadioButton(lbl.symbolLabel.labelTypes[2])
         self.labelTypeLayout.addWidget(self.normalType)
         self.labelTypeLayout.addWidget(self.NLPType)
         self.labelTypeLayout.addWidget(self.pyLType)
@@ -361,7 +362,7 @@ class symbolLabelsDialogue(QDialog):
         self.symbolLabelsLayout.addWidget(edf.boldLabel("Use"), 0, 4)
         self.symbolLabelsLayout.addWidget(edf.boldLabel("Type"), 0, 5)
         for item in self.items:
-            if type(item) == shp.symbolLabel:
+            if type(item) == lbl.symbolLabel:
                 i += 1
                 self.labelItemList.append(item)
                 self.labelDefinitionList.append(edf.longLineEdit())
@@ -372,19 +373,19 @@ class symbolLabelsDialogue(QDialog):
                 self.labelHeightList[-1].setText(str(item.labelHeight))
                 self.symbolLabelsLayout.addWidget(self.labelHeightList[i - 1], i, 1)
                 self.labelAlignmentList.append(QComboBox())
-                self.labelAlignmentList[-1].addItems(shp.symbolLabel.labelAlignments)
+                self.labelAlignmentList[-1].addItems(lbl.symbolLabel.labelAlignments)
                 self.labelAlignmentList[-1].setCurrentText(item.labelAlign)
                 self.symbolLabelsLayout.addWidget(self.labelAlignmentList[-1], i, 2)
                 self.labelOrientationList.append(QComboBox())
-                self.labelOrientationList[-1].addItems(shp.symbolLabel.labelOrients)
+                self.labelOrientationList[-1].addItems(lbl.symbolLabel.labelOrients)
                 self.labelOrientationList[-1].setCurrentText(item.labelOrient)
                 self.symbolLabelsLayout.addWidget(self.labelOrientationList[-1], i, 3)
                 self.labelUseList.append(QComboBox())
-                self.labelUseList[-1].addItems(shp.symbolLabel.labelUses)
+                self.labelUseList[-1].addItems(lbl.symbolLabel.labelUses)
                 self.labelUseList[-1].setCurrentText(item.labelUse)
                 self.symbolLabelsLayout.addWidget(self.labelUseList[-1], i, 4)
                 self.labelTypeList.append(QComboBox())
-                self.labelTypeList[-1].addItems(shp.symbolLabel.labelTypes)
+                self.labelTypeList[-1].addItems(lbl.symbolLabel.labelTypes)
                 self.labelTypeList[-1].setCurrentText(item.labelType)
                 self.symbolLabelsLayout.addWidget(self.labelTypeList[-1], i, 5)
         if i == 0:  # no labels to edit
@@ -392,11 +393,10 @@ class symbolLabelsDialogue(QDialog):
 
 
 class instanceProperties(QDialog):
-    def __init__(self, parent, instance: shp.schematicSymbol = None):
+    def __init__(self, parent):
         # assert isinstance(instance, shp.symbolShape)
         super().__init__(parent)
         self.parent = parent
-        self.instance = instance
         self.initUI()
 
     def initUI(self):
@@ -407,32 +407,25 @@ class instanceProperties(QDialog):
         formLayout = QFormLayout()
         self.libNameEdit = edf.longLineEdit()
         self.libNameEdit.setReadOnly(True)
-        self.libNameEdit.setText(self.instance.libraryName)
         self.libNameEdit.setToolTip("Library Name (Read Only)")
         formLayout.addRow(edf.boldLabel("Library Name", self), self.libNameEdit)
         self.cellNameEdit = edf.longLineEdit()
-        self.cellNameEdit.setText(self.instance.cellName)
         self.cellNameEdit.setReadOnly(True)
         self.cellNameEdit.setToolTip("Cell Name (Read Only)")
         formLayout.addRow(edf.boldLabel("Cell Name", self), self.cellNameEdit)
         self.viewNameEdit = edf.longLineEdit()
-        self.viewNameEdit.setText(self.instance.viewName)
         self.viewNameEdit.setReadOnly(True)
         self.viewNameEdit.setToolTip("View Name (Read Only)")
         formLayout.addRow(edf.boldLabel("View Name", self), self.viewNameEdit)
         self.instNameEdit = edf.longLineEdit()
-        self.instNameEdit.setText(self.instance.instanceName)
         self.instNameEdit.setToolTip("Instance Name")
         formLayout.addRow(edf.boldLabel("Instance Name", self), self.instNameEdit)
-        location = (self.instance.scenePos() - self.instance.scene().origin).toTuple()
         self.xLocationEdit = edf.shortLineEdit()
-        self.xLocationEdit.setText(str(location[0]))
         formLayout.addRow(edf.boldLabel("x location", self), self.xLocationEdit)
         self.yLocationEdit = edf.shortLineEdit()
-        self.yLocationEdit.setText(str(location[1]))
         formLayout.addRow(edf.boldLabel("y location", self), self.yLocationEdit)
         self.angleEdit = edf.longLineEdit()
-        self.angleEdit.setText(str(self.instance.angle))
+
         formLayout.addRow(edf.boldLabel("Angle", self), self.angleEdit)
         formLayout.setVerticalSpacing(10)
         self.instanceLabelsLayout = QGridLayout()
@@ -442,46 +435,19 @@ class instanceProperties(QDialog):
         self.instanceLabelsLayout.setColumnStretch(0, 0)
         self.instanceLabelsLayout.setColumnStretch(1, 1)
         self.instanceLabelsLayout.setColumnStretch(2, 0)
-        row_index = 0
-        for label in self.instance.labels.values():
-            if label.labelDefinition not in shp.symbolLabel.predefinedLabels:
-                self.instanceLabelsLayout.addWidget(
-                    edf.boldLabel(label.labelName, self), row_index, 0
-                )
-                labelValueEdit = edf.longLineEdit()
-                labelValueEdit.setText(str(label.labelValue))
-                self.instanceLabelsLayout.addWidget(labelValueEdit, row_index, 1)
-                visibleCombo = QComboBox(self)
-                visibleCombo.setInsertPolicy(QComboBox.NoInsert)
-                visibleCombo.addItems(["True", "False"])
-                if label.labelVisible:
-                    visibleCombo.setCurrentIndex(0)
-                else:
-                    visibleCombo.setCurrentIndex(1)
-                self.instanceLabelsLayout.addWidget(visibleCombo, row_index, 2)
-                row_index += 1
 
-        instanceAttributesLayout = QGridLayout()
-        instanceAttributesLayout.setColumnMinimumWidth(0, 100)
-        instanceAttributesLayout.setColumnMinimumWidth(1, 200)
-        instanceAttributesLayout.setColumnStretch(0, 0)
-        instanceAttributesLayout.setColumnStretch(1, 1)
-        # now list instance attributes
-        for counter, name in enumerate(self.instance._symattrs.keys()):
-            instanceAttributesLayout.addWidget(edf.boldLabel(name, self), counter, 0)
-            labelType = edf.longLineEdit()
-            labelType.setReadOnly(True)
-            labelNameEdit = edf.longLineEdit()
-            labelNameEdit.setText(self.instance._symattrs.get(name))
-            labelNameEdit.setToolTip(f"{name} attribute (Read Only)")
-            instanceAttributesLayout.addWidget(labelNameEdit, counter, 1)
+        self.instanceAttributesLayout = QGridLayout()
+        self.instanceAttributesLayout.setColumnMinimumWidth(0, 100)
+        self.instanceAttributesLayout.setColumnMinimumWidth(1, 200)
+        self.instanceAttributesLayout.setColumnStretch(0, 0)
+        self.instanceAttributesLayout.setColumnStretch(1, 1)
 
         self.mainLayout.addLayout(formLayout)
         self.mainLayout.addWidget(edf.boldLabel("Instance Labels", self))
         self.mainLayout.addLayout(self.instanceLabelsLayout)
         self.mainLayout.addSpacing(40)
         self.mainLayout.addWidget(edf.boldLabel("Instance Attributes", self))
-        self.mainLayout.addLayout(instanceAttributesLayout)
+        self.mainLayout.addLayout(self.instanceAttributesLayout)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
         self.buttonBox.accepted.connect(self.accept)
@@ -725,7 +691,8 @@ class displayConfigDialog(QDialog):
         fLayout = QFormLayout()
         gridValueGroup.setLayout(fLayout)
         self.majorGridEntry = QLineEdit()
-        self.majorGridEntry.setToolTip("Enter Dot or Line Grid Spacing Value as a multiple of scene grid")
+        self.majorGridEntry.setToolTip(
+            "Enter Dot or Line Grid Spacing Value as a multiple of scene grid")
         fLayout.addRow("GridSpacing:", self.majorGridEntry)
         self.snapGridEdit = QLineEdit()
         self.snapGridEdit.setToolTip("Enter the Snap Grid Value as a multiple of scene grid")
