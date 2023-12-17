@@ -38,6 +38,7 @@ import revedaEditor.common.labels as lbl
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.fileio.symbolEncoder as se
 import pdk.layoutLayers as laylyr
+import pdk.pcells as pcells
 import pathlib
 
 
@@ -290,7 +291,7 @@ class layoutItems:
                             self.scene.logger.error("Not a pcell cell")
                         else:
                             pcellInstance = eval(
-                                f'pcell.{pcellDef[1]["reference"]}()')
+                                f'pcells.{pcellDef[1]["reference"]}()')
                             pcellInstance(**item["params"])
                             pcellInstance.libraryName = item["lib"]
                             pcellInstance.cellName = item["cell"]

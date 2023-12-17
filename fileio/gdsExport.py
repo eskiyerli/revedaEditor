@@ -64,51 +64,58 @@ class gdsExporter:
             case lshp.layoutRect:
                 rect = gdstk.rectangle(corner1=item.start.toTuple(),
                                        corner2=item.end.toTuple(),
-                                       layer=item.layer.gdsLayer, datatype=item.layer.datatype)
+                                       layer=item.layer.gdsLayer,
+                                       datatype=item.layer.datatype)
                 parentCell.add(rect)
             case lshp.layoutPath:
-                path = gdstk.FlexPath(points=[item.draftLine.p1().toTuple(),
-                                              item.draftLine.p2().toTuple()],
-                                      width=item.width, ends=(item.startExtend,
-                                                              item.endExtend), simple_path=True,
-                                      layer=item.layer.gdsLayer, datatype=item.layer.datatype)
+                path = gdstk.FlexPath(
+                    points=[item.draftLine.p1().toTuple(),
+                            item.draftLine.p2().toTuple()],
+                    width=item.width, ends=(item.startExtend,
+                                            item.endExtend), simple_path=True,
+                    layer=item.layer.gdsLayer, datatype=item.layer.datatype)
                 parentCell.add(path)
             case lshp.layoutLabel:
-                label = gdstk.Label(text=item.labelText, origin=item.start.toTuple(),
-                                     rotation=item.angle,layer=item.layer.gdsLayer)
+                label = gdstk.Label(text=item.labelText,
+                                    origin=item.start.toTuple(),
+                                    rotation=item.angle, layer=item.layer.gdsLayer)
                 parentCell.add(label)
             case lshp.layoutPin:
                 pin = gdstk.rectangle(corner1=item.start.toTuple(),
-                                       corner2=item.end.toTuple(),
-                                       layer=item.layer.gdsLayer, datatype=item.layer.datatype)
+                                      corner2=item.end.toTuple(),
+                                      layer=item.layer.gdsLayer,
+                                      datatype=item.layer.datatype)
                 parentCell.add(pin)
             case lshp.layoutPolygon:
                 points = [point.toTuple() for point in item.points]
                 polygon = gdstk.Polygon(points=points,
-                                         layer=item.layer.gdsLayer, datatype=item.layer.datatype)
+                                        layer=item.layer.gdsLayer,
+                                        datatype=item.layer.datatype)
                 parentCell.add(polygon)
             case lshp.layoutViaArray:
                 viaName = f'via_{item.via.width}_{item.via.height}_{item.via.layer.name}_{item.via.layer.purpose}'
                 if viaName not in self._cellNamesSet:
                     viaCell = library.new_cell(f'via_{item.via.width}_{item.via.height}_'
                                                f'{item.via.layer.name}_{item.via.layer.purpose}')
-                    via = gdstk.rectangle(item.via.rect.topLeft().toTuple(),
-                                          item.via.rect.bottomRight().toTuple(),
-                                          layer=item.via.layer.gdsLayer,
-                                          datatype=item.via.layer.datatype)
+                    via = gdstk.rectangle(
+                        item.mapToScene(item.via.rect.topLeft()).toTuple(),
+                        item.mapToScene(item.via.rect.bottomRight()).toTuple(),
+                        layer=item.via.layer.gdsLayer,
+                        datatype=item.via.layer.datatype)
                     self._cellNamesSet.add(viaCell.name)
                     viaCell.add(via)
                 viaCell = library[viaName]
-                viaArray = gdstk.Reference(cell = viaCell, origin=item.start.toTuple(),
-                                           columns= item.xnum, rows= item.ynum, spacing= (
-                                            item.spacing+item.width, item.spacing+item.height))
+                viaArray = gdstk.Reference(cell=viaCell, origin=item.start.toTuple(),
+                                           columns=item.xnum, rows=item.ynum, spacing=(
+                        item.spacing + item.width, item.spacing + item.height))
                 parentCell.add(viaArray)
             case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
                     case lshp.layoutPcell:
                         pcellParamDict = gdsExporter.extractPcellInstanceParameters(item)
                         pcellNameSuffix = '_'.join([f"{key}_{value}" for key, value in
-                                               pcellParamDict.items()]).replace('.','p')
+                                                    pcellParamDict.items()]).replace('.',
+                                                                                     'p')
                         pcellName = (f'{item.libraryName}_{type(item).__name__}'
                                      f'_{pcellNameSuffix}')
                         if pcellName not in self._cellNamesSet:

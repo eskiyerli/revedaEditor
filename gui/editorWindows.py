@@ -109,6 +109,7 @@ import revedaEditor.common.layoutShapes as layp
 import pdk.schLayers as schlyr
 import pdk.layoutLayers as laylyr
 import pdk.process as fabproc
+import pdk.pcells as pcells
 import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.common.layoutShapes as lshp  # import layout shapes
 import revedaEditor.fileio.loadJSON as lj
@@ -1771,14 +1772,15 @@ class layoutEditor(editorWindow):
         if dlg.exec() == QDialog.Accepted:
             self.gdsExportDir = pathlib.Path(dlg.exportPathEdit.text().strip())
             gdsExportPath = self.gdsExportDir / f"{self.cellName}.gds"
-            self.checkSaveCell()  # save and reload the cell to get the positions right
-            self.centralW.scene.clear()
-            self.loadLayout()
+            # reprocess the layout to get the layout positions right.
+            topLevelItems = [item for item in self.centralW.scene.items() if item.parentItem() is None]
+            decodedData = json.loads(json.dumps(topLevelItems, cls=layenc.layoutEncoder))
             layoutItems = [
-                item
-                for item in self.centralW.scene.items()
-                if item.parentItem() is None
+                lj.layoutItems(self.centralW.scene).create(item)
+                for item in decodedData
+                if item.get("type") in self.centralW.scene.layoutShapes
             ]
+
             gdsExportObj = gdse.gdsExporter(self.cellName, layoutItems, gdsExportPath)
             gdsExportObj.unit = Quantity(dlg.unitEdit.text().strip()).real
             gdsExportObj.precision = Quantity(dlg.precisionEdit.text().strip()).real
@@ -4453,7 +4455,7 @@ class layout_scene(editor_scene):
         self.layoutInstanceTuple = None
 
         self.itemCounter = 0
-        self.newPath = None
+        self._newPath = None
         self.newPathTuple = None
         self.draftLine = None
         self.m45Rotate = QTransform()
@@ -4534,26 +4536,17 @@ class layout_scene(editor_scene):
             ).boundingRect()
 
             if mouse_event.button() == Qt.LeftButton:
-                if self.editModes.drawRect:
-                    # Create a new rectangle
-                    self.newRect = lshp.layoutRect(
-                        self.mousePressLoc,
-                        self.mousePressLoc,
-                        self.selectEdLayer,
-                    )
-                    self.addUndoStack(self.newRect)
-                elif self.editModes.drawPath:
-                    # Create a new path
-                    self.newPath = lshp.layoutPath(
-                        QLineF(self.mousePressLoc, self.mousePressLoc),
-                        self.newPathTuple.layer,
-                        self.newPathTuple.width,
-                        self.newPathTuple.startExtend,
-                        self.newPathTuple.endExtend,
-                        self.newPathTuple.mode,
-                    )
-                    self.newPath.name = self.newPathTuple.name
-                    self.addUndoStack(self.newPath)
+                if self.editModes.drawPath and self._newPath is not None:
+                    if self._newPath.draftLine.isNull():
+                        self.removeItem(self._newPath)
+                        self.undoStack.removeLastCommand()
+                    else:
+                        self._newPath = None
+                elif self.editModes.drawRect and self._newRect is not None:
+                    self._newRect.end = self.mousePressLoc
+                    self._newRect.setSelected(False)
+                    self._newRect = None
+
                 elif self.editModes.drawRuler:
                     if self._newRuler is None:
                         self._newRuler = lshp.layoutRuler(
@@ -4637,13 +4630,9 @@ class layout_scene(editor_scene):
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
             # Handle drawing rectangle mode
-            if self.editModes.drawRect:
-                self.editorWindow.messageLine.setText(
-                    "Release mouse on the bottom left point"
-                )
-                self.newRect.end = self.mouseMoveLoc
+
             # Handle drawing pin mode
-            elif self.editModes.drawPin and self.newPin is not None:
+            if self.editModes.drawPin and self.newPin is not None:
                 self.newPin.end = self.mouseMoveLoc
             # Handle selecting item mode with shift modifier
             elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
@@ -4651,15 +4640,21 @@ class layout_scene(editor_scene):
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
         else:
+            if self.editModes.drawRect:
+                if self._newRect.scene() is None:
+                    self.addUndoStack(self._newRect)
+                self._newRect.end = self.mouseMoveLoc
             # Handle drawing pin mode with no new pin
-            if self.editModes.drawPin and self.newPin is None:
+            elif self.editModes.drawPin and self.newPin is None:
                 if self.newLabel is not None:
                     self.newLabel.start = self.mouseMoveLoc
             # Handle drawing path mode
-            elif self.editModes.drawPath and self.newPath is not None:
-                self.newPath.draftLine = QLineF(
-                    self.newPath.draftLine.p1(), self.mouseMoveLoc
+            elif self.editModes.drawPath and self._newPath is not None:
+                self._newPath.draftLine = QLineF(
+                    self._newPath.draftLine.p1(), self.mouseMoveLoc
                 )
+                if self._newPath.scene() is None:
+                    self.addUndoStack(self._newPath)
             elif self.editModes.drawRuler and self._newRuler is not None:
                 self._newRuler.draftLine = QLineF(
                     self._newRuler.draftLine.p1(), self.mouseMoveLoc
@@ -4743,12 +4738,30 @@ class layout_scene(editor_scene):
         modifiers = QGuiApplication.keyboardModifiers()
         try:
             if mouse_event.button() == Qt.LeftButton:
-                if self.editModes.drawRect:
-                    self.newRect.setSelected(False)
-                    self.newRect = None
-                elif (
-                        self.editModes.drawPin
-                ):  # finish pin editing and start label editing
+                if self.editModes.drawPath:
+                    self.editorWindow.messageLine.setText(
+                        "Wire mode")
+                    # Create a new path
+                    self._newPath = lshp.layoutPath(
+                        QLineF(self.mouseReleaseLoc, self.mouseReleaseLoc),
+                        self.newPathTuple.layer,
+                        self.newPathTuple.width,
+                        self.newPathTuple.startExtend,
+                        self.newPathTuple.endExtend,
+                        self.newPathTuple.mode,
+                    )
+                    self._newPath.name = self.newPathTuple.name
+                    self._newPath.setSelected(True)
+                elif self.editModes.drawRect:
+                    self.editorWindow.messageLine.setText('Rectangle mode.')
+                    # Create a new rectangle
+                    self._newRect = lshp.layoutRect(
+                        self.mouseReleaseLoc,
+                        self.mouseReleaseLoc,
+                        self.selectEdLayer,
+                    )
+                    
+                elif (self.editModes.drawPin):  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc,
@@ -4760,6 +4773,7 @@ class layout_scene(editor_scene):
                     elif self.newPin is None and self.newLabel is not None:
                         # finish label editing
                         self.newLabel = None
+
                 elif self.editModes.addInstance and self.newInstance is not None:
                     self.newInstance = None
                     self.layoutInstanceTuple = None
@@ -4786,11 +4800,7 @@ class layout_scene(editor_scene):
                     self.newPolygon = None
                     self.removeItem(self._polygonGuideLine)
                     self._polygonGuideLine = None
-                elif self.editModes.drawPath and self.newPath is not None:
-                    if self.newPath.draftLine.length() < self.snapTuple[0]:
-                        self.removeItem(self.newPath)
-                    self.newPath = None
-                    self.editModes.setMode("selectItem")
+
 
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
@@ -4915,22 +4925,22 @@ class layout_scene(editor_scene):
         try:
             with filePathObj.open("r") as file:
                 decodedData = json.load(file)
-            # Create layout items for each item in decoded data in a generator expression
             self.snapTuple = decodedData[1].get("snapGrid")
-            self.createLayoutItems(decodedData)
+            self.createLayoutItems(decodedData[2:])
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
     def createLayoutItems(self, decodedData):
-        layoutItems = [
-            lj.layoutItems(self).create(item)
-            for item in decodedData[2:]
-            if item.get("type") in self.layoutShapes
-        ]
-        # A hack to get loading working. Otherwise, when it is saved the top-level items
-        # get destroyed.
-        undoCommand = us.loadShapesUndo(self, layoutItems)
-        self.undoStack.push(undoCommand)
+        if decodedData:
+            loadedLayoutItems = [
+                lj.layoutItems(self).create(item)
+                for item in decodedData
+                if item.get("type") in self.layoutShapes
+            ]
+            # A hack to get loading working. Otherwise, when it is saved the top-level items
+            # get destroyed.
+            undoCommand = us.loadShapesUndo(self, loadedLayoutItems)
+            self.undoStack.push(undoCommand)
 
     def reloadScene(self):
         # Get the top level items from the scene
@@ -5606,6 +5616,7 @@ class schematic_view(editor_view):
             if self.scene._newNet:
                 self.scene.checkNewNet(self.scene._newNet)
                 self.scene._newNet = None
+                self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
 
 
@@ -5615,6 +5626,16 @@ class layout_view(editor_view):
         self.parent = parent
         super().__init__(self.scene, self.parent)
         self.visibleRect = None
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key_Escape:
+            if self.scene.editModes.drawPath and self.scene._newPath:
+                self.scene._newNet = None
+                
+            elif self.scene.editModes.drawRect and self.scene._newRect:
+                self.scene._newRect = None
+            self.scene.editModes.setMode("selectItem")
+        super().keyPressEvent(event)
 
 
 class xyceNetlist:
