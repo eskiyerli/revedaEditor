@@ -33,7 +33,7 @@ from copy import deepcopy
 import inspect
 from quantiphy import Quantity
 import itertools as itt
-from typing import (Union, Optional, NamedTuple)
+from typing import Union, Optional, NamedTuple
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -1773,8 +1773,14 @@ class layoutEditor(editorWindow):
             self.gdsExportDir = pathlib.Path(dlg.exportPathEdit.text().strip())
             gdsExportPath = self.gdsExportDir / f"{self.cellName}.gds"
             # reprocess the layout to get the layout positions right.
-            topLevelItems = [item for item in self.centralW.scene.items() if item.parentItem() is None]
-            decodedData = json.loads(json.dumps(topLevelItems, cls=layenc.layoutEncoder))
+            topLevelItems = [
+                item
+                for item in self.centralW.scene.items()
+                if item.parentItem() is None
+            ]
+            decodedData = json.loads(
+                json.dumps(topLevelItems, cls=layenc.layoutEncoder)
+            )
             layoutItems = [
                 lj.layoutItems(self.centralW.scene).create(item)
                 for item in decodedData
@@ -3807,7 +3813,9 @@ class schematic_scene(editor_scene):
         Add a trio of wires between two points
         """
         try:
-            if start.y() == end.y() or start.x() == end.x():  # horizontal or verticalline
+            if (
+                    start.y() == end.y() or start.x() == end.x()
+            ):  # horizontal or verticalline
                 lines = [net.schematicNet(start, end)]
             else:
                 firstPointX = self.snapToBase(
@@ -4027,16 +4035,12 @@ class schematic_scene(editor_scene):
                 float(dlg.xLocationEdit.text().strip()),
                 float(dlg.yLocationEdit.text().strip()),
             )
-            item.setPos(
-                self.snapToGrid(location - self.origin, self.snapTuple)
-            )
+            item.setPos(self.snapToGrid(location - self.origin, self.snapTuple))
             tempDoc = QTextDocument()
             for i in range(dlg.instanceLabelsLayout.rowCount()):
                 # first create label name document with HTML annotations
                 tempDoc.setHtml(
-                    dlg.instanceLabelsLayout.itemAtPosition(i, 0)
-                    .widget()
-                    .text()
+                    dlg.instanceLabelsLayout.itemAtPosition(i, 0).widget().text()
                 )
                 # now strip html annotations
                 tempLabelName = tempDoc.toPlainText().strip()
@@ -4044,9 +4048,7 @@ class schematic_scene(editor_scene):
                 if item.labels.get(tempLabelName):
                     # this is where the label value is set.
                     item.labels[tempLabelName].labelValue = (
-                        dlg.instanceLabelsLayout.itemAtPosition(i, 1)
-                        .widget()
-                        .text()
+                        dlg.instanceLabelsLayout.itemAtPosition(i, 1).widget().text()
                     )
                     visible = (
                         dlg.instanceLabelsLayout.itemAtPosition(i, 2)
@@ -4057,10 +4059,7 @@ class schematic_scene(editor_scene):
                         item.labels[tempLabelName].labelVisible = True
                     else:
                         item.labels[tempLabelName].labelVisible = False
-            [
-                labelItem.labelDefs()
-                for labelItem in item.labels.values()
-            ]
+            [labelItem.labelDefs() for labelItem in item.labels.values()]
 
     def setNetProperties(self, item):
         dlg = pdlg.netProperties(self.editorWindow)
@@ -4118,9 +4117,7 @@ class schematic_scene(editor_scene):
                 int(float(dlg.xlocationEdit.text().strip())),
                 int(float(dlg.ylocationEdit.text().strip())),
             )
-            item.start = self.snapToGrid(
-                itemStartPos - self.origin, self.snapTuple
-            )
+            item.start = self.snapToGrid(itemStartPos - self.origin, self.snapTuple)
             item.angle = float(dlg.angleEdit.text().strip())
 
     def netNameEdit(self):
@@ -4576,27 +4573,7 @@ class layout_scene(editor_scene):
                     self.arrayViaTuple = None
                     self._arrayVia = None
                     self.editModes.setMode("selectItem")
-                elif self.editModes.drawPolygon:
-                    if self.newPolygon is None:
-                        # Create a new polygon
-                        self.newPolygon = lshp.layoutPolygon(
-                            [self.mousePressLoc, self.mousePressLoc],
-                            self.selectEdLayer,
-                        )
-                        self.addUndoStack(self.newPolygon)
-                        # Create a guide line for the polygon
-                        self._polygonGuideLine = QGraphicsLineItem(
-                            QLineF(
-                                self.newPolygon.points[-2], self.newPolygon.points[-1]
-                            )
-                        )
-                        self._polygonGuideLine.setPen(
-                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
-                        )
-                        self.addUndoStack(self._polygonGuideLine)
 
-                    else:
-                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.selectItem:
                     # Select scene items
                     self.selectSceneItems(modifiers)
@@ -4739,8 +4716,7 @@ class layout_scene(editor_scene):
         try:
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.drawPath:
-                    self.editorWindow.messageLine.setText(
-                        "Wire mode")
+                    self.editorWindow.messageLine.setText("Wire mode")
                     # Create a new path
                     self._newPath = lshp.layoutPath(
                         QLineF(self.mouseReleaseLoc, self.mouseReleaseLoc),
@@ -4753,15 +4729,17 @@ class layout_scene(editor_scene):
                     self._newPath.name = self.newPathTuple.name
                     self._newPath.setSelected(True)
                 elif self.editModes.drawRect:
-                    self.editorWindow.messageLine.setText('Rectangle mode.')
+                    self.editorWindow.messageLine.setText("Rectangle mode.")
                     # Create a new rectangle
                     self._newRect = lshp.layoutRect(
                         self.mouseReleaseLoc,
                         self.mouseReleaseLoc,
                         self.selectEdLayer,
                     )
-                    
-                elif (self.editModes.drawPin):  # finish pin editing and start label editing
+
+                elif (
+                        self.editModes.drawPin
+                ):  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
                             self.mouseReleaseLoc,
@@ -4774,6 +4752,26 @@ class layout_scene(editor_scene):
                         # finish label editing
                         self.newLabel = None
 
+                elif self.editModes.drawPolygon:
+                    if self.newPolygon is None:
+                        # Create a new polygon
+                        self.newPolygon = lshp.layoutPolygon(
+                            [self.mouseReleaseLoc, self.mouseReleaseLoc],
+                            self.selectEdLayer,
+                        )
+                        self.addUndoStack(self.newPolygon)
+                        # Create a guide line for the polygon
+                        self._polygonGuideLine = QGraphicsLineItem(
+                            QLineF(
+                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                            )
+                        )
+                        self._polygonGuideLine.setPen(
+                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
+                        )
+                        self.addUndoStack(self._polygonGuideLine)
+                    else:
+                        self.newPolygon.addPoint(self.mouseReleaseLoc)
                 elif self.editModes.addInstance and self.newInstance is not None:
                     self.newInstance = None
                     self.layoutInstanceTuple = None
@@ -4800,7 +4798,6 @@ class layout_scene(editor_scene):
                     self.newPolygon = None
                     self.removeItem(self._polygonGuideLine)
                     self._polygonGuideLine = None
-
 
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
@@ -5631,9 +5628,17 @@ class layout_view(editor_view):
         if event.key() == Qt.Key_Escape:
             if self.scene.editModes.drawPath and self.scene._newPath:
                 self.scene._newNet = None
-                
+
             elif self.scene.editModes.drawRect and self.scene._newRect:
                 self.scene._newRect = None
+
+            elif self.scene.editModes.drawPolygon and self.scene.newPolygon:
+                self.scene.newPolygon.polygon.remove(0)
+                self.scene.newPolygon.points.pop(0)
+                self.scene.editModes.setMode("selectItem")
+                self.scene.newPolygon = None
+                self.scene.removeItem(self.scene._polygonGuideLine)
+                self.scene._polygonGuideLine = None
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
 

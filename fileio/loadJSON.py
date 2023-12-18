@@ -372,33 +372,33 @@ class layoutItems:
 
     def createLabelShape(self, item):
         layoutLayer = laylyr.pdkTextLayers[item["ln"]]
-        item = lshp.layoutLabel(QPoint(item["st"][0], item["st"][1]), item["lt"],
-                                item["ff"], item["fs"], item["fh"], item["la"], item["lo"],
-                                layoutLayer, )
-        item.angle = item.get("ang", 0)
-        return item
+        label = lshp.layoutLabel(QPoint(item["st"][0], item["st"][1]), item["lt"],
+                                 item["ff"], item["fs"], item["fh"], item["la"], item["lo"],
+                                 layoutLayer, )
+        label.angle = item.get("ang", 0)
+        return label
 
     def createPinShape(self, item):
         layoutLayer = laylyr.pdkPinLayers[item["ln"]]
-        item = lshp.layoutPin(QPoint(item["tl"][0], item["tl"][1]),
-                              QPoint(item["br"][0], item["br"][1]), item["pn"], item["pd"],
-                              item["pt"],
-                              layoutLayer, )
-        item.angle = item.get("ang", 0)
-        return item
+        pin = lshp.layoutPin(QPoint(item["tl"][0], item["tl"][1]),
+                             QPoint(item["br"][0], item["br"][1]), item["pn"], item["pd"],
+                             item["pt"],
+                             layoutLayer, )
+        pin.angle = item.get("ang", 0)
+        return pin
 
     def createPolygonShape(self, item):
         layoutLayer = laylyr.pdkDrawingLayers[item["ln"]]
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
-        item = lshp.layoutPolygon(pointsList, layoutLayer)
-        item.angle = item.get("ang", 0)
-        return item
+        polygon = lshp.layoutPolygon(pointsList, layoutLayer)
+        polygon.angle = item.get("ang", 0)
+        return polygon
 
     def createViaArrayShape(self, item):
         viaDefTuple = fabproc.processVias[fabproc.processViaNames.index(item["via"]["vdt"])]
         via = lshp.layoutVia(QPoint(item["via"]["st"][0], item["via"]["st"][1]),
                              viaDefTuple, item["via"]["w"], item["via"]["h"], )
-        item = lshp.layoutViaArray(QPoint(item["st"][0], item["st"][1]), via, item["sp"],
-                                   item["xn"], item["yn"])
-        item.angle = item.get("ang", 0)
-        return item
+        viaArray = lshp.layoutViaArray(QPoint(item["st"][0], item["st"][1]), via, item["sp"],
+                                       item["xn"], item["yn"])
+        viaArray.angle = item.get("ang", 0)
+        return viaArray
