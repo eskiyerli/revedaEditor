@@ -146,6 +146,8 @@ class libraryBrowser(QMainWindow):
         self.designView = self.libBrowserCont.designView
         self.libraryModel = self.designView.libraryModel
         self.editProcess = None
+        self._spicefilePathObj: pathlib.Path = None
+        self._verilogafilePathObj: pathlib.Path = None
 
     def _createMenuBar(self):
         self.browserMenubar = self.menuBar()
@@ -511,17 +513,34 @@ class libraryBrowser(QMainWindow):
                     if items[1]["filePath"]:
                         if self.editProcess is None:
                             self.editProcess = QProcess()
-                            VerilogafilePathObj = (
+                            self._verilogafilePathObj = (
                                 viewItem.parent()
                                 .data(Qt.UserRole + 2)
                                 .joinpath(items[1]["filePath"])
                             )
-                            self.editProcess.finished.connect(self.editProcessFinished)
+                            self.editProcess.finished.connect(self.verilogaEditFinished)
                             self.editProcess.start(
-                                self.appMainW.textEditorPath, [str(VerilogafilePathObj)]
-                            )
+                                str(self.appMainW.textEditorPath),
+                                [str(self._verilogafilePathObj)])
                     else:
                         self.logger.warning("File path not defined.")
+                case "spice":
+                    with open(viewItem.viewPath) as tempFile:
+                        items = json.load(tempFile)
+                    if items[1]["filePath"]:
+                        self.editProcess = QProcess()
+                        self._spicefilePathObj = (
+                            viewItem.parent()
+                            .data(Qt.UserRole + 2)
+                            .joinpath(items[1]["filePath"])
+                        )
+                        self.editProcess.finished.connect(self.spiceEditFinished)
+                        self.editProcess.start(
+                            str(self.appMainW.textEditorPath),
+                            [str(self._spicefilePathObj)])
+                    else:
+                        self.logger.warning("File path not defined.")
+
                 case "pcell":
                     with open(viewItem.viewPath) as tempFile:
                         items = json.load(tempFile)
@@ -540,8 +559,12 @@ class libraryBrowser(QMainWindow):
 
         return openCellViewTuple
 
-    def editProcessFinished(self):
-        self.appMainW.importVerilogaClick()
+    def verilogaEditFinished(self):
+        self.appMainW.importVerilogaModule(str(self._verilogafilePathObj))
+        self.editProcess = None
+
+    def spiceEditFinished(self):
+        self.appMainW.importSpiceSubckt(str(self._spicefilePathObj))
         self.editProcess = None
 
     def deleteCellViewClick(self, s):
@@ -2679,10 +2702,9 @@ class symbol_scene(editor_scene):
                     self.editorWindow.messageLine.setText("Add Symbol Pin")
                     self.newPin = self.pinDraw(self.mousePressLoc)
                     self.newPin.setSelected(True)
-                elif self.editModes.drawLine:
-                    self.editorWindow.messageLine.setText("Drawing a Line")
-                    self.newLine = self.lineDraw(self.mousePressLoc, self.mousePressLoc)
-                    self.newLine.setSelected(True)
+                elif self.editModes.drawLine and self.newLine:
+                    self.newLine.setSelected(False)
+                    self.newLine = None
                 elif self.editModes.addLabel:
                     self.newLabel = self.labelDraw(
                         self.mousePressLoc,
@@ -2703,26 +2725,7 @@ class symbol_scene(editor_scene):
                     self.newCircle = self.circleDraw(
                         self.mousePressLoc, self.mousePressLoc
                     )
-                elif self.editModes.drawPolygon:
-                    if self.newPolygon is None:
-                        # Create a new polygon
-                        self.newPolygon = shp.symbolPolygon(
-                            [self.mousePressLoc, self.mousePressLoc],
-                        )
-                        self.addUndoStack(self.newPolygon)
-                        # Create a guide line for the polygon
-                        self.polygonGuideLine = QGraphicsLineItem(
-                            QLineF(
-                                self.newPolygon.points[-2], self.newPolygon.points[-1]
-                            )
-                        )
-                        self.polygonGuideLine.setPen(
-                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
-                        )
-                        self.addUndoStack(self.polygonGuideLine)
 
-                    else:
-                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.drawArc:
                     self.editorWindow.messageLine.setText("Start drawing an arc")
                     self.newArc = self.arcDraw(self.mousePressLoc, self.mousePressLoc)
@@ -2738,10 +2741,7 @@ class symbol_scene(editor_scene):
         self.mouseMoveLoc = mouse_event.scenePos().toPoint()
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
-            if self.editModes.drawLine:
-                self.editorWindow.messageLine.setText("Release mouse on the end point")
-                self.newLine.end = self.mouseMoveLoc
-            elif self.editModes.drawPin and self.newPin.isSelected():
+            if self.editModes.drawPin and self.newPin.isSelected():
                 self.newPin.setPos(self.mouseMoveLoc - self.mousePressLoc)
             elif self.editModes.drawRect:
                 self.editorWindow.messageLine.setText(
@@ -2763,7 +2763,10 @@ class symbol_scene(editor_scene):
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
         else:
-            if self.editModes.drawPolygon and self.newPolygon is not None:
+            if self.editModes.drawLine and self.newLine:
+                self.editorWindow.messageLine.setText("Press mouse on the end point")
+                self.newLine.end = self.mouseMoveLoc
+            elif self.editModes.drawPolygon and self.newPolygon:
                 self.polygonGuideLine.setLine(
                     QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
                 )
@@ -2778,7 +2781,12 @@ class symbol_scene(editor_scene):
             modifiers = QGuiApplication.keyboardModifiers()
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.drawLine:
-                    self.newLine.setSelected(False)
+                    self.editorWindow.messageLine.setText("Drawing a Line")
+                    self.newLine = self.lineDraw(
+                        self.mouseReleaseLoc, self.mouseReleaseLoc
+                    )
+                    self.newLine.setSelected(True)
+
                 elif self.editModes.drawCircle:
                     self.newCircle.setSelected(False)
                     self.newCircle.update()
@@ -2792,6 +2800,26 @@ class symbol_scene(editor_scene):
                 elif self.editModes.addLabel:
                     self.newLabel.setSelected(False)
                     self.editModes.addLabel = False
+                elif self.editModes.drawPolygon:
+                    if self.newPolygon is None:
+                        # Create a new polygon
+                        self.newPolygon = shp.symbolPolygon(
+                            [self.mouseReleaseLoc, self.mouseReleaseLoc],
+                        )
+                        self.addUndoStack(self.newPolygon)
+                        # Create a guide line for the polygon
+                        self.polygonGuideLine = QGraphicsLineItem(
+                            QLineF(
+                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                            )
+                        )
+                        self.polygonGuideLine.setPen(
+                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
+                        )
+                        self.addUndoStack(self.polygonGuideLine)
+
+                    else:
+                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
@@ -2801,19 +2829,14 @@ class symbol_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"Error in Mouse Press Event: {e} ")
 
-    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseDoubleClickEvent(event)
-        self.mouseDoubleClickLoc = event.scenePos().toPoint()
-        try:
-            if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
-                self.newPolygon.polygon.remove(0)
-                self.newPolygon.points.pop(0)
-                self.editModes.setMode("selectItem")
-                self.newPolygon = None
-                self.removeItem(self.polygonGuideLine)
-                self.polygonGuideLine = None
-        except Exception as e:
-            self.logger.error(f"Error in mouse Double Click Event: {e}")
+    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    #     super().mouseDoubleClickEvent(event)
+    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
+    #     try:
+    #         if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
+    #
+    #     except Exception as e:
+    #         self.logger.error(f"Error in mouse Double Click Event: {e}")
 
     def lineDraw(self, start: QPoint, current: QPoint):
         line = shp.symbolLine(start, current)
@@ -2881,7 +2904,6 @@ class symbol_scene(editor_scene):
         label.labelVisible = self.labelOpaque
         label.labelDefs()
         label.setOpacity(1)
-        print(label)
         undoCommand = us.addShapeUndo(self, label)
         self.undoStack.push(undoCommand)
         return label
@@ -3008,6 +3030,27 @@ class symbol_scene(editor_scene):
                 self.queryDlg.labelYLine.setText(str(sceneStartPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLabelShape(item)
+            elif isinstance(item, shp.symbolPolygon):
+                dlg = pdlg.symbolPolygonProperties(self.editorWindow, len(item.points))
+                for i, point in enumerate(item.points):
+                    dlg.pointXEdits[i].setText(str(point.x()))
+                    dlg.pointYEdits[i].setText(str(point.y()))
+                if dlg.exec() == QDialog.Accepted:
+                    tempPoints = []
+                    for i in range(dlg.polygonGroupLayout.rowCount() - 2):
+                        xedit = (
+                            dlg.polygonGroupLayout.itemAtPosition(i + 2, 1)
+                            .widget()
+                            .text()
+                        )
+                        yedit = (
+                            dlg.polygonGroupLayout.itemAtPosition(i + 2, 2)
+                            .widget()
+                            .text()
+                        )
+                        if xedit != "" and yedit != "":
+                            tempPoints.append(QPointF(float(xedit), float(yedit)))
+                    item.points = tempPoints
 
     def updateRectangleShape(self, item: shp.symbolRectangle):
         """
@@ -4786,21 +4829,21 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
 
-    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseDoubleClickEvent(event)
-        self.mouseDoubleClickLoc = event.scenePos().toPoint()
-        try:
-            if event.button() == Qt.LeftButton:
-                if self.editModes.drawPolygon:
-                    self.newPolygon.polygon.remove(0)
-                    self.newPolygon.points.pop(0)
-                    self.editModes.setMode("selectItem")
-                    self.newPolygon = None
-                    self.removeItem(self._polygonGuideLine)
-                    self._polygonGuideLine = None
-
-        except Exception as e:
-            self.logger.error(f"mouse double click error: {e}")
+    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    #     super().mouseDoubleClickEvent(event)
+    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
+    #     try:
+    #         if event.button() == Qt.LeftButton:
+    #             if self.editModes.drawPolygon:
+    #                 self.newPolygon.polygon.remove(0)
+    #                 self.newPolygon.points.pop(0)
+    #                 self.editModes.setMode("selectItem")
+    #                 self.newPolygon = None
+    #                 self.removeItem(self._polygonGuideLine)
+    #                 self._polygonGuideLine = None
+    #
+    #     except Exception as e:
+    #         self.logger.error(f"mouse double click error: {e}")
 
     def drawInstance(self, pos: QPoint):
         """
@@ -5599,6 +5642,20 @@ class symbol_view(editor_view):
         super().__init__(self.scene, self.parent)
         self.visibleRect = None
 
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key_Escape:
+            if self.scene.editModes.drawLine and self.scene.newLine:
+                self.scene.newLine.setSelected(False)
+                self.scene.newLine = None
+            elif self.scene.editModes.drawPolygon and self.scene.newPolygon:
+                self.scene.newPolygon.polygon.remove(0)
+                self.scene.newPolygon.points.pop(0)
+                self.scene.newPolygon = None
+                self.scene.removeItem(self.scene.polygonGuideLine)
+                self.scene.polygonGuideLine = None
+            self.scene.editModes.setMode("selectItem")
+        super().keyPressEvent(event)
+
 
 class schematic_view(editor_view):
     def __init__(self, scene, parent):
@@ -5832,7 +5889,13 @@ class xyceNetlist:
 
 
 class configViewEdit(QMainWindow):
-    def __init__(self, appmainW, schViewItem, configDict, viewItem):
+    def __init__(
+            self,
+            appmainW: QMainWindow,
+            schViewItem: scb.viewItem,
+            configDict: dict,
+            viewItem: scb.viewItem,
+    ):
         super().__init__(parent=appmainW)
         self.appmainW = appmainW  # app mainwindow
         self.schViewItem = schViewItem
@@ -5917,6 +5980,20 @@ class configViewEdit(QMainWindow):
         items.insert(2, self.configDict)
         with configFilePathObj.open(mode="w+") as configFile:
             json.dump(items, configFile, indent=4)
+
+    def closeWindow(self):
+        self.close()
+
+    def closeEvent(self, event):
+        cellViewTuple = ddef.viewTuple(
+            self.viewItem.parent().parent().libraryName,
+            self.viewItem.parent().cellName,
+            self.viewItem.viewName,
+        )
+        self.appmainW.openViews.pop(cellViewTuple)
+        self.saveClick()
+        event.accept()
+        super().closeEvent(event)
 
 
 class configViewEditContainer(QWidget):

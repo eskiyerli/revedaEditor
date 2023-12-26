@@ -135,6 +135,7 @@ class MainWindow(QMainWindow):
         self.menuTools.addAction(self.libraryBrowserAction)
         self.menuTools.addAction(self.createStippleAction)
         self.importTools.addAction(self.importVerilogaAction)
+        self.importTools.addAction(self.importSpiceAction)
         self.menuOptions.addAction(self.optionsAction)
         self.menuHelp.addAction(self.helpAction)
         self.menuHelp.addAction(self.aboutAction)
@@ -148,6 +149,7 @@ class MainWindow(QMainWindow):
         self.importVerilogaAction = QAction(
             importVerilogaIcon, "Import Verilog-a file..."
         )
+        self.importSpiceAction = QAction(importVerilogaIcon, "Import Spice file...", self)
         openLibIcon = QIcon(":/icons/database--pencil.png")
         self.libraryBrowserAction = QAction(openLibIcon, "Library Browser", self)
         optionsIcon = QIcon(":/icons/resource-monitor.png")
@@ -162,6 +164,7 @@ class MainWindow(QMainWindow):
         self.exitAction.triggered.connect(self.exitApp)  # type: ignore
         self.libraryBrowserAction.triggered.connect(self.libraryBrowserClick)
         self.importVerilogaAction.triggered.connect(self.importVerilogaClick)
+        self.importSpiceAction.triggered.connect(self.importSpiceClick)
         self.optionsAction.triggered.connect(self.optionsClick)
         self.createStippleAction.triggered.connect(self.createStippleClick)
         self.helpAction.triggered.connect(self.helpClick)
@@ -217,20 +220,21 @@ class MainWindow(QMainWindow):
 
     def optionsClick(self):
         dlg = fd.appProperties(self)
-        dlg.editorPathEdit.setText(self.textEditorPath)
+        dlg.editorPathEdit.setText(str(self.textEditorPath))
         dlg.simPathEdit.setText(str(self.simulationPath))
         dlg.switchViewsEdit.setText(", ".join(self.switchViewList))
         dlg.stopViewsEdit.setText(", ".join(self.stopViewList))
 
         if dlg.exec() == QDialog.Accepted:
-            self.textEditorPath = dlg.editorPathEdit.text()
+            self.textEditorPath = pathlib.Path(dlg.editorPathEdit.text())
             self.simulationPath = pathlib.Path(dlg.simPathEdit.text())
             self.switchViewList = [
                 switchView.strip()
                 for switchView in dlg.switchViewsEdit.text().split(",")
             ]
             self.stopViewList = [
-                stopView.strip() for stopView in dlg.stopViewsEdit.text().split(",")
+                stopView.strip() for stopView in
+                dlg.stopViewsEdit.text().split(",")
             ]
             if dlg.optionSaveBox.isChecked():
                 self.saveState()
@@ -246,26 +250,28 @@ class MainWindow(QMainWindow):
             None
         """
         # Get the library model
+        self.importVerilogaModule('')
+
+    def importVerilogaModule(self, filePath: str):
         library_model = self.libraryBrowser.libraryModel
-
         # Open the import dialog
-        import_dlg = fd.importVerilogaCellDialogue(library_model, self)
-
+        importDlg = fd.importVerilogaCellDialogue(library_model, self)
+        importDlg.vaFileEdit.setText(filePath)
         # Set the default view name in the dialog
-        import_dlg.vaViewName.setText("veriloga")
-
+        importDlg.vaViewName.setText("veriloga")
         # Execute the import dialog and check if it was accepted
-        if import_dlg.exec() == QDialog.Accepted:
+        if importDlg.exec() == QDialog.Accepted:
             # Create the Verilog-A object from the file path
-            imported_va_obj = hdl.verilogaC(pathlib.Path(import_dlg.vaFileEdit.text()))
+            imported_va_obj = hdl.verilogaC(
+                pathlib.Path(importDlg.vaFileEdit.text()))
 
             # Create the Verilog-A view item tuple
             va_view_item_tuple = imv.createVaView(
-                self, import_dlg, library_model, imported_va_obj
+                self, importDlg, library_model, imported_va_obj
             )
 
             # Check if the symbol checkbox is checked
-            if import_dlg.symbolCheckBox.isChecked():
+            if importDlg.symbolCheckBox.isChecked():
                 # Create the Verilog-A symbol
                 imv.createVaSymbol(
                     self,
@@ -274,6 +280,43 @@ class MainWindow(QMainWindow):
                     self.libraryBrowser,
                     imported_va_obj,
                 )
+
+    def importSpiceClick(self):
+        """
+        Import a Spice view and add it to a design library.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        self.importSpiceSubckt('')
+
+    def importSpiceSubckt(self, filePath: str):
+        # Get the library model
+        library_model = self.libraryBrowser.libraryModel
+        # Open the import dialog
+        importDlg = fd.importSpiceCellDialogue(library_model, self)
+        importDlg.spiceFileEdit.setText(filePath)
+        # Set the default view name in the dialog
+        importDlg.spiceViewName.setText("spice")
+        # Execute the import dialog and check if it was accepted
+        if importDlg.exec() == QDialog.Accepted:
+            # Create the Verilog-A object from the file path
+            importedSpiceObj = hdl.spiceC(
+                pathlib.Path(importDlg.spiceFileEdit.text()))
+
+            # Create the Verilog-A view item tuple
+            spiceViewItemTuple = imv.createSpiceView(
+                self, importDlg, library_model, importedSpiceObj
+            )
+
+            # Check if the symbol checkbox is checked
+            if importDlg.symbolCheckBox.isChecked():
+                # Create the spice symbol
+                imv.createSpiceSymbol(self, spiceViewItemTuple, self.libraryDict,
+                                      self.libraryBrowser, importedSpiceObj)
 
     def createStippleClick(self):
         stippleWindow = stip.stippleEditor(self)
@@ -303,7 +346,7 @@ class MainWindow(QMainWindow):
             self.logger.info(f"Configuration file: {self.confFilePath} exists")
             with self.confFilePath.open(mode="r") as f:
                 items = json.load(f)
-            self.textEditorPath = items.get("textEditorPath")
+            self.textEditorPath = pathlib.Path(items.get("textEditorPath"))
             self.simulationPath = pathlib.Path(items.get("simulationPath"))
             if items.get("switchViewList")[0] != "":
                 self.switchViewList = items.get("switchViewList")
@@ -312,7 +355,7 @@ class MainWindow(QMainWindow):
 
     def saveState(self):
         items = {
-            "textEditorPath": self.textEditorPath,
+            "textEditorPath": str(self.textEditorPath),
             "simulationPath": str(self.simulationPath),
             "switchViewList": self.switchViewList,
             "stopViewList": self.stopViewList,

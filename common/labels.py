@@ -23,9 +23,9 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-from PySide6.QtCore import (QPoint, Qt)
-from PySide6.QtGui import (QBrush, QFont, QColor)
-from PySide6.QtWidgets import (QGraphicsSimpleTextItem, QGraphicsItem)
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QBrush, QFont, QColor
+from PySide6.QtWidgets import QGraphicsSimpleTextItem, QGraphicsItem
 import pdk.symLayers as symlyr
 import pdk.callbacks as cb
 import itertools as itt
@@ -53,14 +53,14 @@ class symbolLabel(QGraphicsSimpleTextItem):
     ]
 
     def __init__(
-            self,
-            start: QPoint,
-            labelDefinition: str,
-            labelType: str,
-            labelHeight: str,
-            labelAlign: str,
-            labelOrient: str,
-            labelUse: str,
+        self,
+        start: QPoint,
+        labelDefinition: str,
+        labelType: str,
+        labelHeight: str,
+        labelAlign: str,
+        labelOrient: str,
+        labelUse: str,
     ):
         super().__init__("")
         self._start = start  # top left corner
@@ -84,6 +84,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._labelFont.setKerning(False)
         self._labelVisible: bool = False
         self.setBrush(symlyr.labelBrush)
+        self.setPos(self._start)
 
         match self._labelOrient:
             case "R0":
@@ -300,7 +301,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
                         if self.parentItem() is None:
                             self._labelValue = self._labelDefinition
                         else:
-                            self._labelValue = self.parentItem().attr.get("modelName", "")
+                            self._labelValue = self.parentItem().attr.get(
+                                "modelName", ""
+                            )
 
                         self._labelText = self._labelValue
                     case "[@elementNum]":
@@ -327,8 +330,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
                     case 2:
                         if self._labelValue:
                             # Set label text to the second field of label definition with "%" replaced by label value
-                            self._labelText = labelFields[1].strip().replace("%",
-                                                                             self._labelValue)
+                            self._labelText = (
+                                labelFields[1].strip().replace("%", self._labelValue)
+                            )
                         else:
                             self._labelValue = "?"
                     case 3:
@@ -337,8 +341,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
                         )
                         if self._labelValue:
                             # Set label text to the third field of label definition with temp label value replaced by label value
-                            self._labelText = labelFields[2].replace(tempLabelValue,
-                                                                     self._labelValue)
+                            self._labelText = labelFields[2].replace(
+                                tempLabelValue, self._labelValue
+                            )
                         else:
                             self._labelText = labelFields[2]
                             self._labelValue = tempLabelValue
@@ -361,4 +366,4 @@ class symbolLabel(QGraphicsSimpleTextItem):
                 self._labelText = f"{self._labelName} = {labelFunction}"
         except Exception as e:
             if self.scene():
-                self.scene().logger.error(f'PyLabel Error:{e}')
+                self.scene().logger.error(f"PyLabel Error:{e}")

@@ -35,10 +35,10 @@ class symbolAttribute(object):
         self._definition = definition
 
     def __str__(self):
-        return f'{self.name}: {self.definition}'
+        return f"{self.name}: {self.definition}"
 
     def __repr__(self):
-        return f'{type(self)}({self.name},{self.definition})'
+        return f"{type(self)}({self.name},{self.definition})"
 
     @property
     def name(self):
@@ -63,56 +63,93 @@ class symbolEncoder(json.JSONEncoder):
     def default(self, item):
         match type(item):
             case shp.symbolRectangle:
-                itemDict = {"type": "rect", "rect": item.rect.getCoords(),
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "rect",
+                    "rect": item.rect.getCoords(),
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case shp.symbolLine:
-                itemDict = {"type": "line", "st": item.start.toTuple(), "end": item.end.toTuple(),
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "line",
+                    "st": item.start.toTuple(),
+                    "end": item.end.toTuple(),
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case shp.symbolCircle:
-                itemDict = {"type": "circle", "cen": item.centre.toTuple(),
-                            "end": item.end.toTuple(),
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "circle",
+                    "cen": item.centre.toTuple(),
+                    "end": item.end.toTuple(),
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case shp.symbolPolygon:
                 pointsList = [item.mapToScene(point).toTuple() for point in item.points]
                 itemDict = {
-                        "type": "polygon",
-                        "ps": pointsList,
-                    }
+                    "type": "polygon",
+                    "ps": pointsList,
+                }
                 return itemDict
             case shp.symbolArc:
-                itemDict = {"type": "arc", "st": item.start.toTuple(), "end": item.end.toTuple(),
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "arc",
+                    "st": item.start.toTuple(),
+                    "end": item.end.toTuple(),
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case shp.symbolPin:
-                itemDict = {"type": "pin", "st": item.start.toTuple(), "nam": item.pinName,
-                            "pd": item.pinDir, "pt": item.pinType,
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "pin",
+                    "st": item.start.toTuple(),
+                    "nam": item.pinName,
+                    "pd": item.pinDir,
+                    "pt": item.pinType,
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case shp.text:
-                itemDict = {"type": "text", "st": item.start.toTuple(),
-                            'tc': item.textContent, 'ff': item.fontFamily, 'fs': item.fontStyle,
-                            'th': item.textHeight, 'ta': item.textAlignment, 'to': item.textOrient,
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(),
-                            "ang": item.angle, }
+                itemDict = {
+                    "type": "text",
+                    "st": item.start.toTuple(),
+                    "tc": item.textContent,
+                    "ff": item.fontFamily,
+                    "fs": item.fontStyle,
+                    "th": item.textHeight,
+                    "ta": item.textAlignment,
+                    "to": item.textOrient,
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                    "ang": item.angle,
+                }
                 return itemDict
             case lbl.symbolLabel:
-                itemDict = {"type": "label", "st": item.start.toTuple(), "nam": item.labelName,
-                            "def": item.labelDefinition,  # label as entered
-                            "txt": item.labelText,  # shown label
-                            "val": item.labelValue,  # label value
-                            "vis": item.labelVisible,  # label visibility
-                            "lt": item.labelType, "ht": item.labelHeight, "al": item.labelAlign,
-                            "or": item.labelOrient, "use": item.labelUse,
-                            "loc": (item.scenePos() - item.scene().origin).toTuple(), }
+                itemDict = {
+                    "type": "label",
+                    "st": item.start.toTuple(),
+                    "nam": item.labelName,
+                    "def": item.labelDefinition,  # label as entered
+                    "txt": item.labelText,  # shown label
+                    "val": item.labelValue,  # label value
+                    "vis": item.labelVisible,  # label visibility
+                    "lt": item.labelType,
+                    "ht": item.labelHeight,
+                    "al": item.labelAlign,
+                    "or": item.labelOrient,
+                    "use": item.labelUse,
+                    "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                }
                 return itemDict
             case symbolAttribute:
-                itemDict = {"type": "attr", "nam": item.name, "def": item.definition, }
+                itemDict = {
+                    "type": "attr",
+                    "nam": item.name,
+                    "def": item.definition,
+                }
                 return itemDict

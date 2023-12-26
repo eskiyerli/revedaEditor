@@ -20,14 +20,19 @@
 #   Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
 import json
+
 # schematic editor backend
 import pathlib
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import (Qt, )
-from PySide6.QtGui import (QStandardItem, )
-from PySide6.QtWidgets import (QMessageBox)
+from PySide6.QtCore import (
+    Qt,
+)
+from PySide6.QtGui import (
+    QStandardItem,
+)
+from PySide6.QtWidgets import QMessageBox
 
 
 class libraryItem(QStandardItem):
@@ -46,7 +51,7 @@ class libraryItem(QStandardItem):
         return f"library item path: {self.libraryPath}, library item name: {self.libraryName}"
 
     def __repr__(self):
-        return f'{type(self).__name__}({self.libraryPath})'
+        return f"{type(self).__name__}({self.libraryPath})"
 
     @property
     def libraryPath(self):
@@ -78,7 +83,7 @@ class cellItem(QStandardItem):
         return f"cell item path: {self.cellPath}, \ncell item name: {self.cellName}"
 
     def __repr__(self):
-        return f'{type(self).__name__}({self.cellPath})'
+        return f"{type(self).__name__}({self.cellPath})"
 
     @property
     def cellName(self):
@@ -90,7 +95,7 @@ class viewItem(QStandardItem):
         self.viewPath = viewPath
         super().__init__(self.viewPath.stem)
         self.setEditable(False)
-        self.setData('view', Qt.UserRole + 1)
+        self.setData("view", Qt.UserRole + 1)
         # set the data to the item to be the path to the view.
         self.setData(viewPath, Qt.UserRole + 2)
 
@@ -101,12 +106,12 @@ class viewItem(QStandardItem):
         return f"view item path: {self.viewPath}, view item name: {self.viewName}"
 
     def __repr__(self):
-        return f'{type(self).__name__}(pathlib.Path({self.viewPath}))'
+        return f"{type(self).__name__}(pathlib.Path({self.viewPath}))"
 
     def delete(self):
-        '''
+        """
         delete the view file and remove the row.
-        '''
+        """
         self.viewPath.unlink()
         viewRow = self.row()
         parent = self.parent()
@@ -114,24 +119,24 @@ class viewItem(QStandardItem):
 
     @property
     def viewType(self):
-        if 'schematic' in self.viewPath.stem:
-            return 'schematic'
-        elif 'symbol' in self.viewPath.stem:
-            return 'symbol'
-        elif 'veriloga' in self.viewPath.stem:
-            return 'veriloga'
-        elif 'config' in self.viewPath.stem:
-            return 'config'
-        elif 'xyce' in self.viewPath.stem:
-            return 'xyce'
-        elif 'spice' in self.viewPath.stem:
-            return 'spice'
-        elif 'myhdl'  in self.viewPath.stem:
-            return 'myhdl'
-        elif 'layout'in self.viewPath.stem:
-            return 'layout'
-        elif 'pcell' in self.viewPath.stem:
-            return 'pcell'
+        if "schematic" in self.viewPath.stem:
+            return "schematic"
+        elif "symbol" in self.viewPath.stem:
+            return "symbol"
+        elif "veriloga" in self.viewPath.stem:
+            return "veriloga"
+        elif "config" in self.viewPath.stem:
+            return "config"
+        elif "xyce" in self.viewPath.stem:
+            return "xyce"
+        elif "spice" in self.viewPath.stem:
+            return "spice"
+        elif "myhdl" in self.viewPath.stem:
+            return "myhdl"
+        elif "layout" in self.viewPath.stem:
+            return "layout"
+        elif "pcell" in self.viewPath.stem:
+            return "pcell"
         else:
             return None
 
@@ -165,7 +170,9 @@ def createCell(parent, model, selectedLib, cellName):
             QMessageBox.warning(parent, "Error", "Please enter a cell name")
             return None
         elif cellPath.exists():
-            QMessageBox.warning(parent, "Error", "Cell already exits. Delete cell first.")
+            QMessageBox.warning(
+                parent, "Error", "Cell already exits. Delete cell first."
+            )
             return None
         else:
             cellPath.mkdir()
@@ -179,33 +186,36 @@ def createCellView(parent, viewName, cellItem: cellItem):
     if viewName.strip() == "":
         QMessageBox.warning(parent, "Error", "Please enter a view name")
         return None
-    viewPath = cellItem.data(Qt.UserRole + 2).joinpath(f'{viewName}.json')
+    viewPath = cellItem.data(Qt.UserRole + 2).joinpath(f"{viewName}.json")
     if viewPath.exists():
-        parent.logger.warning('Replacing the cell view.')
-        oldView = [cellItem.child(row) for row in range(cellItem.rowCount()) if
-                   cellItem.child(row).viewName == viewName][0]
+        parent.logger.warning("Replacing the cell view.")
+        oldView = [
+            cellItem.child(row)
+            for row in range(cellItem.rowCount())
+            if cellItem.child(row).viewName == viewName
+        ][0]
         oldView.delete()
     newViewItem = viewItem(viewPath)
     viewPath.touch()  # create empty cell view
     items = list()
-    if 'schematic' in viewName:
-        items.insert(0, {'viewName': 'schematic'})
-        items.insert(1, {"snapGrid": (10,5)})
-    elif 'symbol' in viewName:
-        items.insert(0, {'viewName': 'symbol'})
-        items.insert(1, {"snapGrid": (10,5)})
-    elif 'veriloga' in viewName:
-        items.insert(0, {'viewName': 'veriloga'})
-    elif 'config' in viewName:
-        items.insert(0, {'viewName': 'config'})
-    elif 'layout' in viewName:
-        items.insert(0, {'viewName': 'layout'})
-        items.insert(1, {"snapGrid": (10,5)})
-    elif 'pcell' in viewName:
-        items.insert(0, {'viewName': 'pcell'})
-    with viewPath.open(mode='w') as f:
+    if "schematic" in viewName:
+        items.insert(0, {"viewName": "schematic"})
+        items.insert(1, {"snapGrid": (10, 5)})
+    elif "symbol" in viewName:
+        items.insert(0, {"viewName": "symbol"})
+        items.insert(1, {"snapGrid": (10, 5)})
+    elif "veriloga" in viewName:
+        items.insert(0, {"viewName": "veriloga"})
+    elif "config" in viewName:
+        items.insert(0, {"viewName": "config"})
+    elif "layout" in viewName:
+        items.insert(0, {"viewName": "layout"})
+        items.insert(1, {"snapGrid": (10, 5)})
+    elif "pcell" in viewName:
+        items.insert(0, {"viewName": "pcell"})
+    with viewPath.open(mode="w") as f:
         json.dump(items, f, indent=4)
-    parent.logger.warning(f'Created {viewName} at {str(viewPath)}')
+    parent.logger.warning(f"Created {viewName} at {str(viewPath)}")
     cellItem.appendRow(newViewItem)
 
     return newViewItem
@@ -220,7 +230,9 @@ def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -
     copyName: the name of the new cell
     selectedLibPath: the path of the selected library
     """
-    cellPath = origCellItem.data(Qt.UserRole + 2)  # get the cell path from item user data
+    cellPath = origCellItem.data(
+        Qt.UserRole + 2
+    )  # get the cell path from item user data
     if copyName == "":  # assign a default name for the cell
         copyName = "newCell"
     copyPath = selectedLibPath.joinpath(copyName)
@@ -231,15 +243,19 @@ def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -
         assert cellPath.exists()
         shutil.copytree(cellPath, copyPath)  # copied the cell
         libraryItem = model.findItems(selectedLibPath.name, flags=Qt.MatchExactly)[
-            0]  # find the library item
+            0
+        ]  # find the library item
         # create new cell item
         newCellItem = cellItem(copyPath)
         newCellItem.setEditable(False)
         newCellItem.setData("cell", Qt.UserRole + 1)
         newCellItem.setData(copyPath, Qt.UserRole + 2)
         # go through view list and add to cell item
-        addedViewList = [viewItem(viewPath) for viewPath in copyPath.iterdir() if
-                    viewPath.suffix == ".json"]
+        addedViewList = [
+            viewItem(viewPath)
+            for viewPath in copyPath.iterdir()
+            if viewPath.suffix == ".json"
+        ]
         [addedView.setEditable(False) for addedView in addedViewList]
 
         newCellItem.appendRows(addedViewList)
