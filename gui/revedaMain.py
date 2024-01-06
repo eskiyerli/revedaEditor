@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
         # look for library.json file where the script is invoked
         self.libraryPathObj = self.runPath.joinpath("library.json")
         self.libraryDict = self.readLibDefFile(self.libraryPathObj)
-        self.textEditorPath = str(self.runPath)
+        self.textEditorPath: pathlib.Path = self.runPath
         self.threadPool = QThreadPool.globalInstance()
         self.confFilePath = self.runPath.joinpath("reveda.conf")
         self.loadState()
@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
                 pathlib.Path(importDlg.vaFileEdit.text()))
 
             # Create the Verilog-A view item tuple
-            va_view_item_tuple = imv.createVaView(
+            vaViewItemTuple = imv.createVaView(
                 self, importDlg, library_model, imported_va_obj
             )
 
@@ -275,7 +275,7 @@ class MainWindow(QMainWindow):
                 # Create the Verilog-A symbol
                 imv.createVaSymbol(
                     self,
-                    va_view_item_tuple,
+                    vaViewItemTuple,
                     self.libraryDict,
                     self.libraryBrowser,
                     imported_va_obj,

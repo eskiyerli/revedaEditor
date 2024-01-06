@@ -114,8 +114,7 @@ class viewItem(QStandardItem):
         """
         self.viewPath.unlink()
         viewRow = self.row()
-        parent = self.parent()
-        parent.removeRow(viewRow)
+        self.parent().removeRow(viewRow)
 
     @property
     def viewType(self):

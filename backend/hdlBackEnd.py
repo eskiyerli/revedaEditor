@@ -52,8 +52,7 @@ class verilogaC:
         with open(self._pathObj) as f:
             self.fileLines = f.readlines()
 
-        # moduleLines = self.stripComments()
-        # self.oneLiners(moduleLines)
+        self.findPinsParams(self.oneLiners(self.stripComments()))
 
     def stripComments(self) -> list:
         """
@@ -88,7 +87,7 @@ class verilogaC:
 
     def oneLiners(self, statementLines: list):
         """
-        Extracts information from statement lines and populates instance attributes.
+        Convert the statement lines into one-liners.
         """
         tempLine = ''
         oneLiners = list()
@@ -103,12 +102,18 @@ class verilogaC:
 
     def findPinsParams(self, filteredLines: list):
         for line in filteredLines:
-            splitLine = line.strip().split()
+            splitLine = line.strip().split(' ', 1)
             match splitLine[0].lower():
                 case 'module':
-                    self._vaModule = splitLine[1].split('(')[0]
-                    pinList = line.split('(')[1].split(')')[0].split(',')
-                    self.pins = [pin.strip() for pin in pinList]
+                    if '(' in splitLine[1]:
+                        self._vaModule = splitLine[1].split('(')[0]
+                    else:
+                        self._vaModule = splitLine[1].replace(';', '').strip()
+                    if '(' in splitLine[1] and ')' in splitLine[1]:
+                        pinList = line.split('(')[1].split(')')[0].split(',')
+                        self.pins = [pin.strip() for pin in pinList]
+                    else:
+                        self.pins = []
                 case 'in':
                     rawPins = line.replace('in ', '').replace(';', '').split(',')
                     self.inPins.extend([pin.strip() for pin in rawPins])
@@ -126,12 +131,12 @@ class verilogaC:
                     self.inoutPins.extend([pin.strip() for pin in rawPins])
                 case 'parameter':
                     paramDefPart = \
-                    line.replace('parameter', '').replace(';', '').split('*(')[0]
+                        line.replace('parameter', '').replace(';', '').split('*(')[0]
                     paramName = paramDefPart.split('=')[0].split()[-1].strip()
                     paramValue = paramDefPart.split('=')[1].split()[0].strip()
-                    try:
+                    if "(*" in line:
                         paramAttr = line.strip().split("(*")[1]
-                    except IndexError:
+                    else:
                         paramAttr = ""
                     if "type" in paramAttr and '"instance"' in paramAttr:
                         # parameter value is between = and (*
@@ -140,43 +145,6 @@ class verilogaC:
                             self.modelParams[paramName] = paramValue
                     else:  # no parameter attribute statement
                         self.modelParams[paramName] = paramValue
-
-        # if splitLine:
-        #     if splitLine[0] == 'module':
-        #         self._vaModule = splitLine[1].split('(')[0]
-        #         indexLow = line.index("(")
-        #         indexHigh = line.index(")")
-        #         self.pins = [pin.strip() for pin in
-        #                      line[indexLow + 1: indexHigh].split(",")]
-        #     elif splitLine[0] == 'in' or splitLine[0] == 'input':
-        #         pinsList = splitLine[1].split(';')[0].split(',')
-        #         self.inPins.extend([pin.strip() for pin in pinsList])
-        #     elif splitLine[0] == 'out' or splitLine[0] == 'output':
-        #         pinsList = splitLine[1].split(';')[0].split(',')
-        #         self.outPins.extend([pin.strip() for pin in pinsList])
-        #     elif splitLine[0] == 'inout':
-        #         print(f'splitLine[1]: {splitLine[1]}')
-        #         pinsList = splitLine[1].split(';')[0].split(',')
-        #         self.inoutPins.extend([pin.strip() for pin in pinsList])
-        #     elif splitLine[0] == "parameter":
-        #         paramDefPart = tempLine.split('*(')[0]
-        #         paramName = paramDefPart.split('=')[0].split()[-1].strip()
-        #         paramValue = paramDefPart.split('=')[1].split()[0].strip()
-        #
-        #         try:
-        #             paramAttr = tempLine.strip().split("(*")[1]
-        #         except IndexError:
-        #             paramAttr = ""
-        #
-        #         if "type" in paramAttr and '"instance"' in paramAttr:
-        #             # parameter value is between = and (*
-        #             self.instanceParams[paramName] = paramValue
-        #             if "xyceAlsoModel" in paramAttr and '"yes"' in paramAttr:
-        #                 self.modelParams[paramName] = paramValue
-        #         else:  # no parameter attribute statement
-        #             self.modelParams[paramName] = paramValue
-        #
-        # tempLine = ''
 
     @property
     def pathObj(self):

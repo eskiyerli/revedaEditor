@@ -111,53 +111,40 @@ def flickerNvaModule():
     vaModuleObj = modulePath.parent.joinpath('flickerNoise.va')
     return vaModuleObj
 
+@pytest.fixture()
+def resVaModule():
+    modulePath = pathlib.Path(__file__).resolve()
+    vaModuleObj = modulePath.parent.joinpath('res.va')
+    return vaModuleObj
 
-def test_capvamodule_stripComments1(capvaModule):
-    modulewoComments = hdl.verilogaC(capvaModule).stripComments()
-    assert len(modulewoComments) == 9
-    assert modulewoComments[0] == '`include "disciplines.vams"'
-    assert modulewoComments[1] == '`include "constants.vams"'
-    assert modulewoComments[
-               5] == 'parameter real c = 0 (* type="instance" xyceAlsoModel="yes" *) ;'
+@pytest.fixture()
+def diodeVaModule():
+    modulePath = pathlib.Path(__file__).resolve()
+    vaModuleObj = modulePath.parent.joinpath('diode.va')
+    return vaModuleObj
 
-
-def test_delayvamodule_stripComments(delayvaModule):
-    modulewocomments = hdl.verilogaC(delayvaModule).stripComments()
-    assert len(modulewocomments) == 12
-    assert modulewocomments[-2] == 'end'
-    assert modulewocomments[-1] == 'endmodule'
-
-
-def test_capvamodule_oneliners(capvaModule):
+def test_capvamodule(capvaModule):
     capvaObj = hdl.verilogaC(capvaModule)
-    lineswocomment = capvaObj.stripComments()
-    oneliners = capvaObj.oneLiners(lineswocomment)
-    capvaObj.findPinsParams(oneliners)
+
     assert capvaObj.vaModule == 'capacitor'
     assert capvaObj.pins == ['p', 'n']
     assert capvaObj.inPins == []
     assert capvaObj.inoutPins == ['p', 'n']
     assert capvaObj.instanceParams['c'] == '0'
     assert capvaObj.modelParams['c'] == '0'
-
-
-def test_delayvamodule_oneliners(delayvaModule):
+#
+#
+def test_delayvamodule(delayvaModule):
     delayvaObj = hdl.verilogaC(delayvaModule)
-    lineswocomment = delayvaObj.stripComments()
-    oneliners = delayvaObj.oneLiners(lineswocomment)
-    delayvaObj.findPinsParams(oneliners)
     assert delayvaObj.vaModule == 'sig_delay'
     assert delayvaObj.pins == ['in', 'out1', 'out2']
     assert delayvaObj.inPins == ['in']
     assert delayvaObj.outPins == ['out1', 'out2']
     assert delayvaObj.modelParams['td'] == '3e-6'
-
-
-def test_flickervamodule_oneliners(flickerNvaModule):
+#
+#
+def test_flickervamodule(flickerNvaModule):
     flickerNObj = hdl.verilogaC(flickerNvaModule)
-    lineswocomment = flickerNObj.stripComments()
-    oneliners = flickerNObj.oneLiners(lineswocomment)
-    flickerNObj.findPinsParams(oneliners)
     assert flickerNObj.vaModule == 'flickerNoise'
     assert flickerNObj.pins == ['p', 'n']
     assert flickerNObj.inPins == []
@@ -166,14 +153,12 @@ def test_flickervamodule_oneliners(flickerNvaModule):
     assert flickerNObj.modelParams['kf'] == '1.0e-20'
     assert flickerNObj.modelParams['ef'] == '1.0'
     assert flickerNObj.instanceParams['kf'] == '1.0e-20'
-# #
-# def test_capvamodule_pins(capvaModule):
-#     verilogaObj = hdl.verilogaC(capvaModule)
-#
-#     # assert verilogaObj.pins == ['p', 'n']
-#     # assert verilogaObj.vaModule == 'capacitor'
-#     # assert verilogaObj.instanceParams == {'c': '0'}
-#     # assert verilogaObj.modelParams == {'c': '0'}
-#     # assert verilogaObj.inPins == []
-#     # assert verilogaObj.outPins == []
-#     # assert verilogaObj.inoutPins == ['p', 'n']
+
+def test_resvamodule(diodeVaModule):
+    diodeObj = hdl.verilogaC(diodeVaModule)
+    assert diodeObj.vaModule == 'diode'
+    assert diodeObj.pins == ['a', 'c']
+    assert diodeObj.inPins == []
+    assert diodeObj.inoutPins == ['a', 'c']
+    assert diodeObj.modelParams['IS'] == '1.0e-14'
+    assert diodeObj.instanceParams == {}

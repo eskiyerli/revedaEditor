@@ -40,9 +40,12 @@ import shutil
 import json
 
 
-def createSpiceView(parent: QMainWindow, importDlg: QDialog,
-                    libraryModel: edw.designLibrariesModel,
-                    importedSpiceObj: hdl.spiceC):
+def createSpiceView(
+    parent: QMainWindow,
+    importDlg: QDialog,
+    libraryModel: edw.designLibrariesModel,
+    importedSpiceObj: hdl.spiceC,
+):
     """
     Create a new Spice view.
 
@@ -82,7 +85,7 @@ def createSpiceView(parent: QMainWindow, importDlg: QDialog,
     # Create the Spice item view
     spiceItem = scb.createCellView(parent, importDlg.spiceViewName.text(), cellItem)
     # Create a temporary copy of the imported Spice file
-    tempSpiceFilePathObj = importedSpiceFilePathObj.with_suffix('.tmp')
+    tempSpiceFilePathObj = importedSpiceFilePathObj.with_suffix(".tmp")
     shutil.copy(importedSpiceFilePathObj, tempSpiceFilePathObj)
 
     shutil.copy(tempSpiceFilePathObj, newSpiceFilePathObj)
@@ -103,9 +106,12 @@ def createSpiceView(parent: QMainWindow, importDlg: QDialog,
     return ddef.viewItemTuple(libItem, cellItem, spiceItem)
 
 
-def createVaView(parent: QMainWindow, importDlg: QDialog,
-                 libraryModel: edw.designLibrariesModel,
-                 importedVaObj: hdl.verilogaC):
+def createVaView(
+    parent: QMainWindow,
+    importDlg: QDialog,
+    libraryModel: edw.designLibrariesModel,
+    importedVaObj: hdl.verilogaC,
+) -> ddef.viewItemTuple:
     """
     Create a new Verilog-A view.
 
@@ -164,7 +170,6 @@ def createVaView(parent: QMainWindow, importDlg: QDialog,
     items.insert(0, {"cellView": "veriloga"})
     items.insert(1, {"filePath": str(newVaFilePathObj.name)})
     items.insert(2, {"vaModule": importedVaObj.vaModule})
-    items.insert(3, {"netlistLine": importedVaObj.netlistLine})
 
     # Write the items to the Verilog-A item data file
     with vaItem.data(Qt.UserRole + 2).open(mode="w") as f:
@@ -175,18 +180,21 @@ def createVaView(parent: QMainWindow, importDlg: QDialog,
 
 
 def createSpiceSymbol(
-        parent: QMainWindow,
-        spiceItemTuple: ddef.viewItemTuple,
-        libraryDict: dict,
-        libraryBrowser: edw.libraryBrowser,
-        importedSpiceObj: hdl.spiceC,
+    parent: QMainWindow,
+    spiceItemTuple: ddef.viewItemTuple,
+    libraryDict: dict,
+    libraryBrowser: edw.libraryBrowser,
+    importedSpiceObj: hdl.spiceC,
 ):
-    symbolNameDlg = fd.createCellViewDialog(parent, libraryBrowser.libraryModel,
-                                            spiceItemTuple.cellItem)
+    symbolNameDlg = fd.createCellViewDialog(
+        parent, libraryBrowser.libraryModel, spiceItemTuple.cellItem
+    )
     symbolNameDlg.viewComboBox.setCurrentText("symbol")
     if symbolNameDlg.exec() == QDialog.Accepted:
         symbolViewName = symbolNameDlg.nameEdit.text().strip()
-        symbolViewItem = scb.createCellView(parent, symbolViewName, spiceItemTuple.cellItem)
+        symbolViewItem = scb.createCellView(
+            parent, symbolViewName, spiceItemTuple.cellItem
+        )
         newSpiceFilePathObj = spiceItemTuple.cellItem.data(Qt.UserRole + 2).joinpath(
             importedSpiceObj.pathObj.name
         )
@@ -197,7 +205,7 @@ def createSpiceSymbol(
         )
         symbolScene = symbolWindow.centralW.scene
         dlg = pdlg.symbolCreateDialog(parent)
-        dlg.leftPinsEdit.setText(", ".join(importedSpiceObj.subcktParams['pins']))
+        dlg.leftPinsEdit.setText(", ".join(importedSpiceObj.subcktParams["pins"]))
 
         if dlg.exec() == QDialog.Accepted:
             rectXDim, rectYDim = drawBaseSymbol(symbolScene, dlg)
@@ -211,9 +219,10 @@ def createSpiceSymbol(
                 "Instance",
             )
             symbolFileLabel.labelVisible = False
-            instParamNum = len(importedSpiceObj.subcktParams['params'])
+            instParamNum = len(importedSpiceObj.subcktParams["params"])
             for index, (key, value) in enumerate(
-                    importedSpiceObj.subcktParams['params'].items()):
+                importedSpiceObj.subcktParams["params"].items()
+            ):
                 symbolScene.labelDraw(
                     QPoint(
                         int(rectXDim),
@@ -231,32 +240,55 @@ def createSpiceSymbol(
                 se.symbolAttribute("pinOrder", importedSpiceObj.pinOrder)
             )
             symbolScene.attributeList.append(
-                se.symbolAttribute("incLine", f".INC {str(newSpiceFilePathObj)}"))
+                se.symbolAttribute("incLine", f".INC {str(newSpiceFilePathObj)}\n")
+            )
 
             symbolScene.attributeList.append(
-                se.symbolAttribute("xyceNetlistLine", importedSpiceObj.netlistLine))
+                se.symbolAttribute("XyceNetlistLine", importedSpiceObj.netlistLine)
+            )
 
             symbolWindow.show()
             symbolViewTuple = ddef.viewTuple(
-                spiceItemTuple.libraryItem.libraryName, spiceItemTuple.cellItem.cellName,
-                symbolViewItem.viewName
+                spiceItemTuple.libraryItem.libraryName,
+                spiceItemTuple.cellItem.cellName,
+                symbolViewItem.viewName,
             )
             symbolWindow.libraryView.openViews[symbolViewTuple] = symbolWindow
 
 
 def createVaSymbol(
-        parent: QMainWindow,
-        vaItemTuple: ddef.viewItemTuple,
-        libraryDict: dict,
-        libraryBrowser: edw.libraryBrowser,
-        importedVaObj: hdl.verilogaC,
-):
-    symbolNameDlg = fd.createCellViewDialog(parent, libraryBrowser.libraryModel,
-                                            vaItemTuple.cellItem)
+    parent: QMainWindow,
+    vaItemTuple: ddef.viewItemTuple,
+    libraryDict: dict,
+    libraryBrowser: edw.libraryBrowser,
+    importedVaObj: hdl.verilogaC,
+) -> None:
+    """
+    Creates a symbol for a given view item in the library.
+
+    Args:
+        parent (QMainWindow): The parent window.
+        vaItemTuple (ddef.viewItemTuple): The view item tuple.
+        libraryDict (dict): The library dictionary.
+        libraryBrowser (edw.libraryBrowser): The library browser.
+        importedVaObj (hdl.verilogaC): The imported Veriloga object.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    symbolNameDlg = fd.createCellViewDialog(
+        parent, libraryBrowser.libraryModel, vaItemTuple.cellItem
+    )
     symbolNameDlg.viewComboBox.setCurrentText("symbol")
+    symbolNameDlg.nameEdit.setText('symbol')
     if symbolNameDlg.exec() == QDialog.Accepted:
         symbolViewName = symbolNameDlg.nameEdit.text().strip()
-        symbolViewItem = scb.createCellView(parent, symbolViewName, vaItemTuple.cellItem)
+        symbolViewItem = scb.createCellView(
+            parent, symbolViewName, vaItemTuple.cellItem
+        )
         newVaFilePathObj = vaItemTuple.cellItem.data(Qt.UserRole + 2).joinpath(
             importedVaObj.pathObj.name
         )
@@ -274,15 +306,15 @@ def createVaSymbol(
 
         if dlg.exec() == QDialog.Accepted:
             rectXDim, rectYDim = drawBaseSymbol(symbolScene, dlg)
-            vaFileLabel = symbolScene.labelDraw(
-                QPoint(int(0.25 * rectXDim), int(0.6 * rectYDim)),
-                f"[@vaFile:vaFile=%:vaFile={str(newVaFilePathObj)}]",
-                "NLPLabel",
-                "12",
-                "Center",
-                "R0",
-                "Instance",
-            )
+            # vaFileLabel = symbolScene.labelDraw(
+            #     QPoint(int(0.25 * rectXDim), int(0.6 * rectYDim)),
+            #     f"[@vaFile:vaFile=%:vaFile={str(newVaFilePathObj)}]",
+            #     "NLPLabel",
+            #     "12",
+            #     "Center",
+            #     "R0",
+            #     "Instance",
+            # )
             vaFileLabel.labelVisible = False
             vaModuleLabel = symbolScene.labelDraw(
                 QPoint(int(0.25 * rectXDim), int(0.8 * rectYDim)),
@@ -293,52 +325,60 @@ def createVaSymbol(
                 "R0",
                 "Instance",
             )
-            vaModuleLabel.labelVisible = False
-            vaModelLabel = symbolScene.labelDraw(
-                QPoint(int(0.25 * rectXDim), int(1 * rectYDim)),
-                f"[@vaModel:vaModel=%:vaModel={importedVaObj.vaModule}Model]",
-                "NLPLabel",
-                "12",
-                "Center",
-                "R0",
-                "Instance",
-            )
-            vaModelLabel.labelVisible = False
+            vaModuleLabel.labelVisible = True
+            # vaModelLabel = symbolScene.labelDraw(
+            #     QPoint(int(0.25 * rectXDim), int(1 * rectYDim)),
+            #     f"[@vaModel:vaModel=%:vaModel={importedVaObj.vaModule}Model]",
+            #     "NLPLabel",
+            #     "12",
+            #     "Center",
+            #     "R0",
+            #     "Instance",
+            # )
+            # vaModelLabel.labelVisible = False
 
             instParamNum = len(importedVaObj.instanceParams)
-            for index, (key, value) in enumerate(importedVaObj.instanceParams.items()):
-                symbolScene.labelDraw(
-                    QPoint(
-                        int(rectXDim),
-                        int(index * 0.2 * rectYDim / instParamNum),
-                    ),
-                    f"[@{key}:{key}=%:{key}={value}]",
-                    "NLPLabel",
-                    "12",
-                    "Center",
-                    "R0",
-                    "Instance",
-                )
+            if instParamNum > 0:
+                for index, (key, value) in enumerate(importedVaObj.instanceParams.items()):
+                    symbolScene.labelDraw(
+                        QPoint(
+                            int(rectXDim),
+                            int(index * 0.2 * rectYDim / instParamNum),
+                        ),
+                        f"[@{key}:{key}=%:{key}={value}]",
+                        "NLPLabel",
+                        "12",
+                        "Center",
+                        "R0",
+                        "Instance",
+                    )
 
             symbolScene.attributeList = list()  # empty attribute list
-            for key, value in importedVaObj.modelParams.items():
-                symbolScene.attributeList.append(se.symbolAttribute(key, value))
+            if importedVaObj.modelParams:
+                for key, value in importedVaObj.modelParams.items():
+                    symbolScene.attributeList.append(se.symbolAttribute(key, value))
+                symbolScene.attributeList.append(
+                    se.symbolAttribute("XyceNetlistLine", importedVaObj.netlistLine)
+                )
+
+            modelParamsString = ', '.join(f'{key} = {value}' for key, value in importedVaObj.modelParams.items())
             symbolScene.attributeList.append(
-                se.symbolAttribute("XyceNetlistLine", importedVaObj.netlistLine)
+                se.symbolAttribute(
+                    "vaModelLine",
+                    f".MODEL {importedVaObj.vaModule}Model {importedVaObj.vaModule} {modelParamsString}",
+                )
             )
-            modelParamsString = ''
-            for key, value in importedVaObj.modelParams.items():
-                modelParamsString += f'{key}={value}, '
-            symbolScene.attributeList.append(se.symbolAttribute("vaModelLine",
-                                                                f'.MODEL {importedVaObj.vaModule}Model {importedVaObj.vaModule} {modelParamsString}'))
-            symbolScene.attributeList.append(se.symbolAttribute('vaHDLLine',
-                                                                f'*.HDL {str(importedVaObj.pathObj)}'))
+            symbolScene.attributeList.append(
+                se.symbolAttribute("vaHDLLine", f"*.HDL {str(importedVaObj.pathObj)}")
+            )
             symbolScene.attributeList.append(
                 se.symbolAttribute("pinOrder", importedVaObj.pinOrder)
             )
             symbolWindow.show()
             symbolViewTuple = ddef.viewTuple(
-                vaItemTuple.libraryItem.libraryName, vaItemTuple.cellItem.cellName, "symbol"
+                vaItemTuple.libraryItem.libraryName,
+                vaItemTuple.cellItem.cellName,
+                "symbol",
             )
             symbolWindow.libraryView.openViews[symbolViewTuple] = symbolWindow
 

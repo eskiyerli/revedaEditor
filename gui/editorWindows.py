@@ -146,8 +146,6 @@ class libraryBrowser(QMainWindow):
         self.designView = self.libBrowserCont.designView
         self.libraryModel = self.designView.libraryModel
         self.editProcess = None
-        self._spicefilePathObj: pathlib.Path = None
-        self._verilogafilePathObj: pathlib.Path = None
 
     def _createMenuBar(self):
         self.browserMenubar = self.menuBar()
@@ -475,7 +473,7 @@ class libraryBrowser(QMainWindow):
         self.openCellView(viewItem, cellItem, libItem)
 
     def openCellView(
-            self, viewItem: scb.viewItem, cellItem: scb.cellItem, libItem: scb.libraryItem
+        self, viewItem: scb.viewItem, cellItem: scb.cellItem, libItem: scb.libraryItem
     ):
         viewName = viewItem.viewName
         cellName = cellItem.cellName
@@ -513,34 +511,17 @@ class libraryBrowser(QMainWindow):
                     if items[1]["filePath"]:
                         if self.editProcess is None:
                             self.editProcess = QProcess()
-                            self._verilogafilePathObj = (
+                            VerilogafilePathObj = (
                                 viewItem.parent()
                                 .data(Qt.UserRole + 2)
                                 .joinpath(items[1]["filePath"])
                             )
-                            self.editProcess.finished.connect(self.verilogaEditFinished)
+                            self.editProcess.finished.connect(self.editProcessFinished)
                             self.editProcess.start(
-                                str(self.appMainW.textEditorPath),
-                                [str(self._verilogafilePathObj)])
+                                str(self.appMainW.textEditorPath), [str(VerilogafilePathObj)]
+                            )
                     else:
                         self.logger.warning("File path not defined.")
-                case "spice":
-                    with open(viewItem.viewPath) as tempFile:
-                        items = json.load(tempFile)
-                    if items[1]["filePath"]:
-                        self.editProcess = QProcess()
-                        self._spicefilePathObj = (
-                            viewItem.parent()
-                            .data(Qt.UserRole + 2)
-                            .joinpath(items[1]["filePath"])
-                        )
-                        self.editProcess.finished.connect(self.spiceEditFinished)
-                        self.editProcess.start(
-                            str(self.appMainW.textEditorPath),
-                            [str(self._spicefilePathObj)])
-                    else:
-                        self.logger.warning("File path not defined.")
-
                 case "pcell":
                     with open(viewItem.viewPath) as tempFile:
                         items = json.load(tempFile)
@@ -559,12 +540,8 @@ class libraryBrowser(QMainWindow):
 
         return openCellViewTuple
 
-    def verilogaEditFinished(self):
-        self.appMainW.importVerilogaModule(str(self._verilogafilePathObj))
-        self.editProcess = None
-
-    def spiceEditFinished(self):
-        self.appMainW.importSpiceSubckt(str(self._spicefilePathObj))
+    def editProcessFinished(self):
+        self.appMainW.importVerilogaClick()
         self.editProcess = None
 
     def deleteCellViewClick(self, s):
@@ -696,7 +673,7 @@ class designLibrariesView(QTreeView):
                     for row in range(selectedLibItem.rowCount())
                 ]
                 if (
-                        cellName in libCellNames
+                    cellName in libCellNames
                 ):  # check if there is the cell in the library
                     cellItem = libm.getCellItem(
                         selectedLibItem, dlg.cellCB.currentText()
@@ -897,7 +874,7 @@ class symbolViewsModel(designLibrariesModel):
                     view.name
                     for view in designPath.joinpath(cell).iterdir()
                     if view.suffix == ".json"
-                       and any(x in view.name for x in self.symbolViews)
+                    and any(x in view.name for x in self.symbolViews)
                 ]
                 for view in viewList:
                     self.addViewToModel(designPath.joinpath(cell, view), cellItem)
@@ -921,7 +898,7 @@ class layoutViewsModel(designLibrariesModel):
                     view.name
                     for view in designPath.joinpath(cell).iterdir()
                     if view.suffix == ".json"
-                       and any(x in view.name for x in self.layoutViews)
+                    and any(x in view.name for x in self.layoutViews)
                 ]
                 for view in viewList:
                     self.addViewToModel(designPath.joinpath(cell, view), cellItem)
@@ -933,10 +910,10 @@ class editorWindow(QMainWindow):
     """
 
     def __init__(
-            self,
-            viewItem: scb.viewItem,
-            libraryDict: dict,
-            libraryView: designLibrariesView,
+        self,
+        viewItem: scb.viewItem,
+        libraryDict: dict,
+        libraryView: designLibrariesView,
     ):  # file is a pathlib.Path object
         super().__init__()
         self.centralW = None
@@ -2014,11 +1991,11 @@ class schematicEditor(editorWindow):
         # because we do not save dot points, it is necessary to recreate them.
 
     def createConfigView(
-            self,
-            configItem: scb.viewItem,
-            configDict: dict,
-            newConfigDict: dict,
-            processedCells: set,
+        self,
+        configItem: scb.viewItem,
+        configDict: dict,
+        newConfigDict: dict,
+        processedCells: set,
     ):
         sceneSymbolSet = self.centralW.scene.findSceneSymbolSet()
         for item in sceneSymbolSet:
@@ -2145,10 +2122,10 @@ class schematicEditor(editorWindow):
 
 class symbolEditor(editorWindow):
     def __init__(
-            self,
-            viewItem: scb.viewItem,
-            libraryDict: dict,
-            libraryView: designLibrariesView,
+        self,
+        viewItem: scb.viewItem,
+        libraryDict: dict,
+        libraryView: designLibrariesView,
     ):
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Symbol Editor - {self.cellName} - {self.viewName}")
@@ -2302,7 +2279,7 @@ class symbolEditor(editorWindow):
             )
             self.centralW.scene.labelUse = createLabelDlg.labelUseCombo.currentText()
             self.centralW.scene.labelOpaque = (
-                    createLabelDlg.labelVisiCombo.currentText() == "Yes"
+                createLabelDlg.labelVisiCombo.currentText() == "Yes"
             )
             self.centralW.scene.labelType = "Normal"  # default button
             if createLabelDlg.normalType.isChecked():
@@ -2702,7 +2679,7 @@ class symbol_scene(editor_scene):
                     self.editorWindow.messageLine.setText("Add Symbol Pin")
                     self.newPin = self.pinDraw(self.mousePressLoc)
                     self.newPin.setSelected(True)
-                elif self.editModes.drawLine and self.newLine:
+                elif self.editModes.drawLine:
                     self.newLine.setSelected(False)
                     self.newLine = None
                 elif self.editModes.addLabel:
@@ -2725,7 +2702,26 @@ class symbol_scene(editor_scene):
                     self.newCircle = self.circleDraw(
                         self.mousePressLoc, self.mousePressLoc
                     )
+                elif self.editModes.drawPolygon:
+                    if self.newPolygon is None:
+                        # Create a new polygon
+                        self.newPolygon = shp.symbolPolygon(
+                            [self.mousePressLoc, self.mousePressLoc],
+                        )
+                        self.addUndoStack(self.newPolygon)
+                        # Create a guide line for the polygon
+                        self.polygonGuideLine = QGraphicsLineItem(
+                            QLineF(
+                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                            )
+                        )
+                        self.polygonGuideLine.setPen(
+                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
+                        )
+                        self.addUndoStack(self.polygonGuideLine)
 
+                    else:
+                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.drawArc:
                     self.editorWindow.messageLine.setText("Start drawing an arc")
                     self.newArc = self.arcDraw(self.mousePressLoc, self.mousePressLoc)
@@ -2751,9 +2747,9 @@ class symbol_scene(editor_scene):
             elif self.editModes.drawCircle:
                 self.editorWindow.messageLine.setText("Extend Circle")
                 radius = (
-                                 (self.mouseMoveLoc.x() - self.mousePressLoc.x()) ** 2
-                                 + (self.mouseMoveLoc.y() - self.mousePressLoc.y()) ** 2
-                         ) ** 0.5
+                    (self.mouseMoveLoc.x() - self.mousePressLoc.x()) ** 2
+                    + (self.mouseMoveLoc.y() - self.mousePressLoc.y()) ** 2
+                ) ** 0.5
                 self.newCircle.radius = radius
             elif self.editModes.drawArc:
                 self.editorWindow.messageLine.setText("Extend Arc")
@@ -2763,16 +2759,15 @@ class symbol_scene(editor_scene):
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
         else:
-            if self.editModes.drawLine and self.newLine:
-                self.editorWindow.messageLine.setText("Press mouse on the end point")
-                self.newLine.end = self.mouseMoveLoc
-            elif self.editModes.drawPolygon and self.newPolygon:
+            if self.editModes.drawPolygon and self.newPolygon is not None:
                 self.polygonGuideLine.setLine(
                     QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
                 )
+            elif self.editModes.drawLine and self.newLine is not None:
+                self.editorWindow.messageLine.setText("Release mouse on the end point")
+                self.newLine.end = self.mouseMoveLoc
         self.statusLine.showMessage(
-            f"Cursor Position: {(self.mouseMoveLoc - self.origin).toTuple()}"
-        )
+            f"Cursor Position: {(self.mouseMoveLoc - self.origin).toTuple()}")
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
@@ -2782,9 +2777,7 @@ class symbol_scene(editor_scene):
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.drawLine:
                     self.editorWindow.messageLine.setText("Drawing a Line")
-                    self.newLine = self.lineDraw(
-                        self.mouseReleaseLoc, self.mouseReleaseLoc
-                    )
+                    self.newLine = self.lineDraw(self.mousePressLoc, self.mousePressLoc)
                     self.newLine.setSelected(True)
 
                 elif self.editModes.drawCircle:
@@ -2800,26 +2793,6 @@ class symbol_scene(editor_scene):
                 elif self.editModes.addLabel:
                     self.newLabel.setSelected(False)
                     self.editModes.addLabel = False
-                elif self.editModes.drawPolygon:
-                    if self.newPolygon is None:
-                        # Create a new polygon
-                        self.newPolygon = shp.symbolPolygon(
-                            [self.mouseReleaseLoc, self.mouseReleaseLoc],
-                        )
-                        self.addUndoStack(self.newPolygon)
-                        # Create a guide line for the polygon
-                        self.polygonGuideLine = QGraphicsLineItem(
-                            QLineF(
-                                self.newPolygon.points[-2], self.newPolygon.points[-1]
-                            )
-                        )
-                        self.polygonGuideLine.setPen(
-                            QPen(QColor(255, 255, 0), 1, Qt.DashLine)
-                        )
-                        self.addUndoStack(self.polygonGuideLine)
-
-                    else:
-                        self.newPolygon.addPoint(self.mousePressLoc)
                 elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectInRectItems(
                         self.selectionRectItem.rect(), self.partialSelection
@@ -2829,14 +2802,19 @@ class symbol_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"Error in Mouse Press Event: {e} ")
 
-    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-    #     super().mouseDoubleClickEvent(event)
-    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
-    #     try:
-    #         if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
-    #
-    #     except Exception as e:
-    #         self.logger.error(f"Error in mouse Double Click Event: {e}")
+    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(event)
+        self.mouseDoubleClickLoc = event.scenePos().toPoint()
+        try:
+            if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
+                self.newPolygon.polygon.remove(0)
+                self.newPolygon.points.pop(0)
+                self.editModes.setMode("selectItem")
+                self.newPolygon = None
+                self.removeItem(self.polygonGuideLine)
+                self.polygonGuideLine = None
+        except Exception as e:
+            self.logger.error(f"Error in mouse Double Click Event: {e}")
 
     def lineDraw(self, start: QPoint, current: QPoint):
         line = shp.symbolLine(start, current)
@@ -2883,14 +2861,14 @@ class symbol_scene(editor_scene):
         return pin
 
     def labelDraw(
-            self,
-            current,
-            labelDefinition,
-            labelType,
-            labelHeight,
-            labelAlignment,
-            labelOrient,
-            labelUse,
+        self,
+        current,
+        labelDefinition,
+        labelType,
+        labelHeight,
+        labelAlignment,
+        labelOrient,
+        labelUse,
     ):
         label = lbl.symbolLabel(
             current,
@@ -2904,6 +2882,7 @@ class symbol_scene(editor_scene):
         label.labelVisible = self.labelOpaque
         label.labelDefs()
         label.setOpacity(1)
+        print(label)
         undoCommand = us.addShapeUndo(self, label)
         self.undoStack.push(undoCommand)
         return label
@@ -3030,27 +3009,6 @@ class symbol_scene(editor_scene):
                 self.queryDlg.labelYLine.setText(str(sceneStartPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLabelShape(item)
-            elif isinstance(item, shp.symbolPolygon):
-                dlg = pdlg.symbolPolygonProperties(self.editorWindow, len(item.points))
-                for i, point in enumerate(item.points):
-                    dlg.pointXEdits[i].setText(str(point.x()))
-                    dlg.pointYEdits[i].setText(str(point.y()))
-                if dlg.exec() == QDialog.Accepted:
-                    tempPoints = []
-                    for i in range(dlg.polygonGroupLayout.rowCount() - 2):
-                        xedit = (
-                            dlg.polygonGroupLayout.itemAtPosition(i + 2, 1)
-                            .widget()
-                            .text()
-                        )
-                        yedit = (
-                            dlg.polygonGroupLayout.itemAtPosition(i + 2, 2)
-                            .widget()
-                            .text()
-                        )
-                        if xedit != "" and yedit != "":
-                            tempPoints.append(QPointF(float(xedit), float(yedit)))
-                    item.points = tempPoints
 
     def updateRectangleShape(self, item: shp.symbolRectangle):
         """
@@ -3202,7 +3160,11 @@ class symbol_scene(editor_scene):
         self.undoStack.push(undoCommand)
 
     def loadSymbol(self, itemsList: list):
-        self.snapTuple = itemsList[1].get("snapGrid")
+        snapGrid = itemsList[1].get("snapGrid")
+        self.majorGrid = snapGrid[0]  # dot/line grid spacing
+        self.snapGrid = snapGrid[1]  # snapping grid size
+        self.snapTuple = (self.snapGrid, self.snapGrid)
+        self.snapDistance = 2 * self.snapGrid
         self.parent.view.snapTuple = self.snapTuple
         self.editorWindow.snapTuple = self.snapTuple
         self.attributeList = []
@@ -3407,7 +3369,7 @@ class schematic_scene(editor_scene):
                         self.addItem(self._snapPointRect)
                     self._snapPointRect.setPos(self.mouseMoveLoc)
                     self._newNet.draftLine = QLineF(
-                        self.mousePressLoc, self.mouseMoveLoc
+                        self.mouseReleaseLoc, self.mouseMoveLoc
                     )
                     if self._newNet.scene() is None:
                         self.addUndoStack(self._newNet)
@@ -3538,7 +3500,7 @@ class schematic_scene(editor_scene):
                             points.append(item.draftLine.p1().toPoint())
                             lengths.append(
                                 (
-                                        item.mapToScene(item.draftLine.p1()) - eventLoc
+                                    item.mapToScene(item.draftLine.p1()) - eventLoc
                                 ).manhattanLength()
                             )
                         elif snapRect.contains(item.draftLine.p2().toPoint()):
@@ -3547,7 +3509,7 @@ class schematic_scene(editor_scene):
                             # print(f'net end:{item.end}')
                             lengths.append(
                                 (
-                                        item.mapToScene(item.draftLine.p2()) - eventLoc
+                                    item.mapToScene(item.draftLine.p2()) - eventLoc
                                 ).manhattanLength()
                             )
                 if len(lengths) > 0:
@@ -3723,9 +3685,9 @@ class schematic_scene(editor_scene):
             for netItem2 in otherNetsSet:
                 if self.checkNetConnect(netItem, netItem2):
                     if (
-                            (netItem2.nameSet or netItem2.nameAdded)
-                            and (netItem.nameSet or netItem.nameAdded)
-                            and (netItem.name != netItem2.name)
+                        (netItem2.nameSet or netItem2.nameAdded)
+                        and (netItem.nameSet or netItem.nameAdded)
+                        and (netItem.name != netItem2.name)
                     ):
                         self.editorWindow.messageLine.setText(
                             "Error: multiple names assigned to same net"
@@ -3757,7 +3719,7 @@ class schematic_scene(editor_scene):
 
         if otherNetItem is not netItem:
             for netItemEnd, otherEnd in itt.product(
-                    netItem.sceneEndPoints, otherNetItem.sceneEndPoints
+                netItem.sceneEndPoints, otherNetItem.sceneEndPoints
             ):
                 # not a very elegant solution to mistakes in net end points.
                 if (netItemEnd - otherEnd).manhattanLength() <= 1:
@@ -3857,7 +3819,7 @@ class schematic_scene(editor_scene):
         """
         try:
             if (
-                    start.y() == end.y() or start.x() == end.x()
+                start.y() == end.y() or start.x() == end.x()
             ):  # horizontal or verticalline
                 lines = [net.schematicNet(start, end)]
             else:
@@ -3987,13 +3949,17 @@ class schematic_scene(editor_scene):
         """
         load schematic from item list
         """
-        self.snapTuple = itemsList[1].get("snapGrid")
+        snapGrid = itemsList[1].get("snapGrid")
+        self.majorGrid = snapGrid[0]  # dot/line grid spacing
+        self.snapGrid = snapGrid[1]  # snapping grid size
+        self.snapTuple = (self.snapGrid, self.snapGrid)
+        self.snapDistance = 2 * self.snapGrid
         shapesList = list()
         for item in itemsList[2:]:
             itemShape = lj.schematicItems(self).create(item)
             if (
-                    type(itemShape) == shp.schematicSymbol
-                    and itemShape.counter > self.itemCounter
+                type(itemShape) == shp.schematicSymbol
+                and itemShape.counter > self.itemCounter
             ):
                 self.itemCounter = itemShape.counter
                 # increment item counter for next symbol
@@ -4001,6 +3967,7 @@ class schematic_scene(editor_scene):
             shapesList.append(itemShape)
 
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
+        print(f"snap tuple: {self.snapTuple}")
 
     def reloadScene(self):
         topLevelItems = [item for item in self.items() if item.parentItem() is None]
@@ -4196,9 +4163,9 @@ class schematic_scene(editor_scene):
         oldSymbolItem = False
 
         askViewNameDlg = pdlg.symbolNameDialog(
-            self.parent.parent.file.parent,
-            self.parent.parent.cellName,
-            self.parent.parent,
+            self.editorWindow.file.parent,
+            self.editorWindow.cellName,
+            self.editorWindow,
         )
         if askViewNameDlg.exec() == QDialog.Accepted:
             symbolViewName = askViewNameDlg.symbolViewsCB.currentText()
@@ -4206,7 +4173,7 @@ class schematic_scene(editor_scene):
                 oldSymbolItem = True
             if oldSymbolItem:
                 deleteSymViewDlg = fd.deleteSymbolDialog(
-                    self.parent.parent.cellName, symbolViewName, self.parent.parent
+                    self.editorWindow.cellName, symbolViewName, self.editorWindow
                 )
                 if deleteSymViewDlg.exec() == QDialog.Accepted:
                     self.createSymbolViewItem(symbolViewName)
@@ -4251,9 +4218,10 @@ class schematic_scene(editor_scene):
             if pinItem.pinDir == shp.schematicPin.pinDirs[2]
         ]
 
-        dlg = pdlg.symbolCreateDialog(
-            self.parent.parent, inputPins, outputPins, inoutPins
-        )
+        dlg = pdlg.symbolCreateDialog(self.parent.parent)
+        dlg.leftPinsEdit.setText(", ".join(inputPins))
+        dlg.rightPinsEdit.setText(", ".join(outputPins))
+        dlg.topPinsEdit.setText(", ".join(inoutPins))
         if dlg.exec() == QDialog.Accepted:
             symbolViewItem = scb.createCellView(
                 self.editorWindow, symbolViewName, cellItem
@@ -4301,11 +4269,11 @@ class schematic_scene(editor_scene):
                 stubLength = int(float(dlg.stubLengthEdit.text().strip()))
                 pinDistance = int(float(dlg.pinDistanceEdit.text().strip()))
                 rectXDim = (
-                                   max(len(topPinNames), len(bottomPinNames)) + 1
-                           ) * pinDistance
+                    max(len(topPinNames), len(bottomPinNames)) + 1
+                ) * pinDistance
                 rectYDim = (
-                                   max(len(leftPinNames), len(rightPinNames)) + 1
-                           ) * pinDistance
+                    max(len(leftPinNames), len(rightPinNames)) + 1
+                ) * pinDistance
             except ValueError:
                 self.logger.error("Enter valid value")
 
@@ -4374,7 +4342,7 @@ class schematic_scene(editor_scene):
             )
             symbolScene.addItem(
                 schematicPins[schematicPinNames.index(bottomPinNames[i])].toSymbolPin(
-                    bottomPinLocs[i], symbolScene.snapTuple
+                    bottomPinLocs[i]
                 )
             )  # symbol attribute generation for netlisting.
         symbolScene.attributeList = list()  # empty attribute list
@@ -4383,6 +4351,9 @@ class schematic_scene(editor_scene):
             symenc.symbolAttribute(
                 "XyceNetlistLine", "X[@instName] [@cellName] [@pinList]"
             )
+        )
+        symbolScene.attributeList.append(
+            symenc.symbolAttribute("pinOrder", ", ".join(schematicPinNames))
         )
 
         symbolWindow.checkSaveCell()
@@ -4403,7 +4374,7 @@ class schematic_scene(editor_scene):
                         for i in range(cellItem.rowCount())
                         # if cellItem.child(i).text() != item.viewName
                         if "schematic" in cellItem.child(i).text()
-                           or "symbol" in cellItem.child(i).text()
+                        or "symbol" in cellItem.child(i).text()
                     ]
                     dlg.viewListCB.addItems(viewNames)
                     if dlg.exec() == QDialog.Accepted:
@@ -4504,7 +4475,7 @@ class layout_scene(editor_scene):
         self.newPinTuple = None
         self.newLabelTuple = None
         self.newLabel = None
-        self.newPolygon = None
+        self._newPolygon = None
         self.arrayViaTuple = None
         self.singleVia = None
         self._arrayVia = None
@@ -4708,9 +4679,9 @@ class layout_scene(editor_scene):
                     self._arrayVia.setPos(self.mouseMoveLoc - self._arrayVia.start)
                     self._arrayVia.setSelected(True)
             # Handle drawing polygon mode
-            elif self.editModes.drawPolygon and self.newPolygon is not None:
+            elif self.editModes.drawPolygon and self._newPolygon is not None:
                 self._polygonGuideLine.setLine(
-                    QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
+                    QLineF(self._newPolygon.points[-1], self.mouseMoveLoc)
                 )
             # Handle adding instance mode with layout instance tuple
             elif self.editModes.addInstance and self.layoutInstanceTuple is not None:
@@ -4781,7 +4752,7 @@ class layout_scene(editor_scene):
                     )
 
                 elif (
-                        self.editModes.drawPin
+                    self.editModes.drawPin
                 ):  # finish pin editing and start label editing
                     if self.newPin is not None and self.newLabel is None:
                         self.newLabel = lshp.layoutLabel(
@@ -4796,25 +4767,26 @@ class layout_scene(editor_scene):
                         self.newLabel = None
 
                 elif self.editModes.drawPolygon:
-                    if self.newPolygon is None:
+                    if self._newPolygon is None:
                         # Create a new polygon
-                        self.newPolygon = lshp.layoutPolygon(
+                        self._newPolygon = lshp.layoutPolygon(
                             [self.mouseReleaseLoc, self.mouseReleaseLoc],
                             self.selectEdLayer,
                         )
-                        self.addUndoStack(self.newPolygon)
+                        self.addUndoStack(self._newPolygon)
                         # Create a guide line for the polygon
                         self._polygonGuideLine = QGraphicsLineItem(
                             QLineF(
-                                self.newPolygon.points[-2], self.newPolygon.points[-1]
+                                self._newPolygon.points[-2], self._newPolygon.points[-1]
                             )
                         )
                         self._polygonGuideLine.setPen(
                             QPen(QColor(255, 255, 0), 1, Qt.DashLine)
                         )
                         self.addUndoStack(self._polygonGuideLine)
+
                     else:
-                        self.newPolygon.addPoint(self.mouseReleaseLoc)
+                        self._newPolygon.addPoint(self.mouseReleaseLoc)
                 elif self.editModes.addInstance and self.newInstance is not None:
                     self.newInstance = None
                     self.layoutInstanceTuple = None
@@ -4829,21 +4801,21 @@ class layout_scene(editor_scene):
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
 
-    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-    #     super().mouseDoubleClickEvent(event)
-    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
-    #     try:
-    #         if event.button() == Qt.LeftButton:
-    #             if self.editModes.drawPolygon:
-    #                 self.newPolygon.polygon.remove(0)
-    #                 self.newPolygon.points.pop(0)
-    #                 self.editModes.setMode("selectItem")
-    #                 self.newPolygon = None
-    #                 self.removeItem(self._polygonGuideLine)
-    #                 self._polygonGuideLine = None
-    #
-    #     except Exception as e:
-    #         self.logger.error(f"mouse double click error: {e}")
+    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(event)
+        self.mouseDoubleClickLoc = event.scenePos().toPoint()
+        try:
+            if event.button() == Qt.LeftButton:
+                if self.editModes.drawPolygon:
+                    self._newPolygon.polygon.remove(0)
+                    self._newPolygon.points.pop(0)
+                    self.editModes.setMode("selectItem")
+                    self._newPolygon = None
+                    self.removeItem(self._polygonGuideLine)
+                    self._polygonGuideLine = None
+
+        except Exception as e:
+            self.logger.error(f"mouse double click error: {e}")
 
     def drawInstance(self, pos: QPoint):
         """
@@ -4965,7 +4937,11 @@ class layout_scene(editor_scene):
         try:
             with filePathObj.open("r") as file:
                 decodedData = json.load(file)
-            self.snapTuple = decodedData[1].get("snapGrid")
+            snapGrid = decodedData[1].get("snapGrid")
+            self.majorGrid = snapGrid[0]  # dot/line grid spacing
+            self.snapGrid = snapGrid[1]  # snapping grid size
+            self.snapTuple = (self.snapGrid, self.snapGrid)
+            self.snapDistance = 2 * self.snapGrid
             self.createLayoutItems(decodedData[2:])
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
@@ -5642,20 +5618,6 @@ class symbol_view(editor_view):
         super().__init__(self.scene, self.parent)
         self.visibleRect = None
 
-    def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key_Escape:
-            if self.scene.editModes.drawLine and self.scene.newLine:
-                self.scene.newLine.setSelected(False)
-                self.scene.newLine = None
-            elif self.scene.editModes.drawPolygon and self.scene.newPolygon:
-                self.scene.newPolygon.polygon.remove(0)
-                self.scene.newPolygon.points.pop(0)
-                self.scene.newPolygon = None
-                self.scene.removeItem(self.scene.polygonGuideLine)
-                self.scene.polygonGuideLine = None
-            self.scene.editModes.setMode("selectItem")
-        super().keyPressEvent(event)
-
 
 class schematic_view(editor_view):
     def __init__(self, scene, parent):
@@ -5688,24 +5650,16 @@ class layout_view(editor_view):
 
             elif self.scene.editModes.drawRect and self.scene._newRect:
                 self.scene._newRect = None
-
-            elif self.scene.editModes.drawPolygon and self.scene.newPolygon:
-                self.scene.newPolygon.polygon.remove(0)
-                self.scene.newPolygon.points.pop(0)
-                self.scene.editModes.setMode("selectItem")
-                self.scene.newPolygon = None
-                self.scene.removeItem(self.scene._polygonGuideLine)
-                self.scene._polygonGuideLine = None
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
 
 
 class xyceNetlist:
     def __init__(
-            self,
-            schematic: schematicEditor,
-            filePathObj: pathlib.Path,
-            use_config: bool = False,
+        self,
+        schematic: schematicEditor,
+        filePathObj: pathlib.Path,
+        use_config: bool = False,
     ):
         self.filePathObj = filePathObj
         self.schematic = schematic
@@ -5723,6 +5677,9 @@ class xyceNetlist:
         self.switchViewList = schematic.switchViewList
         self.stopViewList = schematic.stopViewList
         self.netlistedViewsSet = set()  # keeps track of netlisted views.
+        self.includeLines = set()  # keeps track of include lines.
+        self.vamodelLines = set()  # keeps track of vamodel lines.
+        self.vahdlLines = set()  # keeps track of *.HDL lines.
 
     def writeNetlist(self):
         with self.filePathObj.open(mode="w") as cirFile:
@@ -5748,6 +5705,12 @@ class xyceNetlist:
             self.recursiveNetlisting(self.schematic, cirFile)
 
             cirFile.write(".END\n")
+            for line in self.includeLines:
+                cirFile.write(f'{line}\n')
+            for line in self.vamodelLines:
+                cirFile.write(f'{line}\n')
+            for line in self.vahdlLines:
+                cirFile.write(f'{line}\n')
 
     @property
     def configDict(self):
@@ -5768,134 +5731,199 @@ class xyceNetlist:
             # schematic
             sceneSymbolSet = schematicScene.findSceneSymbolSet()
             schematicScene.generatePinNetMap(sceneSymbolSet)
-            for item in sceneSymbolSet:
+            for elementSymbol in sceneSymbolSet:
                 if (
-                        item.symattrs.get("XyceNetlistLine")
-                        and item.symattrs.get("XyceNetlistPass") != "1"
-                        and (not item.netlistIgnore)
+                    elementSymbol.symattrs.get("XyceNetlistLine")
+                    and elementSymbol.symattrs.get("XyceNetlistPass") != "1"
+                    and (not elementSymbol.netlistIgnore)
                 ):
-                    self.netlistedViewsSet.add(
-                        ddef.viewTuple(item.libraryName, item.cellName, item.viewName)
-                    )
                     libItem = libm.getLibItem(
-                        schematic.libraryView.libraryModel, item.libraryName
+                        schematic.libraryView.libraryModel, elementSymbol.libraryName
                     )
-                    cellItem = libm.getCellItem(libItem, item.cellName)
+                    cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
                     viewItems = [
                         cellItem.child(row) for row in range(cellItem.rowCount())
                     ]
                     viewNames = [view.viewName for view in viewItems]
 
-                    viewDict = dict(zip(viewNames, viewItems))
+                    netlistView = "symbol"
                     if self._use_config:
-                        netlistableViews = [self.configDict.get(item.cellName)[1]]
+                        netlistView = self.configDict.get(elementSymbol.cellName)[1]
                     else:
-                        netlistableViews = [
-                            viewItemName
-                            for viewItemName in self.switchViewList
-                            if viewItemName in viewNames
-                        ]
-                    # now create the netlist line for that item.
+                        for viewName in self.switchViewList:
+                            if viewName in viewNames:
+                                netlistView = viewName
+                                break
+                    # these are qstandarditem in library browser.
+                    viewItem = libm.getViewItem(cellItem, netlistView)
 
-                    self.createItemLine(cirFile, item, netlistableViews, viewDict)
-                elif item.netlistIgnore:
-                    cirFile.write(f"*{item.instanceName} is marked to be ignored\n")
-                elif not item.symattrs.get("XyceNetlistPass", False):
+
+                    # now create the netlist line for that item.
+                    print(f"{elementSymbol.cellName}, {netlistView}")
+                    self.createItemLine(cirFile, elementSymbol, cellItem, netlistView)
+                elif elementSymbol.netlistIgnore:
                     cirFile.write(
-                        f"*{item.instanceName} has no XyceNetlistLine attribute\n"
+                        f"*{elementSymbol.instanceName} is marked to be ignored\n"
+                    )
+                elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
+                    cirFile.write(
+                        f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n"
                     )
 
         except Exception as e:
-            self.schematic.logger.error(e)
+            self.schematic.logger.error(f'Netlisting error: {e}')
 
-    def createItemLine(self, cirFile, item, netlistableViews: list, viewDict: dict):
-        for viewName in netlistableViews:
-            if viewName in viewDict:
-                viewTuple = ddef.viewTuple(item.libraryName, item.cellName, viewName)
-                if viewDict[viewName].viewType == "schematic":
-                    cirFile.write(self.createXyceSymbolLine(item))
+    def createItemLine(
+        self,
+        cirFile,
+        elementSymbol: shp.schematicSymbol,
+        cellItem: scb.cellItem,
+        netlistView: str,
+    ):
+        pass
+        if "schematic" in netlistView:
+            # First write subckt call in the netlist.
+            cirFile.write(self.createXyceSymbolLine(elementSymbol))
+            schematicItem = libm.getViewItem(cellItem, netlistView)
+            if netlistView not in self.stopViewList:
+                # now load the schematic
+                schematicObj = schematicEditor(
+                    schematicItem, self.libraryDict, self.libraryView
+                )
+                schematicObj.loadSchematic()
 
-                    schematicObj = schematicEditor(
-                        viewDict[viewName],
-                        self.libraryDict,
-                        self.libraryView,
-                    )
+                viewTuple = ddef.viewTuple(
+                    schematicObj.libName, schematicObj.cellName, schematicObj.viewName
+                )
 
-                    schematicObj.loadSchematic()
-                    if viewTuple not in self.netlistedViewsSet:
-                        self.netlistedViewsSet.add(viewTuple)
-                        # print(f'{schematicObj.cellName} {schematicObj.viewName}')
-                        pinList = " ".join(item.pinNetMap.keys())
-                        cirFile.write(f".SUBCKT {schematicObj.cellName} {pinList}\n")
-                        self.recursiveNetlisting(schematicObj, cirFile)
-                        cirFile.write(".ENDS\n")
-                elif viewDict[viewName].viewType == "veriloga":
-                    with viewDict[viewName].data(Qt.UserRole + 2).open(
-                            mode="r"
-                    ) as vaview:
-                        items = json.load(vaview)
-                    netlistLine = items[3]["netlistLine"]
-                    netlistLine = netlistLine.replace(
-                        "[@instName]", f"{item.instanceName}"
-                    )
-                    # TODO: fix veriloga netlisting
-                    # for pinName, netName in item.pinNetMap.items():
-                    #     netlistLine = netlistLine.replace(f"[|{pinName}:%]", f"{netName}")
-                    pinList = " ".join(item.pinNetMap.values())
-                    netlistLine = netlistLine.replace("[@pinList]", pinList)
-                    for labelItem in item.labels.values():
-                        if labelItem.labelDefinition in netlistLine:
-                            netlistLine = netlistLine.replace(
-                                labelItem.labelDefinition, labelItem.labelText
-                            )
-                    cirFile.write(f"{netlistLine}\n")
+                if viewTuple not in self.netlistedViewsSet:
                     self.netlistedViewsSet.add(viewTuple)
-                elif viewDict[viewName].viewType == "symbol":
-                    cirFile.write(f"{self.createXyceSymbolLine(item)}")
-                    self.netlistedViewsSet.add(
-                        ddef.viewTuple(item.libraryName, item.cellName, item.viewName)
-                    )
-                break
 
-    def createXyceSymbolLine(self, item):
+                    # pinList = " ".join(item.pinNetMap.keys())
+                    pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(
+                        ",", " "
+                    )
+
+                    cirFile.write(f".SUBCKT {schematicObj.cellName} {pinList}\n")
+                    self.recursiveNetlisting(schematicObj, cirFile)
+                    cirFile.write(".ENDS\n")
+        elif "symbol" in netlistView:
+            cirFile.write(self.createXyceSymbolLine(elementSymbol))
+        elif "spice" in netlistView:
+            cirFile.write(self.createSpiceLine(elementSymbol))
+        elif "veriloga" in netlistView:
+            cirFile.write(self.createVerilogaLine(elementSymbol))
+
+    def createXyceSymbolLine(self, elementSymbol: shp.schematicSymbol):
         """
         Create a netlist line from a nlp device format line.
         """
         try:
-            xyceNetlistFormatLine = item.symattrs["XyceNetlistLine"].strip()
-            for labelItem in item.labels.values():
+            xyceNetlistFormatLine = elementSymbol.symattrs["XyceNetlistLine"].strip()
+            for labelItem in elementSymbol.labels.values():
                 if labelItem.labelDefinition in xyceNetlistFormatLine:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
                         labelItem.labelDefinition, labelItem.labelText
                     )
 
-            for attrb, value in item.symattrs.items():
+            for attrb, value in elementSymbol.symattrs.items():
                 if f"[%{attrb}]" in xyceNetlistFormatLine:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
                         f"[%{attrb}]", value
                     )
-            pinList = " ".join(item.pinNetMap.values())
+            pinList = " ".join(elementSymbol.pinNetMap.values())
             xyceNetlistFormatLine = (
-                    xyceNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+                xyceNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
             )
             return xyceNetlistFormatLine
         except Exception as e:
             self._scene.logger.error(e)
             self._scene.logger.error(
-                f"Netlist line is not defined for {item.instanceName}"
+                f"Netlist line is not defined for {elementSymbol.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
-            return f"*Netlist line is not defined for symbol of {item.instanceName}\n"
+            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+
+    def createSpiceLine(self, elementSymbol: shp.schematicSymbol):
+        """
+        Create a netlist line from a nlp device format line.
+        """
+        try:
+            spiceNetlistFormatLine = elementSymbol.symattrs["XyceNetlistLine"].strip()
+            for labelItem in elementSymbol.labels.values():
+                if labelItem.labelDefinition in spiceNetlistFormatLine:
+                    spiceNetlistFormatLine = spiceNetlistFormatLine.replace(
+                        labelItem.labelDefinition, labelItem.labelText
+                    )
+
+            for attrb, value in elementSymbol.symattrs.items():
+                if f"[%{attrb}]" in spiceNetlistFormatLine:
+                    spiceNetlistFormatLine = spiceNetlistFormatLine.replace(
+                        f"[%{attrb}]", value
+                    )
+            pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(",", " ")
+            spiceNetlistFormatLine = (
+                spiceNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+            )
+            self.includeLines.add(
+                elementSymbol.symattrs.get(
+                    "incLine", "* no include line is found for {item.cellName}"
+                ).strip()
+            )
+            return spiceNetlistFormatLine
+        except Exception as e:
+            self._scene.logger.error(f'Spice subckt netlist error: {e}')
+            self._scene.logger.error(
+                f"Netlist line is not defined for {elementSymbol.instanceName}"
+            )
+            # if there is no NLPDeviceFormat line, create a warning line
+            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+
+    def createVerilogaLine(self, elementSymbol):
+        """
+        Create a netlist line from a nlp device format line.
+        """
+        try:
+            verilogaNetlistFormatLine = elementSymbol.symattrs[
+                "XyceNetlistLine"
+            ].strip()
+            for labelItem in elementSymbol.labels.values():
+                if labelItem.labelDefinition in verilogaNetlistFormatLine:
+                    verilogaNetlistFormatLine = verilogaNetlistFormatLine.replace(
+                        labelItem.labelDefinition, labelItem.labelText
+                    )
+
+            for attrb, value in elementSymbol.symattrs.items():
+                if f"[%{attrb}]" in verilogaNetlistFormatLine:
+                    verilogaNetlistFormatLine = verilogaNetlistFormatLine.replace(
+                        f"[%{attrb}]", value
+                    )
+            pinList = " ".join(elementSymbol.pinNetMap.values())
+            verilogaNetlistFormatLine = (
+                verilogaNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+            )
+            self.vamodelLines.add(
+                elementSymbol.symattrs.get(
+                    "vaModelLine", "* no model line is found for {item.cellName}"
+                ).strip()
+            )
+            self.vahdlLines.add(
+                elementSymbol.symattrs.get(
+                    "vaHDLLine", "* no hdl line is found for {item.cellName}"
+                ).strip()
+            )
+            return verilogaNetlistFormatLine
+        except Exception as e:
+            self._scene.logger.error(e)
+            self._scene.logger.error(
+                f"Netlist line is not defined for {elementSymbol.instanceName}"
+            )
+            # if there is no NLPDeviceFormat line, create a warning line
+            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
 
 
 class configViewEdit(QMainWindow):
-    def __init__(
-            self,
-            appmainW: QMainWindow,
-            schViewItem: scb.viewItem,
-            configDict: dict,
-            viewItem: scb.viewItem,
-    ):
+    def __init__(self, appmainW, schViewItem, configDict, viewItem):
         super().__init__(parent=appmainW)
         self.appmainW = appmainW  # app mainwindow
         self.schViewItem = schViewItem
@@ -5912,6 +5940,7 @@ class configViewEdit(QMainWindow):
 
     def _createMenuBar(self):
         self.mainMenu = self.menuBar()
+        self.mainMenu.setNativeMenuBar(False)  # for mac
         self.fileMenu = self.mainMenu.addMenu("&File")
         self.editMenu = self.mainMenu.addMenu("&Edit")
         self.status_bar = self.statusBar()
@@ -5980,20 +6009,6 @@ class configViewEdit(QMainWindow):
         items.insert(2, self.configDict)
         with configFilePathObj.open(mode="w+") as configFile:
             json.dump(items, configFile, indent=4)
-
-    def closeWindow(self):
-        self.close()
-
-    def closeEvent(self, event):
-        cellViewTuple = ddef.viewTuple(
-            self.viewItem.parent().parent().libraryName,
-            self.viewItem.parent().cellName,
-            self.viewItem.viewName,
-        )
-        self.appmainW.openViews.pop(cellViewTuple)
-        self.saveClick()
-        event.accept()
-        super().closeEvent(event)
 
 
 class configViewEditContainer(QWidget):

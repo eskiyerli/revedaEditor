@@ -128,11 +128,6 @@ class viewItemTuple(NamedTuple):
     viewItem: object
 
 
-# schematic related tuples
-
-
-
-
 # layout related tuples
 class layoutPathTuple(NamedTuple):
     layer: layLayer

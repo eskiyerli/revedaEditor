@@ -507,7 +507,8 @@ class schematicNet(QGraphicsItem):
                     initialRect = initialRect.united(netItem.sceneShapeRect)
 
                     # Remove each parallel net from the scene
-                    netItem.scene().removeItem(netItem)
+                    if netItem.scene():
+                        netItem.scene().removeItem(netItem)
 
                 # Adjust the initialRect by 2 pixels on each side
                 newNetPoints = initialRect.adjusted(2, 2, -2, -2)

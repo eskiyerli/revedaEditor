@@ -313,7 +313,7 @@ class netlistExportDialogue(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle(f'Export Netlist for {parent.cellName}-{parent.viewName}')
-        self.setMinimumSize(500, 100)
+        # self.setMinimumSize(500, 100)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
