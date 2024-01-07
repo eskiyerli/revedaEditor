@@ -2129,6 +2129,7 @@ class symbolEditor(editorWindow):
     ):
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Symbol Editor - {self.cellName} - {self.viewName}")
+        self._symbolContextMenu()
         # self._createActions()
 
     def init_UI(self):
@@ -2190,7 +2191,6 @@ class symbolEditor(editorWindow):
         self.createPinAction.triggered.connect(self.createPinClick)
         self.objPropAction.triggered.connect(self.objPropClick)
         self.deleteAction.triggered.connect(self.deleteClick)
-
         self.viewPropAction.triggered.connect(self.viewPropClick)
 
     def _symbolContextMenu(self):
@@ -2402,8 +2402,6 @@ class editor_scene(QGraphicsScene):
         self.editModes.rotateItem = False
         self.itemContextMenu = QMenu()
         self.appMainW = self.editorWindow.appMainW
-        # self.viewRect = self.parent.view.mapToScene(
-        #         self.parent.view.viewport().rect()).boundingRect()
         self.logger = self.appMainW.logger
         self.messageLine = self.editorWindow.messageLine
         self.statusLine = self.editorWindow.statusLine
@@ -2882,22 +2880,21 @@ class symbol_scene(editor_scene):
         label.labelVisible = self.labelOpaque
         label.labelDefs()
         label.setOpacity(1)
-        print(label)
         undoCommand = us.addShapeUndo(self, label)
         self.undoStack.push(undoCommand)
         return label
 
-    def copy_selected_items(self):
+    def copySelectedItems(self):
         """
         Copies the selected items in the scene, creates a duplicate of each item,
         and adds them to the scene with a slight shift in position.
         """
         for item in self.selectedItems():
             # Serialize the item to JSON
-            selected_item_json = json.dumps(item, cls=symenc.symbolEncoder)
+            selectedItemJson = json.dumps(item, cls=symenc.symbolEncoder)
 
             # Deserialize the JSON back to a dictionary
-            itemCopyDict = json.loads(selected_item_json)
+            itemCopyDict = json.loads(selectedItemJson)
 
             # Create a new shape based on the item dictionary and the snap tuple
             shape = lj.symbolItems(self).create(itemCopyDict)
@@ -4349,7 +4346,7 @@ class schematic_scene(editor_scene):
 
         symbolScene.attributeList.append(
             symenc.symbolAttribute(
-                "XyceNetlistLine", "X[@instName] [@cellName] [@pinList]"
+                "XyceSymbolNetlistLine", "X[@instName] [@cellName] [@pinList]"
             )
         )
         symbolScene.attributeList.append(
@@ -5733,8 +5730,7 @@ class xyceNetlist:
             schematicScene.generatePinNetMap(sceneSymbolSet)
             for elementSymbol in sceneSymbolSet:
                 if (
-                    elementSymbol.symattrs.get("XyceNetlistLine")
-                    and elementSymbol.symattrs.get("XyceNetlistPass") != "1"
+                    elementSymbol.symattrs.get("XyceNetlistPass") != "1"
                     and (not elementSymbol.netlistIgnore)
                 ):
                     libItem = libm.getLibItem(
@@ -5798,8 +5794,6 @@ class xyceNetlist:
 
                 if viewTuple not in self.netlistedViewsSet:
                     self.netlistedViewsSet.add(viewTuple)
-
-                    # pinList = " ".join(item.pinNetMap.keys())
                     pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(
                         ",", " "
                     )
@@ -5819,7 +5813,7 @@ class xyceNetlist:
         Create a netlist line from a nlp device format line.
         """
         try:
-            xyceNetlistFormatLine = elementSymbol.symattrs["XyceNetlistLine"].strip()
+            xyceNetlistFormatLine = elementSymbol.symattrs["XyceSymbolNetlistLine"].strip()
             for labelItem in elementSymbol.labels.values():
                 if labelItem.labelDefinition in xyceNetlistFormatLine:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
@@ -5849,7 +5843,7 @@ class xyceNetlist:
         Create a netlist line from a nlp device format line.
         """
         try:
-            spiceNetlistFormatLine = elementSymbol.symattrs["XyceNetlistLine"].strip()
+            spiceNetlistFormatLine = elementSymbol.symattrs["XyceSpiceNetlistLine"].strip()
             for labelItem in elementSymbol.labels.values():
                 if labelItem.labelDefinition in spiceNetlistFormatLine:
                     spiceNetlistFormatLine = spiceNetlistFormatLine.replace(
@@ -5885,7 +5879,7 @@ class xyceNetlist:
         """
         try:
             verilogaNetlistFormatLine = elementSymbol.symattrs[
-                "XyceNetlistLine"
+                "XyceVerilogaNetlistLine"
             ].strip()
             for labelItem in elementSymbol.labels.values():
                 if labelItem.labelDefinition in verilogaNetlistFormatLine:

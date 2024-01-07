@@ -244,7 +244,7 @@ def createSpiceSymbol(
             )
 
             symbolScene.attributeList.append(
-                se.symbolAttribute("XyceNetlistLine", importedSpiceObj.netlistLine)
+                se.symbolAttribute("XyceSpiceNetlistLine", importedSpiceObj.netlistLine)
             )
 
             symbolWindow.show()
@@ -283,7 +283,7 @@ def createVaSymbol(
         parent, libraryBrowser.libraryModel, vaItemTuple.cellItem
     )
     symbolNameDlg.viewComboBox.setCurrentText("symbol")
-    symbolNameDlg.nameEdit.setText('symbol')
+    symbolNameDlg.nameEdit.setText("symbol")
     if symbolNameDlg.exec() == QDialog.Accepted:
         symbolViewName = symbolNameDlg.nameEdit.text().strip()
         symbolViewItem = scb.createCellView(
@@ -339,7 +339,9 @@ def createVaSymbol(
 
             instParamNum = len(importedVaObj.instanceParams)
             if instParamNum > 0:
-                for index, (key, value) in enumerate(importedVaObj.instanceParams.items()):
+                for index, (key, value) in enumerate(
+                    importedVaObj.instanceParams.items()
+                ):
                     symbolScene.labelDraw(
                         QPoint(
                             int(rectXDim),
@@ -358,10 +360,14 @@ def createVaSymbol(
                 for key, value in importedVaObj.modelParams.items():
                     symbolScene.attributeList.append(se.symbolAttribute(key, value))
                 symbolScene.attributeList.append(
-                    se.symbolAttribute("XyceNetlistLine", importedVaObj.netlistLine)
+                    se.symbolAttribute(
+                        "XyceVerilogaNetlistLine", importedVaObj.netlistLine
+                    )
                 )
 
-            modelParamsString = ', '.join(f'{key} = {value}' for key, value in importedVaObj.modelParams.items())
+            modelParamsString = ", ".join(
+                f"{key} = {value}" for key, value in importedVaObj.modelParams.items()
+            )
             symbolScene.attributeList.append(
                 se.symbolAttribute(
                     "vaModelLine",

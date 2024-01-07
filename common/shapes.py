@@ -99,7 +99,7 @@ class symbolShape(QGraphicsItem):
     def angle(self, value):
         self._angle = value
         self.prepareGeometryChange()
-        self.setRotation(value)  # self.update(self.boundingRect())
+        self.setRotation(value) 
 
     @property
     def stretch(self):

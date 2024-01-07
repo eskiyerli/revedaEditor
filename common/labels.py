@@ -83,6 +83,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._labelFont.setPointSize(int(float(self._labelHeight)))
         self._labelFont.setKerning(False)
         self._labelVisible: bool = False
+        self._angle: float = 0.0  # rotation angle
         self.setBrush(symlyr.labelBrush)
         self.setPos(self._start)
 
@@ -112,6 +113,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
             else:
                 self.setBrush(symlyr.labelBrush)
         return super().itemChange(change, value)
+
+    def contextMenuEvent(self, event):
+        self.scene().itemContextMenu.exec_(event.screenPos())
 
     @property
     def start(self) -> QPoint:
@@ -223,6 +227,16 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._labelFont = labelFont
 
     @property
+    def angle(self):
+        return self._angle
+
+    @angle.setter
+    def angle(self, value):
+        self._angle = value
+        self.prepareGeometryChange()
+        self.setRotation(value) 
+
+    @property
     def labelVisible(self) -> bool:
         return self._labelVisible
 
@@ -260,93 +274,76 @@ class symbolLabel(QGraphicsSimpleTextItem):
 
     def createNLPLabel(self):
         try:
-            if self._labelDefinition in symbolLabel.predefinedLabels:
-                match self._labelDefinition:
-                    case "[@cellName]":
-                        # Set label name to "cellName" and value and text to parent item's cell name
-                        self._labelName = "cellName"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = self.parentItem().cellName
-                        self._labelText = self._labelValue
-                    case "[@instName]":
-                        # Set label name to "instName" and value and text to parent item's counter with prefix "I"
-                        self._labelName = "instName"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = f"I{self.parentItem().counter}"
-                        self._labelText = self._labelValue
-
-                    case "[@libName]":
-                        # Set label name to "libName" and value and text to parent item's library name
-                        self._labelName = "libName"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = self.parentItem().libraryName
-                        self._labelText = self._labelValue
-                    case "[@viewName]":
-                        # Set label name to "viewName" and value and text to parent item's view name
-                        self._labelName = "viewName"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = self.parentItem().viewName
-                        self._labelText = self._labelValue
-                    case "[@modelName]":
-                        # Set label name to "modelName" and value and text to parent item's "modelName" attribute
-                        self._labelName = "modelName"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = self.parentItem().attr.get(
-                                "modelName", ""
-                            )
-
-                        self._labelText = self._labelValue
-                    case "[@elementNum]":
-                        # Set label name to "elementNum" and value and text to parent item's counter
-                        self._labelName = "elementNum"
-                        if self.parentItem() is None:
-                            self._labelValue = self._labelDefinition
-                        else:
-                            self._labelValue = f"{self.parentItem().counter}"
-                        self._labelText = self._labelValue
+            if self.parentItem() is None: #symbol editor
+                self._labelText = self._labelDefinition
             else:
-                labelFields = (
-                    self._labelDefinition.lstrip("[@")
-                    .rstrip("]")
-                    .rstrip(":")
-                    .split(":")
-                )
-                self._labelName = labelFields[0].strip()
-                match len(labelFields):
-                    case 1:
-                        if not self._labelValue:
-                            self._labelValue = "?"
-                        self._labelText = self._labelValue
-                    case 2:
-                        if self._labelValue:
-                            # Set label text to the second field of label definition with "%" replaced by label value
-                            self._labelText = (
-                                labelFields[1].strip().replace("%", self._labelValue)
+                if self._labelDefinition in symbolLabel.predefinedLabels:
+                    match self._labelDefinition:
+                        case "[@cellName]":
+                            # Set label name to "cellName" and value and text to parent item's cell name
+                            self._labelName = "cellName"
+                            self._labelValue = self.parentItem().cellName
+                            self._labelText = self._labelValue
+                        case "[@instName]":
+                            # Set label name to "instName" and value and text to parent item's counter with prefix "I"
+                            self._labelName = "instName"
+                            self._labelValue = f"I{self.parentItem().counter}"
+                            self._labelText = self._labelValue
+
+                        case "[@libName]":
+                            # Set label name to "libName" and value and text to parent item's library name
+                            self._labelName = "libName"
+                            self._labelValue = self.parentItem().libraryName
+                            self._labelText = self._labelValue
+                        case "[@viewName]":
+                            # Set label name to "viewName" and value and text to parent item's view name
+                            self._labelName = "viewName"
+                            self._labelValue = self.parentItem().viewName
+                            self._labelText = self._labelValue
+                        case "[@modelName]":
+                            # Set label name to "modelName" and value and text to parent item's "modelName" attribute
+                            self._labelName = "modelName"
+                            self._labelValue = self.parentItem().attr.get("modelName", "")
+                            self._labelText = self._labelValue
+                        case "[@elementNum]":
+                            # Set label name to "elementNum" and value and text to parent item's counter
+                            self._labelName = "elementNum"
+                            self._labelValue = f"{self.parentItem().counter}"
+                            self._labelText = self._labelValue
+                else:
+                    labelFields = (
+                        self._labelDefinition.lstrip("[@")
+                        .rstrip("]")
+                        .rstrip(":")
+                        .split(":")
+                    )
+                    self._labelName = labelFields[0].strip()
+                    match len(labelFields):
+                        case 1:
+                            if not self._labelValue:
+                                self._labelValue = "?"
+                            else:
+                                self._labelText = self._labelValue
+                        case 2:
+                            if self._labelValue:
+                                # Set label text to the second field of label definition with "%" replaced by label value
+                                self._labelText = (
+                                    labelFields[1].strip().replace("%", self._labelValue)
+                                )
+                            else:
+                                self._labelValue = "?"
+                        case 3:
+                            tempLabelValue = (
+                                labelFields[2].strip().split("=")[-1].split()[-1]
                             )
-                        else:
-                            self._labelValue = "?"
-                    case 3:
-                        tempLabelValue = (
-                            labelFields[2].strip().split("=")[-1].split()[-1]
-                        )
-                        if self._labelValue:
-                            # Set label text to the third field of label definition with temp label value replaced by label value
-                            self._labelText = labelFields[2].replace(
-                                tempLabelValue, self._labelValue
-                            )
-                        else:
-                            self._labelText = labelFields[2]
-                            self._labelValue = tempLabelValue
+                            if self._labelValue:
+                                # Set label text to the third field of label definition with temp label value replaced by label value
+                                self._labelText = labelFields[2].replace(
+                                    tempLabelValue, self._labelValue
+                                )
+                            else:
+                                self._labelText = labelFields[2]
+                                self._labelValue = tempLabelValue
 
         except Exception as e:
             self.scene().logger.error(

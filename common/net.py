@@ -785,9 +785,6 @@ class guideLine(QGraphicsLineItem):
     def __repr__(self):
         return f"guideLine({self.mapToScene(self.line().p1()), self.mapToScene(self.line().p2())}"
 
-    def __repr__(self):
-        return f"guideLine({self.mapToScene(self.line().p1()), self.mapToScene(self.line().p2())}"
-
     @property
     def name(self):
         return self._name
