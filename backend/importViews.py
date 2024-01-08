@@ -315,7 +315,7 @@ def createVaSymbol(
             #     "R0",
             #     "Instance",
             # )
-            vaFileLabel.labelVisible = False
+            # vaFileLabel.labelVisible = False
             vaModuleLabel = symbolScene.labelDraw(
                 QPoint(int(0.25 * rectXDim), int(0.8 * rectYDim)),
                 f"[@vaModule:vaModule=%:vaModule={importedVaObj.vaModule}]",

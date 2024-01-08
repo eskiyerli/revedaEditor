@@ -248,6 +248,7 @@ class schematicNet(QGraphicsItem):
 
     def createNetSnapLines(self):
         for tupleItem in self._netStretchTupleSet:
+            print(f'net name is set: {tupleItem.net.nameSet}')
             lineSet = self._netSnapLines.setdefault(tupleItem.selfIndex, set())
             stretchLine = guideLine(
                 tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1],
@@ -281,8 +282,8 @@ class schematicNet(QGraphicsItem):
                 lines = self.scene().addStretchWires(
                     snapLine.mapToScene(snapLine.line().p1()).toPoint(),
                     snapLine.mapToScene(snapLine.line().p2()).toPoint(), )
-
-                self.scene().removeItem(snapLine)
+                if snapLine.scene():
+                    self.scene().removeItem(snapLine)
                 if lines:
                     self.scene().addListUndoStack(lines)
 
@@ -290,6 +291,7 @@ class schematicNet(QGraphicsItem):
 
     def removeNetSnapLines(self):
         for snapLineSet in self._netSnapLines.values():
+
             for snapLine in snapLineSet:
                 lines = self.scene().addStretchWires(
                     snapLine.mapToScene(snapLine.line().p1()).toPoint(),
@@ -300,7 +302,8 @@ class schematicNet(QGraphicsItem):
                         if snapLine.nameSet:
                             line.name = snapLine.name
                             line.nameSet = True
-                self.scene().removeItem(snapLine)
+                if snapLine.scene():
+                    self.scene().removeItem(snapLine)
 
         self._netSnapLines = dict()
 

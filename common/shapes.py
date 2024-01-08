@@ -1292,6 +1292,9 @@ class schematicSymbol(symbolShape):
                 item.pin.mapToScene(item.pin.start),
                 item.net.sceneEndPoints[item.netEndIndex - 1],
             )
+            if item.net.nameSet:
+                snapLine.name = item.net.name
+                snapLine.nameSet = True
             self.scene().addItem(snapLine)
             self._snapLines[item.pin].add(snapLine)
             self.scene().removeItem(item.net)
@@ -1318,6 +1321,10 @@ class schematicSymbol(symbolShape):
                 )
                 self.scene().removeItem(snapLine)
             if lines:
+                for line in lines:
+                    if snapLine.nameSet:
+                        line.name = snapLine.name
+                        line.nameSet = True
                 self.scene().addListUndoStack(lines)
         self._snapLines = dict()
         super().mouseReleaseEvent(event)
