@@ -46,7 +46,7 @@ import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.pythonConsole as pcon
 import revedaEditor.gui.stippleEditor as stip
 import revedaEditor.gui.helpBrowser as hlp
-import revinit
+import revedaEditor.gui.revinit as revinit
 
 
 class mainwContainer(QWidget):
