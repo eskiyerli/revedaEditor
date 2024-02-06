@@ -15,8 +15,7 @@
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
 #
-#   Add-ons and extensions developed for this software may be distributed
-#   under their own separate licenses.
+
 #
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
@@ -61,12 +60,13 @@ class mainwContainer(QWidget):
         self.init_UI()
 
     def init_UI(self):
-        # treeView = designLibrariesView(self)
+
         self.console.setfont(QFont("Fira Mono Regular", 12))
         self.console.writeoutput(
-            f"Welcome to Revolution EDA version" f" {revinit.__version__}"
+            f"Welcome to Revolution EDA version {revinit.__version__}"
         )
-        self.console.writeoutput("Revolution Semiconductor (C) 2023.")
+        self.console.writeoutput("Revolution Semiconductor (C) 2024.")
+        self.console.writeoutput("Mozilla Public License v2.0 modified with Commons Clause")
         # layout statements, using a grid layout
         gLayout = QVBoxLayout()
         gLayout.setSpacing(10)
@@ -253,6 +253,10 @@ class MainWindow(QMainWindow):
         self.importVerilogaModule('')
 
     def importVerilogaModule(self, filePath: str):
+        """
+
+        @param filePath:
+        """
         library_model = self.libraryBrowser.libraryModel
         # Open the import dialog
         importDlg = fd.importVerilogaCellDialogue(library_model, self)
@@ -334,12 +338,15 @@ class MainWindow(QMainWindow):
         """
         Load the state of the object from a configuration file.
 
-        This function reads the contents of the configuration file and updates the state of the object based on the values found in the file. 
-        It checks if the configuration file exists and then opens it for reading. If the file exists, it loads the contents of the file as a 
-        JSON object and assigns the values to the corresponding attributes of the object. The attributes updated include `textEditorPath`, 
-        `simulationPath`, `switchViewList`, and `stopViewList`. If the `switchViewList` or `stopViewList` in the configuration file is not 
+        This function reads the contents of the configuration file and updates the
+         state of the object based on the values found in the file.
+        It checks if the configuration file exists and then opens it for reading.
+        If the file exists, it loads the contents of the file as a
+        JSON object and assigns the values to the corresponding attributes of the
+        object. The attributes updated include `textEditorPath`,
+        `simulationPath`, `switchViewList`, and `stopViewList`. If the `switchViewList`
+        or `stopViewList` in the configuration file is not
         empty, it updates the corresponding attributes with the values from the file.
-
         """
 
         if self.confFilePath.exists():

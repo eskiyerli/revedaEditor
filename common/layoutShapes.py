@@ -1446,14 +1446,6 @@ class layoutViaArray(layoutShape):
             painter.setPen(self._selectedPen)
             painter.drawRect(self._rect)
 
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        if self._layer.selectable:
-            self.setFlag(QGraphicsItem.ItemIsMovable, True)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        else:
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, False)
 
     def shape(self) -> QPainterPath:
         path = QPainterPath()

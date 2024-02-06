@@ -1446,7 +1446,7 @@ class schematicPin(symbolShape):
         self._pinName = pinName
         self._pinDir = pinDir
         self._pinType = pinType
-        self._netTupleSet = set()
+        self._pinNetIndexTupleSet = set()
 
     def __repr__(self):
         return (
@@ -1518,57 +1518,47 @@ class schematicPin(symbolShape):
             super().sceneEvent(event)
             return True
 
-    #
+    def findPinNetIndexTuples(self):
+        # Create an empty set to store pin-net-index tuples
+        self._pinNetIndexTupleSet = set()
+
+        # Find all the net items connected to the pin
+        netsConnected = [
+            netItem
+            for netItem in self.scene().items(self.sceneBoundingRect())
+            if isinstance(netItem, net.schematicNet)
+        ]
+
+        # Iterate over each connected net item
+        for netItem in netsConnected:
+            netEndIndex = list(map(self.sceneBoundingRect().contains,
+                               netItem.sceneEndPoints)).index(True)
+            self._pinNetIndexTupleSet.add(pinNetIndexTuple(self,netItem,netEndIndex))
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        # create a named tuple to record whether the pin is located at the start or at
-        # the end of the net.
-
-        for pinNet in self.scene().items(
-            self.sceneBoundingRect().adjusted(-2, -2, 2, 2), Qt.IntersectsItemShape
-        ):
-            if isinstance(pinNet, net.schematicNet):
-                if (
-                    self.sceneBoundingRect()
-                    .adjusted(-2, -2, 2, 2)
-                    .contains(pinNet.mapToScene(pinNet.start))
-                ):
-                    self._netTupleSet.add(ddef.netTuple(pinNet, 1))
-                elif (
-                    self.sceneBoundingRect()
-                    .adjusted(-2, -2, 2, 2)
-                    .contains(pinNet.mapToScene(pinNet.end))
-                ):
-                    self._netTupleSet.add(ddef.netTuple(pinNet, 0))
-        for item in self._netTupleSet:
-            pinSceneLoc = self.mapToScene(self.start)
-            if item.start == 1:
-                item.net.start = pinSceneLoc
-            else:
-                item.net.end = pinSceneLoc
-            item.net.pen = self._guideLinePen
-        super().mousePressEvent(event)
+        # self.findPinNetIndexTuples()
 
     #
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)
-
-        for item in self._netTupleSet:
-            lines = self.scene().addWires(item.net.start)
-            self.scene().extendWires(lines, item.net.start, item.net.end)
-            self.scene().pruneWires(lines, schlyr.wirePen)
-            self.scene().removeItem(item.net)
-        self._netTupleSet = set()
+        #
+        # for item in self._netTupleSet:
+        #     lines = self.scene().addWires(item.net.start)
+        #     self.scene().extendWires(lines, item.net.start, item.net.end)
+        #     self.scene().pruneWires(lines, schlyr.wirePen)
+        #     self.scene().removeItem(item.net)
+        # self._netTupleSet = set()
 
     def itemChange(self, change, value):
-        if self.scene() and change == QGraphicsItem.ItemPositionHasChanged:
-            # item's position has changed
-            # do something here
-            for item in self._netTupleSet:
-                if item.start == 1:
-                    item.net.start = self.mapToScene(self.start)
-                elif item.start == 0:
-                    item.net.end = self.mapToScene(self.start)
+        # if self.scene() and change == QGraphicsItem.ItemPositionHasChanged:
+        #     # item's position has changed
+        #     # do something here
+        #     for item in self._netTupleSet:
+        #         if item.start == 1:
+        #             item.net.start = self.mapToScene(self.start)
+        #         elif item.start == 0:
+        #             item.net.end = self.mapToScene(self.start)
         return super().itemChange(change, value)
 
     # def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:

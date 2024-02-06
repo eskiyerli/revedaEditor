@@ -194,9 +194,9 @@ class schematicNet(QGraphicsItem):
         return f"schematicNet({self.sceneEndPoints})"
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSceneChange and not value:
-            self.mergeOrthoNets()
-            self.clearDots()
+        # if change == QGraphicsItem.ItemSceneChange and not value:
+        #     self.mergeOrthoNets()
+        #     self.clearDots()
         return super().itemChange(change, value)
 
     def mergeOrthoNets(self):
@@ -207,37 +207,39 @@ class schematicNet(QGraphicsItem):
                 self.scene().mergeNets(orthoNets[0])
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
-        self.mergeOrthoNets()
-        self.clearDots()
+        # self.mergeOrthoNets()
+        # self.clearDots()
 
         if self._stretch:
             self.startStretch(event)
-        else:
-            self.findSymPinConnections()
-            self.findNetConnections()
-            self.createPinSnapLines()
-            self.createNetSnapLines()
+        # else:
+        #     self.findSymPinConnections()
+        #     self.findNetConnections()
+        #     self.createPinSnapLines()
+        #     self.createNetSnapLines()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
         if self.stretch:
             self.extendStretch(event)
-        else:
-            if self._pinSnapLines:
-                self.extendPinSnapLines()
-            if self._netSnapLines:
-                self.extendNetSnapLines()
+        # else:
+        #     if self._pinSnapLines:
+        #         self.extendPinSnapLines()
+        #     if self._netSnapLines:
+        #         self.extendNetSnapLines()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
 
         if self.stretch:
             self.endStretch()
-        else:
-            self.removePinSnapLines()
-            self.removeNetSnapLines()
-        # self.createDots()
+        # else:
+        #     self.removePinSnapLines()
+        #     self.removeNetSnapLines()
+        # # self.createDots()
+        if self.scene():
+            self.scene().mergeSplitNets(self)
         super().mouseReleaseEvent(event)
 
     def createPinSnapLines(self):
@@ -343,17 +345,6 @@ class schematicNet(QGraphicsItem):
         self._stretchLine = None
         self.setCursor(Qt.ArrowCursor)
 
-    @property
-    def innerRect(self) -> QRectF:
-        return (
-            QRectF(self._draftLine.p1(), self._draftLine.p2()).normalized().adjusted(2, 2,
-                                                                                     -2,
-                                                                                     -2))
-
-    @property
-    def sceneInnerRect(self) -> QRectF:
-        return self.mapRectToScene(self.innerRect)
-
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """
         Override the hoverEnterEvent method of QGraphicsItem.
@@ -443,7 +434,7 @@ class schematicNet(QGraphicsItem):
         for netEnd in self.sceneEndPoints:
             crossingNets[self.sceneEndPoints.index(netEnd)] = list()
             for netItem in orthoNets:
-                if netItem.sceneInnerRect.contains(netEnd):
+                if netItem.sceneShapeRect.contains(netEnd):
                     crossingNets[self.sceneEndPoints.index(netEnd)].append(netItem)
         return crossingNets
 
