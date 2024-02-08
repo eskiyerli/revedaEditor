@@ -33,7 +33,7 @@ from copy import deepcopy
 import inspect
 from quantiphy import Quantity
 import itertools as itt
-from typing import Union, Optional, NamedTuple
+from typing import Union, Optional, NamedTuple, Dict, Set, Any
 from collections import Counter
 
 # import os
@@ -2305,8 +2305,8 @@ class symbolContainer(QWidget):
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.parent = parent
-        self.scene = symbol_scene(self)
-        self.view = symbol_view(self.scene, self)
+        self.scene = symbolScene(self)
+        self.view = symbolView(self.scene, self)
         self.init_UI()
 
     def init_UI(self):
@@ -2325,8 +2325,8 @@ class schematicContainer(QWidget):
         super().__init__(parent=parent)
         assert isinstance(parent, schematicEditor)
         self.parent = parent
-        self.scene = schematic_scene(self)
-        self.view = schematic_view(self.scene, self)
+        self.scene = schematicScene(self)
+        self.view = schematicView(self.scene, self)
 
         self.init_UI()
 
@@ -2351,7 +2351,7 @@ class layoutContainer(QWidget):
         self.lswWidget.dataSelected.connect(self.selectLayer)
         self.lswWidget.layerSelectable.connect(self.layerSelectableChange)
         self.lswWidget.layerVisible.connect(self.layerVisibleChange)
-        self.scene = layout_scene(self)
+        self.scene = layoutScene(self)
         self.view = layout_view(self.scene, self)
         self.init_UI()
 
@@ -2400,7 +2400,7 @@ class layoutContainer(QWidget):
                     item.update()
 
 
-class editor_scene(QGraphicsScene):
+class editorScene(QGraphicsScene):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -2518,6 +2518,7 @@ class editor_scene(QGraphicsScene):
             itemsAtMousePress = self.items(self.mousePressLoc)
             if itemsAtMousePress:
                 [item.setSelected(True) for item in itemsAtMousePress]
+
         self.editorWindow.messageLine.setText(
             "Item selected" if self.selectedItems() else "Nothing selected"
         )
@@ -2624,7 +2625,7 @@ class editor_scene(QGraphicsScene):
         self.undoStack.push(undoCommand)
 
 
-class symbol_scene(editor_scene):
+class symbolScene(editorScene):
     """
     Scene for Symbol editor.
     """
@@ -3262,7 +3263,9 @@ class symbol_scene(editor_scene):
                 self.attributeList = deepcopy(localAttributeList)
 
 
-class schematic_scene(editor_scene):
+class schematicScene(editorScene):
+    newText: None
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -3285,8 +3288,6 @@ class schematic_scene(editor_scene):
         self.itemCounter = 0
         self.netCounter = 0
         self.schematicNets = {}  # netName: list of nets with the same name
-        self._crossDotPoints = {}  # locations of cross dots
-        self.crossDots = set()  # list of cross dots
         self.viewRect = None
         self.instanceSymbolTuple = None
         # pin attribute defaults
@@ -3314,6 +3315,26 @@ class schematic_scene(editor_scene):
         ]
         self.fixedFont.setPointSize(fontSize)
         self.fixedFont.setKerning(False)
+        self._changedRects: list[QRectF] = []
+        self.changed.connect(self.sceneChanged)
+
+    def sceneChanged(self, rects: list):
+        self._changedRects = rects
+        for rectArea in self._changedRects:
+            netsInArea = [netItem for netItem in self.items(rectArea) if isinstance(
+                netItem, net.schematicNet)]
+            dotsInArea = {dotItem for dotItem in self.items(rectArea) if isinstance(
+                dotItem, net.crossingDot)}
+            for dotItem in dotsInArea:
+                self.removeItem(dotItem)
+            netEndPoints = []
+            for netItem in netsInArea:
+                netEndPoints.extend(netItem.sceneEndPoints)
+            pointCountsDict = Counter(netEndPoints)
+            dotPoints = [point for point, count in pointCountsDict.items() if count >= 3]
+            for dotPoint in dotPoints:
+                self.addItem(net.crossingDot(dotPoint))
+
 
 
     @property
@@ -3338,7 +3359,7 @@ class schematic_scene(editor_scene):
                     self.newInstance.setSelected(True)
                 elif self.editModes.drawWire:
                     self.editorWindow.messageLine.setText("Wire Mode")
-                    if self._newNet is not None:
+                    if self._newNet:
                         self.checkNewNet(self._newNet)
                         self._newNet = None
                     self.mousePressLoc = self.findSnapPoint(
@@ -3391,11 +3412,11 @@ class schematic_scene(editor_scene):
 
                 elif self.editModes.drawText and self.newText.isSelected():
                     self.newText.setPos(self.mouseMoveLoc - self.mousePressLoc)
-
                 elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                     self.selectionRectItem.setRect(
                         QRectF(self.mousePressLoc, self.mouseMoveLoc)
                     )
+
             else:
                 if self.editModes.drawWire and self._newNet is not None:
                     self.mouseMoveLoc = self.findSnapPoint(
@@ -3412,6 +3433,7 @@ class schematic_scene(editor_scene):
                     )
                     if self._newNet.scene() is None:
                         self.addUndoStack(self._newNet)
+
             self.editorWindow.statusLine.showMessage(
                 f"Cursor Position: {str((self.mouseMoveLoc - self.origin).toTuple())}"
             )
@@ -3419,20 +3441,14 @@ class schematic_scene(editor_scene):
             self.logger.error(f"mouse move error: {e}")
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseReleaseEvent(mouse_event)
+
         try:
             self.mouseReleaseLoc = mouse_event.scenePos().toPoint()
             modifiers = QGuiApplication.keyboardModifiers()
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.addInstance:
                     self.editModes.addInstance = False
-
-                elif self.editModes.drawText:
-                    self.parent.parent.messageLine.setText("Note added.")
-                    self.editModes.drawText = False
-                    self.newText = None
                 elif self.editModes.drawPin:
-                    self.parent.parent.messageLine.setText("Pin added")
                     self.editModes.drawPin = False
                     self.newPin = None
                 elif self.editModes.selectItem:
@@ -3442,18 +3458,10 @@ class schematic_scene(editor_scene):
                         )
                         self.removeItem(self.selectionRectItem)
                         self.selectionRectItem = None
-                    # selectedNets = [
-                    #     netItem
-                    #     for netItem in self.selectedItems()
-                    #     if isinstance(netItem, net.schematicNet)
-                    # ]
-                    # if selectedNets:
-                    #     for netItem in selectedNets:
-                    #         if netItem.scene():
-                    #             self.mergeSplitNets(netItem)
 
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
+        super().mouseReleaseEvent(mouse_event)
 
     def checkNewNet(self, newNet: net.schematicNet):
         """
@@ -3472,7 +3480,6 @@ class schematic_scene(editor_scene):
         for netItem in overlapNets:
             splitPoints = self.findSplitPoints(netItem)
             self.splitNets(netItem,splitPoints)
-        splitPoints = None
         splitPoints = self.findSplitPoints(self._totalNet)
         if splitPoints:
             self.splitNets(self._totalNet, splitPoints)
@@ -3491,9 +3498,7 @@ class schematic_scene(editor_scene):
 
         splitPoints.insert(0, inputNet.sceneEndPoints[0])
         splitPoints.append(inputNet.sceneEndPoints[1])
-        orderedPoints = list(Counter(schematic_scene.orderPoints(splitPoints)).keys())
-        print(orderedPoints)
-
+        orderedPoints = list(Counter(schematicScene.orderPoints(splitPoints)).keys())
         for i in range(len(orderedPoints) - 1):
             splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
             splitNet.name = inputNet.name
@@ -3539,7 +3544,7 @@ class schematic_scene(editor_scene):
             2 * snapDistance,
             2 * snapDistance,
         )
-        snapPoints = self.findPossibleConnectPoints(snapRect, ignoredSet)
+        snapPoints = self.findConnectPoints(snapRect, ignoredSet)
         if snapPoints:
             lengths = [
                 (snapPoint - eventLoc).manhattanLength() for snapPoint in snapPoints
@@ -3550,7 +3555,7 @@ class schematic_scene(editor_scene):
 
         return closestPoint
 
-    def findPossibleConnectPoints(
+    def findConnectPoints(
             self, sceneRect: QRect, ignoredSet: set[QGraphicsItem]
     ) -> set[QPoint]:
         snapPoints = set()
@@ -3570,31 +3575,42 @@ class schematic_scene(editor_scene):
                 snapPoints.add(item.mapToScene(item.start).toPoint())
         return snapPoints
 
+    def findNetStretchPoints(self, netItem: net.schematicNet, snapDistance: int):
+        netEndPointsDict: dict[int, QPoint] = {}
+        for netEnd in netItem.sceneEndPoints:
+            snapRect: QRect = QRect(
+                netEnd.x() - snapDistance,
+                netEnd.y() - snapDistance,
+                2 * snapDistance,
+                2 * snapDistance,
+            )
+            snapRectItems = set(self.items(snapRect))-{netItem}
+            for item in snapRectItems:
+                if isinstance(item, net.schematicNet) and any(list(map(snapRect.contains, item.sceneEndPoints))):
+                    netEndPointsDict[netItem.sceneEndPoints.index(netEnd)] = netEnd
+                elif (isinstance(item, shp.symbolPin) or isinstance(item, shp.schematicPin)) and snapRect.contains(
+                        item.mapToScene(item.start).toPoint()):
+                    netEndPointsDict[netItem.sceneEndPoints.index(netEnd)] = item.mapToScene(item.start).toPoint()
+                if netEndPointsDict.get(netItem.sceneEndPoints.index(netEnd)): # after finding one point, no need to iterate.
+                    break
+        return netEndPointsDict
+
     def findSplitPoints(self, targetNet: net.schematicNet) -> list[QPoint]:
-        splitPoints = set()
+        splitPoints: set[QPoint | Any] = set()
         sceneRect = targetNet.sceneShapeRect
         rectItems = set(self.items(sceneRect))
-        schematicPins = set()
+
         for item in rectItems:
             if (
                     isinstance(item, net.schematicNet)
                     and any(list(map(sceneRect.contains, item.sceneEndPoints)))
                     and targetNet.isOrthogonal(item)
             ):
-                splitPoints.add(
-                    item.sceneEndPoints[
-                        list(map(sceneRect.contains, item.sceneEndPoints)).index(True)
-                    ]
-                )
-            elif isinstance(
-                    item, shp.symbolPin
-            ) and sceneRect.contains(item.mapToScene(item.start).toPoint()):
+                splitPoints.add(item.sceneEndPoints[list(map(sceneRect.contains, item.sceneEndPoints)).index(True)])
+            elif (isinstance(item, shp.symbolPin) or isinstance(item, shp.schematicPin)) and sceneRect.contains(
+                    item.mapToScene(item.start).toPoint()):
                 splitPoints.add(item.mapToScene(item.start).toPoint())
-            elif isinstance(
-                    item, shp.schematicPin
-            ) and sceneRect.contains(item.mapToScene(item.start).toPoint()):
-                splitPoints.add(item.mapToScene(item.start).toPoint())
-                schematicPins.add(item)
+
         return list(splitPoints)
 
 
@@ -4514,7 +4530,7 @@ class schematic_scene(editor_scene):
                 self.editModes.setMode("selectItem")
 
 
-class layout_scene(editor_scene):
+class layoutScene(editorScene):
     def __init__(self, parent):
         super().__init__(parent)
         self.selectEdLayer = pdk.layoutLayers.pdkAllLayers[0]
@@ -5500,7 +5516,7 @@ class layout_scene(editor_scene):
         vector.setTransform(transform)
 
 
-class editor_view(QGraphicsView):
+class editorView(QGraphicsView):
     """
     The qgraphicsview for qgraphicsscene. It is used for both schematic and layout editors.
     """
@@ -5541,6 +5557,7 @@ class editor_view(QGraphicsView):
         self.setCursor(Qt.CrossCursor)
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.TextAntialiasing, True)
+        self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
 
 
     def wheelEvent(self, event: QWheelEvent) -> None:
@@ -5698,53 +5715,56 @@ class editor_view(QGraphicsView):
         painter.end()
 
 
-class symbol_view(editor_view):
+class symbolView(editorView):
     def __init__(self, scene, parent):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
 
 
-
-class schematic_view(editor_view):
+class schematicView(editorView):
     # zoomChanged = Signal()
     def __init__(self, scene, parent):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
-        self._dotRadius = 3
+        # self._dotRadius = 3
 
-    #     self.scene.sceneRectChanged.connect(self.onSceneRectChanged)
-    #     self.scene.changed.connect(self.onSceneChanged)
-    #     self.zoomChanged.connect(self.onSceneRectChanged)
-    #
-    # def onSceneRectChanged(self):
-    #     print("Scene rect changed")
-    #
-    # def onSceneChanged(self, changedRegion):
-    #     print("Scene contents changed")
-    #
-    #
-    # def wheelEvent(self, event: QWheelEvent) -> None:
-    #     self.zoomChanged.emit()
-    #     super().wheelEvent(event)
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
+        viewGuideLines = [guideLineItem for guideLineItem in self.scene.items(self.viewRect) if
+                          isinstance(guideLineItem, net.guideLine)]
+        for snapLine in viewGuideLines:
 
-    def drawBackground(self, painter, rect):
-        super().drawBackground(painter, rect)
-        xextend = self._right - self._left
-        yextend = self._bottom - self._top
-        netsInView = [netItem for netItem in self.scene.items(rect) if isinstance(netItem,
-                                                                                  net.schematicNet)]
-        if xextend <= 1000 or yextend <= 1000:
-            netEndPoints = []
-            for netItem in netsInView:
-                netEndPoints.extend(netItem.sceneEndPoints)
-            pointCountsDict = Counter(netEndPoints)
-            dotPoints = [point for point, count in pointCountsDict.items() if count >=3 ]
-            painter.setPen(schlyr.wirePen)
-            painter.setBrush(schlyr.wireBrush)
-            for dotPoint in dotPoints:
-                painter.drawEllipse(dotPoint, self._dotRadius, self._dotRadius)
+            lines = self.scene.addStretchWires(
+                snapLine.mapToScene(snapLine.line().p1()).toPoint(),
+                snapLine.mapToScene(snapLine.line().p2()).toPoint())
+            if lines:
+                self.scene.addListUndoStack(lines)
+                [self.scene.mergeSplitNets(line) for line in lines]
+
+        [self.scene.removeItem(guideLineItem) for guideLineItem in self.scene.items(
+            self.viewRect) if isinstance(guideLineItem, net.guideLine)]
+        # [self.scene.removeItem(netItem) for netItem in self.scene.items(self.viewRect) if
+        #  isinstance(netItem, net.schematicNet) and netItem.draftLine.isNull()]
+
+    # def drawBackground(self, painter, rect):
+    #     super().drawBackground(painter, rect)
+        # xextend = self._right - self._left
+        # yextend = self._bottom - self._top
+        # netsInView = [netItem for netItem in self.scene.items(rect) if isinstance(netItem,
+        #                                                                           net.schematicNet)]
+        # if xextend <= 1000 or yextend <= 1000:
+        #     netEndPoints = []
+        #     for netItem in netsInView:
+        #         netEndPoints.extend(netItem.sceneEndPoints)
+        #     pointCountsDict = Counter(netEndPoints)
+        #     dotPoints = [point for point, count in pointCountsDict.items() if count >=3]
+        #     painter.setPen(schlyr.wirePen)
+        #     painter.setBrush(schlyr.wireBrush)
+        #     for dotPoint in dotPoints:
+        #         painter.drawEllipse(dotPoint, self._dotRadius, self._dotRadius)
 
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -5757,7 +5777,7 @@ class schematic_view(editor_view):
         super().keyPressEvent(event)
 
 
-class layout_view(editor_view):
+class layout_view(editorView):
     def __init__(self, scene, parent):
         self.scene = scene
         self.parent = parent
