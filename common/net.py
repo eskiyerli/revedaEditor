@@ -91,6 +91,7 @@ class schematicNet(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         # self.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setAcceptHoverEvents(True)
         self._mode = 0
         self._name: str = ""
         self._nameConflict: bool = False
@@ -200,40 +201,34 @@ class schematicNet(QGraphicsItem):
         return super().itemChange(change, value)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
-        # print(f'scene @ press event: {self.scene()}')
+        super().mousePressEvent(event)
         if self._stretch:
             self.startStretch(event)
-        else:
-            self.createNetSnapLines()
-        super().mousePressEvent(event)
+        # elif self._netSnapLines:
+        # else:
+        #     self.createNetSnapLines()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(event)
         # print(f'scene @ move event: {self.scene()}')
         if self.stretch:
             self.extendStretch(event)
-        elif self._netSnapLines:
-            self.extendNetSnapLines()
-        super().mouseMoveEvent(event)
+        # elif self._netSnapLines:
+        #     self.extendNetSnapLines()
+
     #
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-        self._netSnapLines = dict()
-    #     if self._netSnapLines:
-    #         for snapLine in self._netSnapLines.values():
-    #
-    #             lines = self.scene().addStretchWires(
-    #                 snapLine.mapToScene(snapLine.line().p1()).toPoint(),
-    #                 snapLine.mapToScene(snapLine.line().p2()).toPoint())
-    #             if lines:
-    #                 self.scene().addListUndoStack(lines)
-    #                 [self.scene().mergeSplitNets(line) for line in lines]
-    #         self._netSnapLines = dict()
-    #     elif self.stretch:
-    #         self.endStretch()
+
+        # self._netSnapLines = dict()
+        if self.stretch:
+            self.endStretch()
         super().mouseReleaseEvent(event)
+
 
     def createNetSnapLines(self):
         self._netSnapLines = {}
         selfEndPointsDict = self.scene().findNetStretchPoints(self, int(self.scene().majorGrid/2))
+
         for selfEndIndex, point in selfEndPointsDict.items():
             stretchLine = guideLine(point, point)
             self.scene().addItem(stretchLine)
@@ -244,18 +239,6 @@ class schematicNet(QGraphicsItem):
             snapLine.setLine(QLineF(snapLine.line().p1(),
                                     snapLine.mapFromScene(self.sceneEndPoints[index])))
 
-    def removeNetSnapLines(self):
-        try:
-            for snapLine in self._netSnapLines.values():
-                lines = self.scene().addStretchWires(
-                    snapLine.mapToScene(snapLine.line().p1()).toPoint(),
-                    snapLine.mapToScene(snapLine.line().p2()).toPoint())
-                if lines:
-                    self.scene().addListUndoStack(lines)
-                    [self.scene().mergeSplitNets(line) for line in lines]
-            self._netSnapLines = dict()
-        except AttributeError as e:
-            print(f'{e}')
 
     def startStretch(self, event):
         """
@@ -304,16 +287,20 @@ class schematicNet(QGraphicsItem):
             None
         """
         super().hoverEnterEvent(event)
-
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
+            sceneNetsSet = self.scene().findSceneNetsSet() -{self}
+            self._connectedNetsSet, _ = self.scene().traverseNets({self}, sceneNetsSet)
             # Create a set of connected netItems based on certain conditions
-            self._connectedNetsSet = {netItem for netItem in self.scene().items() if (
-                    isinstance(netItem, schematicNet) and (
-                    self.nameSet or self.nameAdded) and netItem.name == self.name)}
+            # self._connectedNetsSet = {netItem for netItem in self.scene().items() if (
+            #         isinstance(netItem, schematicNet) and (
+            #         self.nameSet or self.nameAdded) and netItem.name == self.name)}
 
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
+                if not (netItem.nameAdded or netItem.nameSet):
+                    netItem.nameAdded = True
+                    netItem.name = self._name
                 netItem.highlight()
 
             # Create flight lines and add them to the scene
@@ -351,6 +338,11 @@ class schematicNet(QGraphicsItem):
         if self.scene():
             overlapNets = {netItem for netItem in self.scene().items(self.sceneShapeRect) if
                            isinstance(netItem, schematicNet) and netItem is not self}
+            if self._nameSet or self._nameAdded:
+                for netItem in overlapNets:
+                    netItem.name = self._name
+                    netItem.nameSet = self._nameSet
+                    netItem.nameAdded = self._nameAdded
         else:
             overlapNets = set()
         return overlapNets

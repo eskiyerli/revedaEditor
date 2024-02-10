@@ -1454,6 +1454,7 @@ class schematicPin(symbolShape):
             f"{self._pinType})"
         )
 
+
     def paint(self, painter, option, widget):
         if self.isSelected():
             painter.setPen(schlyr.selectedSchematicPinPen)
@@ -1522,33 +1523,57 @@ class schematicPin(symbolShape):
         # Create an empty set to store pin-net-index tuples
         self._pinNetIndexTupleSet = set()
 
+        pinSceneConnectRect = self.mapRectToScene(QRect.span(
+                    QPoint(self._start.x() - 5, self._start.y() - 5),
+                    QPoint(self._start.x() + 5, self._start.y() + 5),
+                )).toRect()
         # Find all the net items connected to the pin
         netsConnected = [
             netItem
-            for netItem in self.scene().items(self.sceneBoundingRect())
+            for netItem in self.scene().items(pinSceneConnectRect)
             if isinstance(netItem, net.schematicNet)
         ]
 
         # Iterate over each connected net item
         for netItem in netsConnected:
-            netEndIndex = list(map(self.sceneBoundingRect().contains,
+            netEndIndex = list(map(pinSceneConnectRect.contains,
                                netItem.sceneEndPoints)).index(True)
             self._pinNetIndexTupleSet.add(pinNetIndexTuple(self,netItem,netEndIndex))
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        # self.findPinNetIndexTuples()
+        self.findPinNetIndexTuples()
+        for tupleItem in self._pinNetIndexTupleSet:
+            self._snapLines = set()
+            snapLine = net.guideLine(
+                self.mapToScene(self.start),
+                tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1],
+            )
+            if tupleItem.net.nameSet:
+                snapLine.name = tupleItem.net.name
+                snapLine.nameSet = True
+            self.scene().addItem(snapLine)
+            self._snapLines.add(snapLine)
+            self.scene().removeItem(tupleItem.net)
+        super().mousePressEvent(event)
 
     #
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)
-        #
-        # for item in self._netTupleSet:
-        #     lines = self.scene().addWires(item.net.start)
-        #     self.scene().extendWires(lines, item.net.start, item.net.end)
-        #     self.scene().pruneWires(lines, schlyr.wirePen)
-        #     self.scene().removeItem(item.net)
-        # self._netTupleSet = set()
+        lines = []
+        for snapLine in self._snapLines:
+            lines = self.scene().addStretchWires(
+                self.mapToScene(self.start).toPoint(),
+                snapLine.mapToScene(snapLine.line().p2()).toPoint(),
+            )
+            self.scene().removeItem(snapLine)
+        if lines:
+            for line in lines:
+                if snapLine.nameSet:
+                    line.name = snapLine.name
+                    line.nameSet = True
+            self.scene().addListUndoStack(lines)
+        self._snapLines = dict()
 
     def itemChange(self, change, value):
         # if self.scene() and change == QGraphicsItem.ItemPositionHasChanged:
@@ -1561,9 +1586,17 @@ class schematicPin(symbolShape):
         #             item.net.end = self.mapToScene(self.start)
         return super().itemChange(change, value)
 
-    # def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-    #     super().mouseMoveEvent(event)
-    #     self.setPos(event.scenePos() - event.buttonDownPos(Qt.LeftButton))
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        for snapLine in self._snapLines:
+            snapLine.setLine(
+                QLineF(
+                    snapLine.mapFromScene(self.mapToScene(self.start)),
+                    snapLine.line().p2(),
+                )
+            )
+
 
     def toSymbolPin(self, start: QPoint):
         return symbolPin(start, self.pinName, self.pinDir, self.pinType)
