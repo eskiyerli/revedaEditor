@@ -3316,29 +3316,29 @@ class schematicScene(editorScene):
         self.fixedFont.setPointSize(fontSize)
         self.fixedFont.setKerning(False)
         self._changedRects: list[QRectF] = []
-        self.changed.connect(self.sceneChanged)
-
-    def sceneChanged(self, rects: list):
-
-        self._changedRects = rects
-        for rectArea in self._changedRects:
-            netsInArea = [netItem for netItem in self.items(rectArea) if isinstance(netItem,
-                                                                        net.schematicNet)]
-
-            if netsInArea:
-                netEndPoints = []
-                for netItem in netsInArea:
-                    netEndPoints.extend(netItem.sceneEndPoints)
-
-                dotsInArea = {dotItem for dotItem in self.items(rectArea) if isinstance(
-                    dotItem, net.crossingDot)}
-                for dotItem in dotsInArea:
-                    self.removeItem(dotItem)
-
-                pointCountsDict = Counter(netEndPoints)
-                dotPoints = [point for point, count in pointCountsDict.items() if count >= 3]
-                for dotPoint in dotPoints:
-                    self.addItem(net.crossingDot(dotPoint))
+        # self.changed.connect(self.sceneChanged)
+    #
+    # def sceneChanged(self, rects: list):
+    #
+    #     self._changedRects = rects
+    #     for rectArea in self._changedRects:
+    #         netsInArea = [netItem for netItem in self.items(rectArea) if isinstance(netItem,
+    #                                                                     net.schematicNet)]
+    #
+    #         if netsInArea:
+    #             netEndPoints = []
+    #             for netItem in netsInArea:
+    #                 netEndPoints.extend(netItem.sceneEndPoints)
+    #
+    #             dotsInArea = {dotItem for dotItem in self.items(rectArea) if isinstance(
+    #                 dotItem, net.crossingDot)}
+    #             for dotItem in dotsInArea:
+    #                 self.removeItem(dotItem)
+    #
+    #             pointCountsDict = Counter(netEndPoints)
+    #             dotPoints = [point for point, count in pointCountsDict.items() if count >= 3]
+    #             for dotPoint in dotPoints:
+    #                 self.addItem(net.crossingDot(dotPoint))
 
     @property
     def drawMode(self):
@@ -5769,22 +5769,22 @@ class schematicView(editorView):
             if netItem.scene():
                 self.scene.mergeSplitNets(netItem)
 
-    # def drawBackground(self, painter, rect):
-    #     super().drawBackground(painter, rect)
-    #     xextend = self._right - self._left
-    #     yextend = self._bottom - self._top
-    #     netsInView = [netItem for netItem in self.scene.items(rect) if isinstance(netItem,
-    #                                                                               net.schematicNet)]
-    #     if xextend <= 1000 or yextend <= 1000:
-    #         netEndPoints = []
-    #         for netItem in netsInView:
-    #             netEndPoints.extend(netItem.sceneEndPoints)
-    #         pointCountsDict = Counter(netEndPoints)
-    #         dotPoints = [point for point, count in pointCountsDict.items() if count >=3]
-    #         painter.setPen(schlyr.wirePen)
-    #         painter.setBrush(schlyr.wireBrush)
-    #         for dotPoint in dotPoints:
-    #             painter.drawEllipse(dotPoint, self._dotRadius, self._dotRadius)
+    def drawBackground(self, painter, rect):
+        super().drawBackground(painter, rect)
+        xextend = self._right - self._left
+        yextend = self._bottom - self._top
+        netsInView = [netItem for netItem in self.scene.items(rect) if isinstance(netItem,
+                                                                                  net.schematicNet)]
+        if xextend <= 1000 or yextend <= 1000:
+            netEndPoints = []
+            for netItem in netsInView:
+                netEndPoints.extend(netItem.sceneEndPoints)
+            pointCountsDict = Counter(netEndPoints)
+            dotPoints = [point for point, count in pointCountsDict.items() if count >=3]
+            painter.setPen(schlyr.wirePen)
+            painter.setBrush(schlyr.wireBrush)
+            for dotPoint in dotPoints:
+                painter.drawEllipse(dotPoint, self._dotRadius, self._dotRadius)
 
 
     def keyPressEvent(self, event: QKeyEvent):
