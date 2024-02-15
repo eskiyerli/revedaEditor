@@ -93,6 +93,22 @@ class deleteShapeUndo(QUndoCommand):
         self._scene.removeItem(self._shape)
 
 
+class addDeleteShapeUndo(QUndoCommand):
+    def __init__(self, scene: QGraphicsScene, addShape: QGraphicsItem, deleteShape: QGraphicsItem):
+        super().__init__()
+        self._scene = scene
+        self._addshape = addShape
+        self._deleteShape = deleteShape
+        self.setText("Add/Delete Shape")
+
+    def undo(self):
+        self._scene.removeItem(self._addshape)
+        self._scene.addItem(self._deleteShape)
+
+    def redo(self):
+        self._scene.addItem(self._addshape)
+        self._scene.removeItem(self._deleteShape)
+
 class updateSymUndo(QUndoCommand):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
         super().__init__()
