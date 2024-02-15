@@ -33,7 +33,7 @@ from copy import deepcopy
 import inspect
 from quantiphy import Quantity
 import itertools as itt
-from typing import Union, Optional, NamedTuple, Dict, Set, Any
+from typing import Union,  Any
 from collections import Counter
 
 # import os
@@ -50,7 +50,6 @@ from PySide6.QtCore import (
     QRectF,
     QRunnable,
     Qt,
-    Signal,
     Slot,
     QLineF,
 )
@@ -1374,6 +1373,7 @@ class editorWindow(QMainWindow):
     def deselectAllClick(self):
         self.centralW.scene.deselectAll()
 
+
     def stretchClick(self, s):
         self.centralW.scene.editModes.setMode("stretchItem")
         self.centralW.scene.stretchSelectedItems()
@@ -2419,6 +2419,7 @@ class editorScene(QGraphicsScene):
             rotateItem=False,
             changeOrigin=False,
             panView=False,
+            stretchItem=False,
         )
         self.readOnly = False  # if the scene is not editable
         self.undoStack = us.undoStack()
@@ -2616,8 +2617,12 @@ class editorScene(QGraphicsScene):
         height = view_widget.height()
         self.setSceneRect(point.x() - width / 2, point.y() - height / 2, width, height)
 
-    def addUndoStack(self, item):
+    def addUndoStack(self, item: QGraphicsItem):
         undoCommand = us.addShapeUndo(self, item)
+        self.undoStack.push(undoCommand)
+
+    def deleteUndoStack(self, item: QGraphicsItem):
+        undoCommand = us.deleteShapeUndo(self, item)
         self.undoStack.push(undoCommand)
 
     def addListUndoStack(self, itemList: list):
@@ -3284,6 +3289,7 @@ class schematicScene(editorScene):
             drawWire=False,
             drawText=False,
             addInstance=False,
+            stretchItem=False,
         )
         self.itemCounter = 0
         self.netCounter = 0
@@ -3297,6 +3303,7 @@ class schematicScene(editorScene):
         self.parentView = None
         # self.wires = None
         self._newNet = None
+        self._stretchNet = None
         self._totalNet = None
         self.newInstance = None
         self.newPin = None
@@ -3435,7 +3442,9 @@ class schematicScene(editorScene):
                     )
                     if self._newNet.scene() is None:
                         self.addUndoStack(self._newNet)
-
+                elif self.editModes.stretchItem and self._stretchNet is not None:
+                    self._stretchNet.draftLine = QLineF(self._stretchNet.draftLine.p1(),
+                                                            self.mouseMoveLoc)
             self.editorWindow.statusLine.showMessage(
                 f"Cursor Position: {str((self.mouseMoveLoc - self.origin).toTuple())}"
             )
@@ -3460,8 +3469,8 @@ class schematicScene(editorScene):
                         )
                         self.removeItem(self.selectionRectItem)
                         self.selectionRectItem = None
-
-
+                # elif self.editModes.stretchItem and self._stretchNet:
+                #     self._stretchNet = None
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
         super().mouseReleaseEvent(mouse_event)
@@ -3484,9 +3493,10 @@ class schematicScene(editorScene):
             splitPoints = self.findSplitPoints(netItem)
             self.splitNets(netItem,splitPoints)
         splitPoints = self.findSplitPoints(self._totalNet)
-        print(f'split points: {splitPoints}')
         if splitPoints:
             self.splitNets(self._totalNet, splitPoints)
+        # else:
+        #     self.addUndoStack(self._totalNet)
 
     def splitNets(self, inputNet: net.schematicNet, splitPoints: list[QPoint]):
         '''
@@ -3503,14 +3513,16 @@ class schematicScene(editorScene):
         splitPoints.insert(0, inputNet.sceneEndPoints[0])
         splitPoints.append(inputNet.sceneEndPoints[1])
         orderedPoints = list(Counter(schematicScene.orderPoints(splitPoints)).keys())
+        splitNetList = []
         for i in range(len(orderedPoints) - 1):
             splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
             splitNet.name = inputNet.name
             splitNet.nameSet = inputNet.nameSet
             splitNet.nameAdded = inputNet.nameAdded
-            self.addItem(splitNet)
+            splitNetList.append(splitNet)
             if inputNet.isSelected():
                 splitNet.setSelected(True)
+        self.addListUndoStack(splitNetList)
         self.removeItem(inputNet)
 
     def mergeNets(self, inputNet: net.schematicNet) -> net.schematicNet:
@@ -3525,18 +3537,6 @@ class schematicScene(editorScene):
             self.addItem(mergedNet)
             self.mergeNets(mergedNet)
 
-    # def splitCrossingNet(self, splittingNet):
-    #     outputNets = set()
-    #     crossingNetsDict = splittingNet.findCrossingNets(splittingNet.findOverlapNets())
-    #     if crossingNetsDict:
-    #         splitNetTuples = splittingNet.createSplitNets(crossingNetsDict)
-    #         if splitNetTuples:  # mergedNet split some nets
-    #             for netTuple in splitNetTuples:
-    #                 self.addItem(netTuple.net)
-    #                 netTuple.net.clearDots()
-    #                 netTuple.net.createDots()
-    #                 outputNets.add(netTuple.net)
-    #     return outputNets
 
     def removeSnapRect(self):
         if self._snapPointRect:
@@ -3598,11 +3598,11 @@ class schematicScene(editorScene):
 
             for item in snapRectItems:
                 if isinstance(item, net.schematicNet) and any(
-                        list(map(snapRect.contains, item.sceneEndPoints))):
+                    list(map(snapRect.contains, item.sceneEndPoints))):
                     netEndPointsDict[sceneEndPoints.index(netEnd)] = netEnd
                 elif (isinstance(item, shp.symbolPin) or isinstance(item,
-                                shp.schematicPin)) and snapRect.contains(
-                        item.mapToScene(item.start).toPoint()):
+                                                                    shp.schematicPin)) and snapRect.contains(
+                                                                        item.mapToScene(item.start).toPoint()):
                     netEndPointsDict[sceneEndPoints.index(netEnd)] = item.mapToScene(
                         item.start).toPoint()
                 if netEndPointsDict.get(sceneEndPoints.index(netEnd)):  # after finding one point, no need to iterate.
@@ -3616,16 +3616,32 @@ class schematicScene(editorScene):
 
         for item in rectItems:
             if (
-                    isinstance(item, net.schematicNet)
-                    and any(list(map(sceneRect.contains, item.sceneEndPoints)))
-                    and targetNet.isOrthogonal(item)
+                isinstance(item, net.schematicNet)
+                and any(list(map(sceneRect.contains, item.sceneEndPoints)))
+                and targetNet.isOrthogonal(item)
             ):
                 splitPoints.add(item.sceneEndPoints[list(map(sceneRect.contains, item.sceneEndPoints)).index(True)])
             elif (isinstance(item, shp.symbolPin) or isinstance(item, shp.schematicPin)) and sceneRect.contains(
-                    item.mapToScene(item.start).toPoint()):
+                item.mapToScene(item.start).toPoint()):
                 splitPoints.add(item.mapToScene(item.start).toPoint())
 
         return list(splitPoints)
+
+    def stretchNet(self, netItem: net.schematicNet, stretchEnd: str):
+        match stretchEnd:
+            case 'p2':
+                self._stretchNet = net.schematicNet(netItem.sceneEndPoints[0],
+                                                netItem.sceneEndPoints[1])
+            case 'p1':
+                self._stretchNet = net.schematicNet(netItem.sceneEndPoints[1],
+                                                netItem.sceneEndPoints[0])
+        self._stretchNet.stretch = True
+        self._stretchNet.name = netItem.name
+        self._stretchNet.nameSet = netItem.nameSet
+        self._stretchNet.nameAdded = netItem.nameSet
+        addDeleteStretchNetCommand = us.addDeleteShapeUndo(self, self._stretchNet, netItem)
+        self.undoStack.push(addDeleteStretchNetCommand)
+
 
 
 
@@ -3651,6 +3667,7 @@ class schematicScene(editorScene):
             netItem.nameAdded = False
             netItem.nameConflict = False
 
+    # netlisting related methods.
     def groupAllNets(self) -> None:
         """
         This method starting from nets connected to pins, then named nets and unnamed
@@ -5747,21 +5764,6 @@ class schematicView(editorView):
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
-        # viewGuideLines = [guideLineItem for guideLineItem in self.scene.items(self.viewRect) if
-        #                   isinstance(guideLineItem, net.guideLine)]
-        #
-        # for snapLine in viewGuideLines:
-        #
-        #     lines = self.scene.addStretchWires(
-        #         snapLine.mapToScene(snapLine.line().p1()).toPoint(),
-        #         snapLine.mapToScene(snapLine.line().p2()).toPoint())
-        #     if lines:
-        #         self.scene.addListUndoStack(lines)
-        #
-        # [self.scene.removeItem(guideLineItem) for guideLineItem in self.scene.items(
-        #     self.viewRect) if isinstance(guideLineItem, net.guideLine)]
-        # netsInView = [netItem for netItem in self.scene.items(self.viewRect) if
-        #               isinstance(netItem, net.schematicNet)]
         # [self.scene.removeItem(netItem) for netItem in netsInView if netItem.draftLine.isNull()]
         netsInView = [netItem for netItem in self.scene.items(self.viewRect) if
                       isinstance(netItem, net.schematicNet)]
@@ -5793,8 +5795,13 @@ class schematicView(editorView):
             if self.scene._newNet is not None:
                 self.scene.checkNewNet(self.scene._newNet)
                 self.scene._newNet = None
-                self.scene.editModes.setMode("selectItem")
+            elif self.scene._stretchNet is not None:
+                self.scene._stretchNet.setSelected(False)
+                self.scene._stretchNet.stretch = False
+                self.scene.checkNewNet(self.scene._stretchNet)
+        self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
+
 
 
 class layoutView(editorView):

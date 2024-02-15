@@ -34,44 +34,39 @@ import itertools as itt
 from typing import Union, Optional, NamedTuple
 
 
-class crossingDot(QGraphicsEllipseItem):
-    dotDiameter = schlyr.crossingDotDiameter
-
-    def __init__(self, point: QPoint):
-
-        self.point = point
-        self._radius = crossingDot.dotDiameter
-        super().__init__(point.x() - self._radius, point.y() - self._radius,
-                         2 * self._radius, 2 * self._radius)
-        self.setPen(schlyr.wirePen)
-        self.setBrush(schlyr.wireBrush)
-        self._name = None
-
-    def paint(self, painter, option, widget) -> None:
-        if self.isSelected():
-            painter.setPen(schlyr.selectedWirePen)
-            painter.setBrush(schlyr.selectedWireBrush)
-        else:
-            painter.setPen(schlyr.wirePen)
-            painter.setBrush(schlyr.wireBrush)
-        painter.drawEllipse(self.point, self._radius, self._radius)
-
-    def __repr__(self):
-        return f"crossingDot({self.point},{self._radius})"
-
-    def findNets(self) -> set["schematicNet"]:
-        if self.scene():
-            return {netItem for netItem in self.scene().items(self.sceneBoundingRect()) if
-                    isinstance(netItem, schematicNet)}
-        else:
-            return set()
-
-
-# class selfIndNetIndTuple(NamedTuple):
-#     selfIndex: int
-#     net: QGraphicsItem
-#     netEndIndex: int
-
+# class crossingDot(QGraphicsEllipseItem):
+#     dotDiameter = schlyr.crossingDotDiameter
+#
+#     def __init__(self, point: QPoint):
+#
+#         self.point = point
+#         self._radius = crossingDot.dotDiameter
+#         super().__init__(point.x() - self._radius, point.y() - self._radius,
+#                          2 * self._radius, 2 * self._radius)
+#         self.setPen(schlyr.wirePen)
+#         self.setBrush(schlyr.wireBrush)
+#         self._name = None
+#
+#     def paint(self, painter, option, widget) -> None:
+#         if self.isSelected():
+#             painter.setPen(schlyr.selectedWirePen)
+#             painter.setBrush(schlyr.selectedWireBrush)
+#         else:
+#             painter.setPen(schlyr.wirePen)
+#             painter.setBrush(schlyr.wireBrush)
+#         painter.drawEllipse(self.point, self._radius, self._radius)
+#
+#     def __repr__(self):
+#         return f"crossingDot({self.point},{self._radius})"
+#
+#     def findNets(self) -> set["schematicNet"]:
+#         if self.scene():
+#             return {netItem for netItem in self.scene().items(self.sceneBoundingRect()) if
+#                     isinstance(netItem, schematicNet)}
+#         else:
+#             return set()
+#
+#
 
 class pointSelfIndex(NamedTuple):
     point: QPoint
@@ -82,8 +77,8 @@ class schematicNet(QGraphicsItem):
     _netSnapLines: dict
     __slots__ = ('_mode','_name', '_nameConflict', '_nameAdded', '_nameSet', '_highlighted',
                  '_flightLinesSet', '_connectedNetsSet', '_netIndexTupleSet', '_scene'
-                 '_netSnapLines', '_stretch', '_nameFont', '_nameItem', '_draftLine',
-                 '_stretchLine', '_shapeRect', '_boundingRect', '_angle')
+                 '_netSnapLines', '_stretch', '_stretchSide', '_nameFont', '_nameItem', '_draftLine',
+                '_shapeRect', '_boundingRect', '_angle', '_transformOriginPoint')
     def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
@@ -102,27 +97,27 @@ class schematicNet(QGraphicsItem):
         self._connectedNetsSet: set[schematicNet] = set()
         self._netSnapLines: dict = {}
         self._stretch: bool = False
+        self._stretchSide: str = ''
         self._nameFont = QFont()
         self._nameFont.setPointSize(8)
         self._nameItem = QStaticText(self._name)
         self._draftLine = QLineF(start, end)
-        self._stretchLine: Optional[guideLine] = None
+        self._transformOriginPoint = self._draftLine.p1()
+        self._angle = None
         match self._mode:
             case 0:
                 self._angle = 90 * math.floor(((self._draftLine.angle() + 45) % 360) / 90)
             case 1:
                 self._angle = 45 * math.floor(((self._draftLine.angle() + 22.5) % 360) / 45)
+            case 2:
+                self._angle = self._draftLine.angle()
         self._draftLine.setAngle(0)
-        self.setTransformOriginPoint(self._draftLine.p1())
-        if self.scene():
-            self._draftLine.setP2(
-                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple))
+        self.setTransformOriginPoint(self._transformOriginPoint)
         self._shapeRect = QRectF(self._draftLine.p1(), self._draftLine.p2()).adjusted(-2,
                                                                                       -2, 2,
                                                                                       2)
         self._boundingRect = self._shapeRect.adjusted(-8, -8, 8, 8)
         self.setRotation(-self._angle)
-
 
     @property
     def draftLine(self):
@@ -132,16 +127,17 @@ class schematicNet(QGraphicsItem):
     def draftLine(self, line: QLineF):
         self.prepareGeometryChange()
         self._draftLine = line
+        self._transformOriginPoint = line.p1()
         match self._mode:
             case 0:
                 self._angle = 90 * math.floor(((self._draftLine.angle() + 45) % 360) / 90)
             case 1:
                 self._angle = 45 * math.floor(((self._draftLine.angle() + 22.5) % 360) / 45)
+            case 2:
+                self._angle = self._draftLine.angle()
         self._draftLine.setAngle(0)
-        self.setTransformOriginPoint(self._draftLine.p1())
-        if self.scene():
-            self._draftLine.setP2(
-                self.scene().snapToGrid(self._draftLine.p2(), self.scene().snapTuple))
+        self.setTransformOriginPoint(self._transformOriginPoint)
+
         self._shapeRect = (
             QRectF(self._draftLine.p1(), self._draftLine.p2()).normalized().adjusted(-2, -2,
                                                                                      2, 2))
@@ -160,8 +156,8 @@ class schematicNet(QGraphicsItem):
         painter.setFont(self._nameFont)
         if self.isSelected():
             pen = schlyr.selectedWirePen
-            if self._stretch:
-                pen = schlyr.stretchWirePen
+        elif self._stretch:
+            pen = schlyr.stretchWirePen
         elif self._highlighted:
             pen = schlyr.hilightPen
         else:
@@ -169,6 +165,7 @@ class schematicNet(QGraphicsItem):
 
         painter.setPen(pen)
         painter.drawLine(self._draftLine)
+        painter.drawEllipse(self._draftLine.p1(), 2, 2)
         if self._nameSet:
             painter.save()
             painter.translate(self._draftLine.center().x(), self._draftLine.center().y())
@@ -199,82 +196,33 @@ class schematicNet(QGraphicsItem):
 
     def itemChange(self, change, value):
         return super().itemChange(change, value)
-
+    #
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         super().mousePressEvent(event)
         if self._stretch:
-            self.startStretch(event)
-        # elif self._netSnapLines:
+            eventPos = event.pos().toPoint()
+            self.setFlag(QGraphicsItem.ItemIsMovable, False)
+            if (eventPos - self._draftLine.p1().toPoint()).manhattanLength() <= self.scene().snapDistance:
+                self.setCursor(Qt.SizeHorCursor)
+                self._stretchSide = 'p1'
+            elif (eventPos-self._draftLine.p2().toPoint()).manhattanLength() <= self.scene(
+            ).snapDistance:
+                self.setCursor(Qt.SizeHorCursor)
+                self._stretchSide = 'p2'
+            self.scene().stretchNet(self, self._stretchSide)
         # else:
-        #     self.createNetSnapLines()
-
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseMoveEvent(event)
-        # print(f'scene @ move event: {self.scene()}')
-        if self.stretch:
-            self.extendStretch(event)
-        # elif self._netSnapLines:
-        #     self.extendNetSnapLines()
-
-    #
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
-
-        # self._netSnapLines = dict()
-        if self.stretch:
-            self.endStretch()
-        super().mouseReleaseEvent(event)
+        #     orthoNets = list(filter(self.isOrthogonal, self.findOverlapNets()))
+        #     for otherNet in orthoNets:
+        #         for selfEnd, otherEnd in itt.product(self.sceneEndPoints, otherNet.sceneEndPoints):
+        #             if selfEnd == otherEnd:
+        #                 if otherNet.sceneEndPoints.index(otherEnd) == 0:
+        #                     otherNet._stretchSide = 'p1'
+        #                 else:
+        #                     otherNet._stretchSide = 'p2'
+        #                 self.scene().stretchNet(otherNet, otherNet._stretchSide)
+        #                 break
 
 
-    def createNetSnapLines(self):
-        self._netSnapLines = {}
-        selfEndPointsDict = self.scene().findNetStretchPoints(self, int(self.scene().majorGrid/2))
-
-        for selfEndIndex, point in selfEndPointsDict.items():
-            stretchLine = guideLine(point, point)
-            self.scene().addItem(stretchLine)
-            self._netSnapLines[selfEndIndex] = stretchLine
-
-    def extendNetSnapLines(self):
-        for index, snapLine in self._netSnapLines.items():
-            snapLine.setLine(QLineF(snapLine.line().p1(),
-                                    snapLine.mapFromScene(self.sceneEndPoints[index])))
-
-
-    def startStretch(self, event):
-        """
-        Handle the start of the stretch of the net using one of the end points.
-        """
-
-        eventPos = event.scenePos().toPoint()
-        self.setFlag(QGraphicsItem.ItemIsMovable, False)
-        if (eventPos - self.mapToScene(
-                self._draftLine.p1()).toPoint()).manhattanLength() <= self.scene().snapDistance:
-            self.setCursor(Qt.SizeHorCursor)
-            self._stretchLine = guideLine(self.mapToScene(self._draftLine.p1()), eventPos)
-        elif (eventPos - self.mapToScene(
-                self._draftLine.p2()).toPoint()).manhattanLength() <= self.scene().snapDistance:
-            self.setCursor(Qt.SizeHorCursor)
-            self._stretchLine = guideLine(self.mapToScene(self._draftLine.p2()), eventPos)
-
-    def extendStretch(self, event):
-        eventPos = event.scenePos().toPoint()
-        if self._stretchLine is not None:
-            if self._stretchLine.scene() is None:
-                self.scene().addItem(self._stretchLine)
-            self._stretchLine.setLine(QLineF(self._stretchLine.line().p1(),
-                                             self._stretchLine.mapFromScene(eventPos), ))
-
-    def endStretch(self):
-        self._stretch = False
-        self._stretchSide = None
-        if self._stretchLine and self.scene():
-            lines = self.scene().addStretchWires(*self._stretchLine.sceneEndPoints)
-            self.scene().removeItem(self._stretchLine)
-        if lines:
-            self.scene().addListUndoStack(lines)
-            self.scene().mergeSplitNets(lines[0])
-        self._stretchLine = None
-        self.setCursor(Qt.ArrowCursor)
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """
@@ -291,10 +239,6 @@ class schematicNet(QGraphicsItem):
         if self.scene().highlightNets:
             sceneNetsSet = self.scene().findSceneNetsSet() -{self}
             self._connectedNetsSet, _ = self.scene().traverseNets({self}, sceneNetsSet)
-            # Create a set of connected netItems based on certain conditions
-            # self._connectedNetsSet = {netItem for netItem in self.scene().items() if (
-            #         isinstance(netItem, schematicNet) and (
-            #         self.nameSet or self.nameAdded) and netItem.name == self.name)}
 
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
@@ -347,7 +291,6 @@ class schematicNet(QGraphicsItem):
             overlapNets = set()
         return overlapNets
 
-
     def mergeNets(self) -> tuple["schematicNet", "schematicNet"]:
         """
         Merges overlapping nets and returns the merged net.
@@ -398,8 +341,6 @@ class schematicNet(QGraphicsItem):
 
         # If there are no other nets or no parallel nets, return self
         return self, self
-
-
 
     def snapToGrid(self, point: Union[QPoint, QPointF]) -> QPoint:
         if self.scene():
@@ -500,7 +441,7 @@ class schematicNet(QGraphicsItem):
         self._stretch = value
 
     @property
-    def stretchSide(self):
+    def stretchSide(self) -> int:
         """
         The end where the net is stretched.
         """
@@ -512,8 +453,20 @@ class schematicNet(QGraphicsItem):
         self._stretchSide = value
 
     @property
-    def angle(self):
+    def angle(self) -> float:
         return self._angle
+
+    @angle.setter
+    def angle(self, value: float):
+        self._angle = value
+
+    @property
+    def stretch(self) -> bool:
+        return self._stretch
+
+    @stretch.setter
+    def stretch(self, value: bool):
+        self._stretch = value
 
 
 class netFlightLine(QGraphicsPathItem):
