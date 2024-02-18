@@ -266,6 +266,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
             self._labelValue = self._labelDefinition
             self._labelText = self._labelDefinition
         elif self._labelType == symbolLabel.labelTypes[1]:  # NLPLabel
+            print('found NLP label')
             self.createNLPLabel()
         elif self._labelType == symbolLabel.labelTypes[2]:  # pyLabel
             # self._labelText = f'{self._labelDefinition}'
@@ -274,10 +275,18 @@ class symbolLabel(QGraphicsSimpleTextItem):
 
     def createNLPLabel(self):
         try:
+            labelFields = (
+                self._labelDefinition.lstrip("[@")
+                .rstrip("]")
+                .rstrip(":")
+                .split(":")
+            )
+            self._labelName = labelFields[0].strip()
             if self.parentItem() is None: #symbol editor
                 self._labelText = self._labelDefinition
             else:
                 if self._labelDefinition in symbolLabel.predefinedLabels:
+                    print('predefined labels')
                     match self._labelDefinition:
                         case "[@cellName]":
                             # Set label name to "cellName" and value and text to parent item's cell name
@@ -311,27 +320,21 @@ class symbolLabel(QGraphicsSimpleTextItem):
                             self._labelValue = f"{self.parentItem().counter}"
                             self._labelText = self._labelValue
                 else:
-                    labelFields = (
-                        self._labelDefinition.lstrip("[@")
-                        .rstrip("]")
-                        .rstrip(":")
-                        .split(":")
-                    )
-                    self._labelName = labelFields[0].strip()
                     match len(labelFields):
                         case 1:
-                            if not self._labelValue:
+                            if (not self._labelValue) or self._labelValue == "?":
                                 self._labelValue = "?"
                             else:
                                 self._labelText = self._labelValue
                         case 2:
-                            if self._labelValue:
+                            if (not self._labelValue) or self._labelValue == "?":
+                                self._labelValue = "?"
+                            else:
                                 # Set label text to the second field of label definition with "%" replaced by label value
                                 self._labelText = (
                                     labelFields[1].strip().replace("%", self._labelValue)
                                 )
-                            else:
-                                self._labelValue = "?"
+
                         case 3:
                             tempLabelValue = (
                                 labelFields[2].strip().split("=")[-1].split()[-1]
@@ -342,8 +345,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
                                     tempLabelValue, self._labelValue
                                 )
                             else:
-                                self._labelText = labelFields[2]
                                 self._labelValue = tempLabelValue
+                                self._labelText = labelFields[2]
+
 
         except Exception as e:
             self.scene().logger.error(

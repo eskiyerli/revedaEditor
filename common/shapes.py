@@ -1224,6 +1224,7 @@ class schematicSymbol(symbolShape):
             if type(item) is symbolPin:
                 self._pins[item.pinName] = item
             elif type(item) is symbolLabel:
+                print(f'label name: {item.labelName}')
                 self._labels[item.labelName] = item
 
     def __repr__(self):

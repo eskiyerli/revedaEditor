@@ -3217,10 +3217,17 @@ class symbolScene(editorScene):
     def saveSymbolCell(self, fileName: pathlib.Path):
         # items = self.items(self.sceneRect())  # get items in scene rect
         items = self.items()
+        [labelItem.labelDefs() for labelItem in items if isinstance(labelItem,
+                                                                    lbl.symbolLabel)]
+        [print(labelItem.labelName) for labelItem in items if isinstance(
+            labelItem, lbl.symbolLabel)]
         items.insert(0, {"cellView": "symbol"})
         items.insert(1, {"snapGrid": self.snapTuple})
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)  # add attribute list to list
+
+        # [print(labelItem.labelName) for labelItem in items if isinstance(
+        #     labelItem, lbl.symbolLabel)]
         with fileName.open(mode="w") as f:
             try:
                 json.dump(items, f, cls=symenc.symbolEncoder, indent=4)
@@ -4039,8 +4046,8 @@ class schematicScene(editorScene):
                 )
                 symbolInstance.cellName = self.instanceSymbolTuple.cellItem.cellName
                 symbolInstance.viewName = self.instanceSymbolTuple.viewItem.viewName
-                for item in symbolInstance.labels.values():
-                    item.labelDefs()
+                for labelItem in symbolInstance.labels.values():
+                    labelItem.labelDefs()
                 return symbolInstance
         except Exception as e:
             self.logger.warning(f"instantiation error: {e}")
@@ -4125,10 +4132,8 @@ class schematicScene(editorScene):
                     item.prepareGeometryChange()
                     if isinstance(item, shp.schematicSymbol):
                         self.setInstanceProperties(item)
-
                     elif isinstance(item, net.schematicNet):
                         self.setNetProperties(item)
-
                     elif isinstance(item, shp.text):
                         item = self.setTextProperties(item)
                     elif isinstance(item, shp.schematicPin):

@@ -28,9 +28,8 @@
 
 import json
 import pdk.process as fabproc
-from PySide6.QtCore import (QPoint, QLineF, QRect, )
-from PySide6.QtWidgets import (QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsRectItem,
-                               QGraphicsItem, )
+from PySide6.QtCore import (QPoint, QLineF )
+from PySide6.QtWidgets import (QGraphicsScene )
 
 from revedaEditor.common.net import schematicNet
 import revedaEditor.common.shapes as shp
