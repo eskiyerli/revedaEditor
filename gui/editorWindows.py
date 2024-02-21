@@ -35,6 +35,8 @@ from quantiphy import Quantity
 import itertools as itt
 from typing import Union,  Any
 from collections import Counter
+from functools import lru_cache
+import time
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -1393,10 +1395,11 @@ class editorWindow(QMainWindow):
         self.messageLine.setText("Click on the view to pan it")
 
     def goUpHierarchy(self):
+        self.saveCell()
         if self.parentEditor is not None:
+            self.parentEditor.updateDesignScene()
             self.parentEditor.raise_()
-            # magic happens in close event.
-            self.close()
+        self.close()
 
     def fitToWindow(self):
         self.centralW.scene.fitItemsInView()
@@ -1417,10 +1420,6 @@ class editorWindow(QMainWindow):
     def closeEvent(self, event):
         cellViewTuple = ddef.viewTuple(self.libName, self.cellName, self.viewName)
         self.appMainW.openViews.pop(cellViewTuple)
-        self.saveCell()
-        if self.parentEditor is not None:
-            self.parentEditor.updateDesignScene()
-            self.parentEditor.raise_()
         event.accept()
         super().closeEvent(event)
 
@@ -3219,15 +3218,11 @@ class symbolScene(editorScene):
         items = self.items()
         [labelItem.labelDefs() for labelItem in items if isinstance(labelItem,
                                                                     lbl.symbolLabel)]
-        [print(labelItem.labelName) for labelItem in items if isinstance(
-            labelItem, lbl.symbolLabel)]
         items.insert(0, {"cellView": "symbol"})
         items.insert(1, {"snapGrid": self.snapTuple})
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)  # add attribute list to list
 
-        # [print(labelItem.labelName) for labelItem in items if isinstance(
-        #     labelItem, lbl.symbolLabel)]
         with fileName.open(mode="w") as f:
             try:
                 json.dump(items, f, cls=symenc.symbolEncoder, indent=4)
@@ -3872,7 +3867,8 @@ class schematicScene(editorScene):
         else:
             return False
 
-    def generatePinNetMap(self, sceneSymbolSet: set):
+    @lru_cache(maxsize=128)
+    def generatePinNetMap(self, sceneSymbolSet: tuple[shp.schematicSymbol]):
         """
         For symbols in sceneSymbolSet, find which pin is connected to which net. If a
         pin is not connected, assign to it a default net starting with d prefix.
@@ -4110,7 +4106,6 @@ class schematicScene(editorScene):
                 # increment item counter for next symbol
                 self.itemCounter += 1
             shapesList.append(itemShape)
-
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
 
     def reloadScene(self):
@@ -4156,7 +4151,7 @@ class schematicScene(editorScene):
         for label in item.labels.values():
             if label.labelDefinition not in lbl.symbolLabel.predefinedLabels:
                 dlg.instanceLabelsLayout.addWidget(
-                    edf.boldLabel(label.labelName, dlg), row_index, 0
+                    edf.boldLabel(label.labelName[1:], dlg), row_index, 0
                 )
                 labelValueEdit = edf.longLineEdit()
                 labelValueEdit.setText(str(label.labelValue))
@@ -4182,7 +4177,6 @@ class schematicScene(editorScene):
         if dlg.exec() == QDialog.Accepted:
             item.instanceName = dlg.instNameEdit.text().strip()
             item.angle = float(dlg.angleEdit.text().strip())
-
             location = QPoint(
                 float(dlg.xLocationEdit.text().strip()),
                 float(dlg.yLocationEdit.text().strip()),
@@ -4195,7 +4189,7 @@ class schematicScene(editorScene):
                     dlg.instanceLabelsLayout.itemAtPosition(i, 0).widget().text()
                 )
                 # now strip html annotations
-                tempLabelName = tempDoc.toPlainText().strip()
+                tempLabelName = f'@{tempDoc.toPlainText().strip()}'
                 # check if label name is in label dictionary of item.
                 if item.labels.get(tempLabelName):
                     # this is where the label value is set.
@@ -5769,6 +5763,19 @@ class schematicView(editorView):
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
+        viewSnapLinesSet = {guideLineItem for guideLineItem in self.scene.items(self.viewRect)
+                         if isinstance(guideLineItem, net.guideLine)}
+        for snapLine in viewSnapLinesSet:
+            lines = self.scene.addStretchWires(snapLine.sceneEndPoints[0],
+                                               snapLine.sceneEndPoints[1]
+            )
+            self.scene.removeItem(snapLine)
+            if lines:
+                for line in lines:
+                    if snapLine.nameSet:
+                        line.name = snapLine.name
+                        line.nameSet = True
+                self.scene.addListUndoStack(lines)
         # [self.scene.removeItem(netItem) for netItem in netsInView if netItem.draftLine.isNull()]
         netsInView = [netItem for netItem in self.scene.items(self.viewRect) if
                       isinstance(netItem, net.schematicNet)]
@@ -5903,7 +5910,10 @@ class xyceNetlist:
             schematicScene.groupAllNets()  # name all nets in the
             # schematic
             sceneSymbolSet = schematicScene.findSceneSymbolSet()
-            schematicScene.generatePinNetMap(sceneSymbolSet)
+            startTime = time.perf_counter()
+            schematicScene.generatePinNetMap(tuple(sceneSymbolSet))
+            endTime = time.perf_counter()
+            print(f'Execution time: {endTime - startTime}')
             for elementSymbol in sceneSymbolSet:
                 if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
                         not elementSymbol.netlistIgnore
@@ -5989,9 +5999,9 @@ class xyceNetlist:
                 "XyceSymbolNetlistLine"
             ].strip()
             for labelItem in elementSymbol.labels.values():
-                if labelItem.labelDefinition in xyceNetlistFormatLine:
+                if labelItem.labelName in xyceNetlistFormatLine:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
-                        labelItem.labelDefinition, labelItem.labelText
+                        labelItem.labelName, labelItem.labelValue
                     )
 
             for attrb, value in elementSymbol.symattrs.items():
@@ -5999,9 +6009,13 @@ class xyceNetlist:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
                         f"[%{attrb}]", value
                     )
-            pinList = " ".join(elementSymbol.pinNetMap.values())
+
+            # pinOrderList = elementSymbol.symattrs.get("pinOrder", "").split(',')
+            #
+
+            pinList = ' '.join(elementSymbol.pinNetMap.values())
             xyceNetlistFormatLine = (
-                    xyceNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+                    xyceNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             return xyceNetlistFormatLine
         except Exception as e:
@@ -6021,9 +6035,9 @@ class xyceNetlist:
                 "XyceSpiceNetlistLine"
             ].strip()
             for labelItem in elementSymbol.labels.values():
-                if labelItem.labelDefinition in spiceNetlistFormatLine:
+                if labelItem.labelName in spiceNetlistFormatLine:
                     spiceNetlistFormatLine = spiceNetlistFormatLine.replace(
-                        labelItem.labelDefinition, labelItem.labelText
+                        labelItem.labelName, labelItem.labelValue
                     )
 
             for attrb, value in elementSymbol.symattrs.items():
@@ -6033,7 +6047,7 @@ class xyceNetlist:
                     )
             pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(",", " ")
             spiceNetlistFormatLine = (
-                    spiceNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+                    spiceNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             self.includeLines.add(
                 elementSymbol.symattrs.get(
@@ -6058,9 +6072,9 @@ class xyceNetlist:
                 "XyceVerilogaNetlistLine"
             ].strip()
             for labelItem in elementSymbol.labels.values():
-                if labelItem.labelDefinition in verilogaNetlistFormatLine:
+                if labelItem.labelName in verilogaNetlistFormatLine:
                     verilogaNetlistFormatLine = verilogaNetlistFormatLine.replace(
-                        labelItem.labelDefinition, labelItem.labelText
+                        labelItem.labelName, labelItem.labelValue
                     )
 
             for attrb, value in elementSymbol.symattrs.items():
@@ -6070,7 +6084,7 @@ class xyceNetlist:
                     )
             pinList = " ".join(elementSymbol.pinNetMap.values())
             verilogaNetlistFormatLine = (
-                    verilogaNetlistFormatLine.replace("[@pinList]", pinList) + "\n"
+                    verilogaNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             self.vamodelLines.add(
                 elementSymbol.symattrs.get(

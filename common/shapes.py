@@ -24,6 +24,7 @@
 #
 
 import math
+from functools import cached_property
 
 from PySide6.QtCore import (
     QPoint,
@@ -864,7 +865,6 @@ class symbolPolygon(symbolShape):
                 if (eventPos - point).manhattanLength() <= self.scene().snapDistance:
                     self._selectedCorner = point
                     self._selectedCornerIndex = self._points.index(point)
-            print(self._selectedCorner)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
@@ -1224,7 +1224,6 @@ class schematicSymbol(symbolShape):
             if type(item) is symbolPin:
                 self._pins[item.pinName] = item
             elif type(item) is symbolLabel:
-                print(f'label name: {item.labelName}')
                 self._labels[item.labelName] = item
 
     def __repr__(self):
@@ -1313,21 +1312,6 @@ class schematicSymbol(symbolShape):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        lines = []
-        for pin, snapLinesSet in self._snapLines.items():
-            for snapLine in snapLinesSet:
-                lines = self.scene().addStretchWires(
-                    pin.mapToScene(pin.start).toPoint(),
-                    snapLine.mapToScene(snapLine.line().p2()).toPoint(),
-                )
-                self.scene().removeItem(snapLine)
-            if lines:
-                for line in lines:
-                    if snapLine.nameSet:
-                        line.name = snapLine.name
-                        line.nameSet = True
-                self.scene().addListUndoStack(lines)
-        self._snapLines = dict()
         super().mouseReleaseEvent(event)
 
     @property
@@ -1391,9 +1375,15 @@ class schematicSymbol(symbolShape):
     def labels(self):
         return self._labels  # dictionary
 
-    @property
+
+    @cached_property
     def pins(self):
-        return self._pins
+        if self.symattrs.get('pinOrder'):
+            pinOrderList = self.symattrs.get("pinOrder").split(',')
+            orderedPins = {key.strip():self._pins[key.strip()] for key in pinOrderList}
+            return orderedPins
+        else:
+            return self._pins
 
     @property
     def shapes(self):

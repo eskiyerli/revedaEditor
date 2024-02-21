@@ -165,7 +165,7 @@ class schematicNet(QGraphicsItem):
 
         painter.setPen(pen)
         painter.drawLine(self._draftLine)
-        painter.drawEllipse(self._draftLine.p1(), 2, 2)
+        # painter.drawEllipse(self._draftLine.p1(), 2, 2)
         if self._nameSet:
             painter.save()
             painter.translate(self._draftLine.center().x(), self._draftLine.center().y())
