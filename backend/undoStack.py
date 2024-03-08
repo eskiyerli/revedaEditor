@@ -94,7 +94,9 @@ class deleteShapeUndo(QUndoCommand):
 
 
 class addDeleteShapeUndo(QUndoCommand):
-    def __init__(self, scene: QGraphicsScene, addShape: QGraphicsItem, deleteShape: QGraphicsItem):
+    def __init__(
+        self, scene: QGraphicsScene, addShape: QGraphicsItem, deleteShape: QGraphicsItem
+    ):
         super().__init__()
         self._scene = scene
         self._addshape = addShape
@@ -108,6 +110,7 @@ class addDeleteShapeUndo(QUndoCommand):
     def redo(self):
         self._scene.addItem(self._addshape)
         self._scene.removeItem(self._deleteShape)
+
 
 class updateSymUndo(QUndoCommand):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):
@@ -206,6 +209,7 @@ class updateSymLabelUndo(updateSymUndo):
         self._item.labelAlign = self._oldItemList[5]
         self._item.labelOrient = self._oldItemList[6]
         self._item.labelUse = self._oldItemList[7]
+        self._item.labelVisible = self._oldItemList[8]
         self._item.labelDefs()
 
     def redo(self):
@@ -216,6 +220,7 @@ class updateSymLabelUndo(updateSymUndo):
         self._item.labelAlign = self._newItemList[5]
         self._item.labelOrient = self._newItemList[6]
         self._item.labelUse = self._newItemList[7]
+        self._item.labelVisible = self._newItemList[8]
         self._item.labelDefs()
 
 

@@ -100,7 +100,7 @@ class symbolShape(QGraphicsItem):
     def angle(self, value):
         self._angle = value
         self.prepareGeometryChange()
-        self.setRotation(value) 
+        self.setRotation(value)
 
     @property
     def stretch(self):
@@ -1375,12 +1375,11 @@ class schematicSymbol(symbolShape):
     def labels(self):
         return self._labels  # dictionary
 
-
     @cached_property
     def pins(self):
-        if self.symattrs.get('pinOrder'):
-            pinOrderList = self.symattrs.get("pinOrder").split(',')
-            orderedPins = {key.strip():self._pins[key.strip()] for key in pinOrderList}
+        if self.symattrs.get("pinOrder"):
+            pinOrderList = self.symattrs.get("pinOrder").split(",")
+            orderedPins = {key.strip(): self._pins[key.strip()] for key in pinOrderList}
             return orderedPins
         else:
             return self._pins
@@ -1444,7 +1443,6 @@ class schematicPin(symbolShape):
             f"schematicPin({self._start}, {self._pinName}, {self._pinDir}, "
             f"{self._pinType})"
         )
-
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1514,10 +1512,12 @@ class schematicPin(symbolShape):
         # Create an empty set to store pin-net-index tuples
         self._pinNetIndexTupleSet = set()
 
-        pinSceneConnectRect = self.mapRectToScene(QRect.span(
-                    QPoint(self._start.x() - 5, self._start.y() - 5),
-                    QPoint(self._start.x() + 5, self._start.y() + 5),
-                )).toRect()
+        pinSceneConnectRect = self.mapRectToScene(
+            QRect.span(
+                QPoint(self._start.x() - 5, self._start.y() - 5),
+                QPoint(self._start.x() + 5, self._start.y() + 5),
+            )
+        ).toRect()
         # Find all the net items connected to the pin
         netsConnected = [
             netItem
@@ -1527,9 +1527,10 @@ class schematicPin(symbolShape):
 
         # Iterate over each connected net item
         for netItem in netsConnected:
-            netEndIndex = list(map(pinSceneConnectRect.contains,
-                               netItem.sceneEndPoints)).index(True)
-            self._pinNetIndexTupleSet.add(pinNetIndexTuple(self,netItem,netEndIndex))
+            netEndIndex = list(
+                map(pinSceneConnectRect.contains, netItem.sceneEndPoints)
+            ).index(True)
+            self._pinNetIndexTupleSet.add(pinNetIndexTuple(self, netItem, netEndIndex))
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -1577,7 +1578,6 @@ class schematicPin(symbolShape):
         #             item.net.end = self.mapToScene(self.start)
         return super().itemChange(change, value)
 
-
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
         for snapLine in self._snapLines:
@@ -1587,7 +1587,6 @@ class schematicPin(symbolShape):
                     snapLine.line().p2(),
                 )
             )
-
 
     def toSymbolPin(self, start: QPoint):
         return symbolPin(start, self.pinName, self.pinDir, self.pinType)

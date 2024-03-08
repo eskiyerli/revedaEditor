@@ -46,6 +46,7 @@ import revedaEditor.gui.pythonConsole as pcon
 import revedaEditor.gui.stippleEditor as stip
 import revedaEditor.gui.helpBrowser as hlp
 import revedaEditor.gui.revinit as revinit
+import revedaEditor.backend.dataDefinitions as ddef
 
 
 class mainwContainer(QWidget):
@@ -60,13 +61,14 @@ class mainwContainer(QWidget):
         self.init_UI()
 
     def init_UI(self):
-
         self.console.setfont(QFont("Fira Mono Regular", 12))
         self.console.writeoutput(
             f"Welcome to Revolution EDA version {revinit.__version__}"
         )
         self.console.writeoutput("Revolution Semiconductor (C) 2024.")
-        self.console.writeoutput("Mozilla Public License v2.0 modified with Commons Clause")
+        self.console.writeoutput(
+            "Mozilla Public License v2.0 modified with Commons Clause"
+        )
         # layout statements, using a grid layout
         gLayout = QVBoxLayout()
         gLayout.setSpacing(10)
@@ -149,7 +151,9 @@ class MainWindow(QMainWindow):
         self.importVerilogaAction = QAction(
             importVerilogaIcon, "Import Verilog-a file..."
         )
-        self.importSpiceAction = QAction(importVerilogaIcon, "Import Spice file...", self)
+        self.importSpiceAction = QAction(
+            importVerilogaIcon, "Import Spice file...", self
+        )
         openLibIcon = QIcon(":/icons/database--pencil.png")
         self.libraryBrowserAction = QAction(openLibIcon, "Library Browser", self)
         optionsIcon = QIcon(":/icons/resource-monitor.png")
@@ -233,8 +237,7 @@ class MainWindow(QMainWindow):
                 for switchView in dlg.switchViewsEdit.text().split(",")
             ]
             self.stopViewList = [
-                stopView.strip() for stopView in
-                dlg.stopViewsEdit.text().split(",")
+                stopView.strip() for stopView in dlg.stopViewsEdit.text().split(",")
             ]
             if dlg.optionSaveBox.isChecked():
                 self.saveState()
@@ -249,10 +252,9 @@ class MainWindow(QMainWindow):
         Returns:
             None
         """
-        # Get the library model
-        self.importVerilogaModule('')
+        self.importVerilogaModule(ddef.viewTuple('', '', ''), '')
 
-    def importVerilogaModule(self, filePath: str):
+    def importVerilogaModule(self, viewT: ddef.viewTuple, filePath: str):
         """
 
         @param filePath:
@@ -261,13 +263,19 @@ class MainWindow(QMainWindow):
         # Open the import dialog
         importDlg = fd.importVerilogaCellDialogue(library_model, self)
         importDlg.vaFileEdit.setText(filePath)
-        # Set the default view name in the dialog
-        importDlg.vaViewName.setText("veriloga")
+        if viewT.libraryName:
+            importDlg.libNamesCB.setCurrentText(viewT.libraryName)
+        if viewT.cellName:
+            importDlg.cellNamesCB.setCurrentText(viewT.cellName)
+        if viewT.viewName:
+            importDlg.vaViewName.setText(viewT.viewName)
+        else:
+            # Set the default view name in the dialog
+            importDlg.vaViewName.setText("veriloga")
         # Execute the import dialog and check if it was accepted
         if importDlg.exec() == QDialog.Accepted:
             # Create the Verilog-A object from the file path
-            imported_va_obj = hdl.verilogaC(
-                pathlib.Path(importDlg.vaFileEdit.text()))
+            imported_va_obj = hdl.verilogaC(pathlib.Path(importDlg.vaFileEdit.text()))
 
             # Create the Verilog-A view item tuple
             vaViewItemTuple = imv.createVaView(
@@ -295,21 +303,27 @@ class MainWindow(QMainWindow):
         Returns:
             None
         """
-        self.importSpiceSubckt('')
+        self.importSpiceSubckt("", ddef.viewTuple('', '', ''))
 
-    def importSpiceSubckt(self, filePath: str):
+    def importSpiceSubckt(self, viewT:ddef.viewTuple, filePath: str):
         # Get the library model
         library_model = self.libraryBrowser.libraryModel
         # Open the import dialog
         importDlg = fd.importSpiceCellDialogue(library_model, self)
         importDlg.spiceFileEdit.setText(filePath)
         # Set the default view name in the dialog
-        importDlg.spiceViewName.setText("spice")
+        if viewT.libraryName:
+            importDlg.libNamesCB.setCurrentText(viewT.libraryName)
+        if viewT.cellName:
+            importDlg.cellNamesCB.setCurrentText(viewT.cellName)
+        if viewT.viewName:
+            importDlg.spiceViewName.setText(viewT.viewName)
+        else:
+            importDlg.spiceViewName.setText("spice")
         # Execute the import dialog and check if it was accepted
         if importDlg.exec() == QDialog.Accepted:
             # Create the Verilog-A object from the file path
-            importedSpiceObj = hdl.spiceC(
-                pathlib.Path(importDlg.spiceFileEdit.text()))
+            importedSpiceObj = hdl.spiceC(pathlib.Path(importDlg.spiceFileEdit.text()))
 
             # Create the Verilog-A view item tuple
             spiceViewItemTuple = imv.createSpiceView(
@@ -319,8 +333,13 @@ class MainWindow(QMainWindow):
             # Check if the symbol checkbox is checked
             if importDlg.symbolCheckBox.isChecked():
                 # Create the spice symbol
-                imv.createSpiceSymbol(self, spiceViewItemTuple, self.libraryDict,
-                                      self.libraryBrowser, importedSpiceObj)
+                imv.createSpiceSymbol(
+                    self,
+                    spiceViewItemTuple,
+                    self.libraryDict,
+                    self.libraryBrowser,
+                    importedSpiceObj,
+                )
 
     def createStippleClick(self):
         stippleWindow = stip.stippleEditor(self)
