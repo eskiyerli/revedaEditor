@@ -108,6 +108,28 @@ class layoutModes(editModes):
     drawRuler: bool
     addInstance: bool
 
+@dataclass
+class selectModes:
+    selectAll: bool
+
+    def setMode(self, attribute):
+        for key in self.__dict__.keys():
+            self.__dict__[key] = False
+        self.__dict__[attribute] = True
+@dataclass
+class schematicSelectModes(selectModes):
+    selectDevice: bool
+    selectNet: bool
+    selectPin: bool
+
+@dataclass
+class layoutSelectModes(selectModes):
+    selectInstance: bool
+    selectPath: bool
+    selectVia: bool
+    selectLabel: bool
+    selectText: bool
+    selectPin: bool
 
 # library editor related named tuples
 class viewTuple(NamedTuple):

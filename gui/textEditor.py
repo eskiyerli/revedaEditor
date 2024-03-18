@@ -1,3 +1,28 @@
+#    “Commons Clause” License Condition v1.0
+#   #
+#    The Software is provided to you by the Licensor under the License, as defined
+#    below, subject to the following condition.
+#
+#    Without limiting other conditions in the License, the grant of rights under the
+#    License will not include, and the License does not grant to you, the right to
+#    Sell the Software.
+#
+#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
+#    granted to you under the License to provide to third parties, for a fee or other
+#    consideration (including without limitation fees for hosting or consulting/
+#    support services related to the Software), a product or service whose value
+#    derives, entirely or substantially, from the functionality of the Software. Any
+#    license notice or attribution required by the License must also include this
+#    Commons Clause License Condition notice.
+#
+#   Add-ons and extensions developed for this software may be distributed
+#   under their own separate licenses.
+#
+#    Software: Revolution EDA
+#    License: Mozilla Public License 2.0
+#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
+#
+
 import sys
 from PySide6.QtWidgets import (
     QApplication,
@@ -8,6 +33,7 @@ from PySide6.QtWidgets import (
     QFontDialog,
     QInputDialog,
     QMessageBox,
+    QLabel,
 )
 from PySide6.QtGui import (
     QTextCharFormat,
@@ -39,7 +65,7 @@ class verilogaHighlighter(QSyntaxHighlighter):
 
         self.highlightingRules = [
             (
-                r"\b(module|endmodule|in|out|parameter|analog|real|electrical)\b",
+                r"\b(module|endmodule|input|output|inout|parameter|analog|real|electrical)\b",
                 keywordFormat,
             ),
             (
@@ -54,7 +80,7 @@ class verilogaHighlighter(QSyntaxHighlighter):
             QColor("#007F00")
         )  # Green color for comments
 
-        self.comment_start = "//"
+        self.commentStart = "//"
         self.multi_comment_start = "/*"
         self.multi_comment_end = "*/"
 
@@ -63,11 +89,11 @@ class verilogaHighlighter(QSyntaxHighlighter):
             for match in re.finditer(pattern, text):
                 self.setFormat(match.start(), match.end() - match.start(), char_format)
 
-        index = text.find(self.comment_start)
+        index = text.find(self.commentStart)
         while index >= 0:
             comment_length = len(text) - index
             self.setFormat(index, comment_length, self.highlightingComment)
-            index = text.find(self.comment_start, index + comment_length)
+            index = text.find(self.commentStart, index + comment_length)
 
         self.setCurrentBlockState(0)
         startIndex = 0
@@ -152,10 +178,10 @@ class xyceHighlighter(QSyntaxHighlighter):
 class verilogaEditor(QMainWindow):
     closedSignal = Signal(ddef.viewTuple, str)
 
-    def __init__(self, fileName=""):
-        super().__init__()
+    def __init__(self, parent, fileName=""):
+        super().__init__(parent=parent)
         self._cellViewTuple = ddef.viewTuple("", "", "")
-
+        self.parent = parent
         self.fileName: str = fileName
         self.textEdit = QTextEdit()
         self.setCentralWidget(self.textEdit)
@@ -164,8 +190,14 @@ class verilogaEditor(QMainWindow):
         self.createMenus()
         self.createToolbar()
 
-        self.setWindowTitle("Xyce Editor")
-        self.resize(600, 600)
+        self.statusLine = self.statusBar()
+        self.statusLabel = QLabel()
+        self.statusLine.addPermanentWidget(self.statusLabel)
+
+        self.textEdit.cursorPositionChanged.connect(self.updateStatus)
+
+        self.setWindowTitle("Verilog-A Editor")
+        self.resize(600, 800)
         self.initEditor()
 
     def initEditor(self):
@@ -317,6 +349,12 @@ class verilogaEditor(QMainWindow):
                 else:
                     cursor.insertText(replace_text)
 
+    def updateStatus(self):
+        cursor = self.textEdit.textCursor()
+        line = cursor.blockNumber() + 1
+        column = cursor.columnNumber() + 1
+        self.statusLabel.setText(f"Line: {line}, Column: {column}")
+
     def closeEvent(self, event):
         if self.textEdit.toPlainText():
             reply = QMessageBox.question(
@@ -342,9 +380,10 @@ class verilogaEditor(QMainWindow):
 
 
 class xyceEditor(verilogaEditor):
-    def __init__(self, fileName=""):
-        super().__init__(fileName)
+    def __init__(self,parent, fileName=""):
+        super().__init__(parent, fileName)
         self.initEditor()
+        self.setWindowTitle("Xyce/SPICE Editor")
 
     def initEditor(self):
         self.highlighter = xyceHighlighter(self.textEdit.document())
@@ -374,7 +413,7 @@ class xyceEditor(verilogaEditor):
 
 def main():
     app = QApplication(sys.argv)
-    editor = xyceEditor()
+    editor = verilogaEditor('')
     editor.show()
     sys.exit(app.exec())
 

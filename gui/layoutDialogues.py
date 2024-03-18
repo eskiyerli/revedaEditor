@@ -25,6 +25,7 @@
 
 import importlib
 import inspect
+import pathlib
 
 from PySide6.QtGui import (
     QStandardItem,
@@ -47,7 +48,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QWidget,
     QCheckBox,
+    QPushButton,
+    QFileDialog,
 )
+
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.gui.editFunctions as edf
 import pdk.process as fabproc
@@ -103,21 +107,23 @@ class pcellInstancePropertiesDialog(pcellInstanceDialog):
 
 
 class pcellLinkDialogue(QDialog):
-    def __init__(self, parent, viewItem: QStandardItem, module: str):
+    def __init__(self, parent, viewItem: QStandardItem):
         super().__init__(parent)
         # self.logger = parent.logger
         self.viewItem = viewItem
-        self.module = module
+        # TODO: A more elegant solution
+        self.pcells = self.getClasses('pdk.pcells')
         self.setWindowTitle("PCell Settings")
-        self.setMinimumSize(600, 300)
+        self.setMinimumSize(400, 200)
         self.mainLayout = QVBoxLayout()
         groupBox = QGroupBox()
+        groupLayout = QVBoxLayout()
         formLayout = QFormLayout()
-        groupBox.setLayout(formLayout)
-        pcells = self.getClasses(self.module)
+        groupBox.setLayout(groupLayout)
         self.pcellCB = QComboBox()
-        self.pcellCB.addItems(pcells)
+        self.pcellCB.addItems(self.pcells)
         formLayout.addRow(edf.boldLabel("PCell:"), self.pcellCB)
+        groupLayout.addLayout(formLayout)
         self.mainLayout.addWidget(groupBox)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -127,12 +133,13 @@ class pcellLinkDialogue(QDialog):
         self.setLayout(self.mainLayout)
         self.show()
 
+
     @staticmethod
-    def getClasses(module_name):
-        module = importlib.import_module(module_name)
+    def getClasses(moduleName:str):
+        module = importlib.import_module(moduleName)
         classes = []
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj):
+            if inspect.isclass(obj) and issubclass(obj,lshp.layoutPcell):
                 classes.append(name)
         return classes
 

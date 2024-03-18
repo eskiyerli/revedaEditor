@@ -102,7 +102,7 @@ class schematicNet(QGraphicsItem):
         "_flightLinesSet",
         "_connectedNetsSet",
         "_netIndexTupleSet",
-        "_scene" "_netSnapLines",
+        "_scene", "_netSnapLines",
         "_stretch",
         "_stretchSide",
         "_nameFont",
@@ -211,7 +211,7 @@ class schematicNet(QGraphicsItem):
         painter.setPen(pen)
         painter.drawLine(self._draftLine)
         # painter.drawEllipse(self._draftLine.p1(), 2, 2)
-        if self._nameSet:
+        if self._nameSet or self._nameAdded:
             painter.save()
             painter.translate(
                 self._draftLine.center().x(), self._draftLine.center().y()
@@ -220,23 +220,20 @@ class schematicNet(QGraphicsItem):
             painter.drawStaticText(0, 0, self._nameItem)
             painter.restore()
 
-    def sceneEvent(self, event):
-        """
-        Handle events related to the scene.
-
-        Args:
-            event: The event to handle.
-
-        Returns:
-            True if the event was handled successfully, False otherwise.
-        """
-        # Check if the current scene has the drawWire edit mode enabled
-        if self.scene() and self.scene().editModes.drawWire:
-            return False
-        else:
-            # Call the parent class's sceneEvent method to handle the event
-            super().sceneEvent(event)
-        return True
+    # def sceneEvent(self, event):
+    #     """
+    #     Do not propagate event if shape needs to keep still.
+    #     """
+    #     switch = not (
+    #         self.scene().selectModes.selectAll or self.scene().selectModes.selectNet
+    #     )
+    #     if switch:
+    #         # Propagate the event to colliding items
+    #         [item.sceneEvent(event) for item in self.collidingItems()]
+    #         return False
+    #     else:
+    #         super().sceneEvent(event)
+    #         return True
 
     def __repr__(self):
         return f"schematicNet({self.sceneEndPoints})"
@@ -244,7 +241,6 @@ class schematicNet(QGraphicsItem):
     def itemChange(self, change, value):
         return super().itemChange(change, value)
 
-    #
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         super().mousePressEvent(event)
         if self._stretch:
@@ -261,17 +257,6 @@ class schematicNet(QGraphicsItem):
                 self.setCursor(Qt.SizeHorCursor)
                 self._stretchSide = "p2"
             self.scene().stretchNet(self, self._stretchSide)
-        # else:
-        #     orthoNets = list(filter(self.isOrthogonal, self.findOverlapNets()))
-        #     for otherNet in orthoNets:
-        #         for selfEnd, otherEnd in itt.product(self.sceneEndPoints, otherNet.sceneEndPoints):
-        #             if selfEnd == otherEnd:
-        #                 if otherNet.sceneEndPoints.index(otherEnd) == 0:
-        #                     otherNet._stretchSide = 'p1'
-        #                 else:
-        #                     otherNet._stretchSide = 'p2'
-        #                 self.scene().stretchNet(otherNet, otherNet._stretchSide)
-        #                 break
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """

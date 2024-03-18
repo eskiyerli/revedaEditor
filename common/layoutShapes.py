@@ -121,7 +121,7 @@ class layoutShape(QGraphicsItem):
         """
         Do not propagate event if shape needs to keep still.
         """
-        if self.scene() and (
+        if (
             self.scene().editModes.changeOrigin or self.scene().drawMode
         ):
             return False
@@ -429,6 +429,16 @@ class layoutInstance(layoutShape):
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.drawRect(self.childrenBoundingRect())
+
+    def sceneEvent(self, event):
+        """
+        Do not propagate event if shape needs to keep still.
+        """
+        if not (self.scene().selectModes.selectInstance or self.scene().selectModes.selectAll):
+            return False
+        else:
+            super().sceneEvent(event)
+            return True
 
     @property
     def libraryName(self):
