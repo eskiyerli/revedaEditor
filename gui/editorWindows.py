@@ -1195,6 +1195,9 @@ class editorWindow(QMainWindow):
         self.createNetAction = QAction(createLineIcon, "Create Net...", self)
         self.createNetAction.setToolTip("Create Net")
 
+        self.createPathAction = QAction(createLineIcon, "Create Path...", self)
+        self.createPathAction.setToolTip("Create Path")
+
         createBusIcon = QIcon(":/icons/node-select-all.png")
         self.createBusAction = QAction(createBusIcon, "Create Bus...", self)
         self.createBusAction.setToolTip("Create Bus")
@@ -1546,7 +1549,7 @@ class layoutEditor(editorWindow):
         self.menuEdit.addAction(self.stretchAction)
         self.menuCreate.addAction(self.createInstAction)
         self.menuCreate.addAction(self.createRectAction)
-        self.menuCreate.addAction(self.createNetAction)
+        self.menuCreate.addAction(self.createPathAction)
         self.menuCreate.addAction(self.createPinAction)
         self.menuCreate.addAction(self.createLabelAction)
         self.menuCreate.addAction(self.createViaAction)
@@ -1575,7 +1578,7 @@ class layoutEditor(editorWindow):
         self.addToolBar(self.layoutToolbar)
         self.layoutToolbar.addAction(self.createInstAction)
         self.layoutToolbar.addAction(self.createRectAction)
-        self.layoutToolbar.addAction(self.createNetAction)
+        self.layoutToolbar.addAction(self.createPathAction)
         self.layoutToolbar.addAction(self.createPinAction)
         self.layoutToolbar.addAction(self.createLabelAction)
         self.layoutToolbar.addAction(self.createViaAction)
@@ -1596,7 +1599,7 @@ class layoutEditor(editorWindow):
         self.createInstAction.triggered.connect(self.createInstClick)
         self.createRectAction.triggered.connect(self.createRectClick)
         self.exportGDSAction.triggered.connect(self.exportGDSClick)
-        self.createNetAction.triggered.connect(self.createPathClick)
+        self.createPathAction.triggered.connect(self.createPathClick)
         self.createPinAction.triggered.connect(self.createPinClick)
         self.createLabelAction.triggered.connect(self.createLabelClick)
         self.createViaAction.triggered.connect(self.createViaClick)
@@ -1611,7 +1614,7 @@ class layoutEditor(editorWindow):
     def _createShortcuts(self):
         super()._createShortcuts()
         self.createRectAction.setShortcut(Qt.Key_R)
-        self.createNetAction.setShortcut(Qt.Key_W)
+        self.createPathAction.setShortcut(Qt.Key_W)
         self.createInstAction.setShortcut(Qt.Key_I)
         self.createPinAction.setShortcut(Qt.Key_P)
         self.createLabelAction.setShortcut(Qt.Key_L)
@@ -2080,7 +2083,8 @@ class schematicEditor(editorWindow):
         simguiw.show()
 
     def checkSaveCell(self):
-        self.centralW.scene.groupAllNets()
+        schematicNets = self.centralW.scene.findSceneNetsSet()
+        self.centralW.scene.groupAllNets(schematicNets)
         self.centralW.scene.saveSchematic(self.file)
 
     def saveCell(self):
@@ -2599,7 +2603,8 @@ class xyceNetlist:
         """
         try:
             schematicScene = schematic.centralW.scene
-            schematicScene.groupAllNets()  # name all nets in the
+            schematicNets = schematicScene.findSceneNetsSet()
+            schematicScene.groupAllNets(schematicNets)  # name all nets in the
             # schematic
             sceneSymbolSet = schematicScene.findSceneSymbolSet()
             schematicScene.generatePinNetMap(tuple(sceneSymbolSet))

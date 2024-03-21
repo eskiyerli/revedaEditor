@@ -1340,7 +1340,7 @@ class schematicScene(editorScene):
         self._stretchNet.stretch = True
         self._stretchNet.name = netItem.name
         self._stretchNet.nameSet = netItem.nameSet
-        self._stretchNet.nameAdded = netItem.nameSet
+        self._stretchNet.nameAdded = netItem.nameAdded
         addDeleteStretchNetCommand = us.addDeleteShapeUndo(
             self, self._stretchNet, netItem
         )
@@ -1370,17 +1370,19 @@ class schematicScene(editorScene):
             netItem.nameConflict = False
 
     # netlisting related methods.
-    def groupAllNets(self) -> None:
+    def groupAllNets(self, sceneNetsSet: set[net.schematicNet]) -> None:
         """
         This method starting from nets connected to pins, then named nets and unnamed
         nets, groups all the nets in the schematic.
         """
         try:
             # all the nets in the schematic in a set to remove duplicates
-            sceneNetsSet = self.findSceneNetsSet()
+            # sceneNetsSet = self.findSceneNetsSet()
             self.clearNetStatus(sceneNetsSet)
             # first find nets connected to pins designating global nets.
-            globalNetsSet = self.findGlobalNets()
+            schematicSymbolSet = self.findSceneSymbolSet()
+            globalNetsSet = self.findGlobalNets(schematicSymbolSet)
+
             sceneNetsSet -= globalNetsSet  # remove these nets from all nets set.
             # now remove nets connected to global nets from this set.
             sceneNetsSet = self.groupNamedNets(globalNetsSet, sceneNetsSet)
@@ -1399,14 +1401,14 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(e)
 
-    def findGlobalNets(self) -> set:
+    def findGlobalNets(self, symbolSet: set[shp.schematicSymbol]) -> set:
         """
         This method finds all nets connected to global pins.
         """
         try:
             globalPinsSet = set()
             globalNetsSet = set()
-            for symbolItem in self.findSceneSymbolSet():
+            for symbolItem in symbolSet:
                 for pinName, pinItem in symbolItem.pins.items():
                     if pinName[-1] == "!":
                         globalPinsSet.add(pinItem)
@@ -1545,6 +1547,21 @@ class schematicScene(editorScene):
             otherNetsSet -= newFoundConnectedSet
             self.traverseNets(connectedSet, otherNetsSet)
         return connectedSet, otherNetsSet
+
+    def findConnectedNetSet(self, startNet: net.schematicNet):
+        '''
+        find all the nets connected to a net including nets connected by name.
+        '''
+
+        sceneNetSet = self.findSceneNetsSet()
+        self.groupAllNets(sceneNetSet)
+        connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
+        # now check if any other name is connected due to a common name:
+        for netItem in otherNetsSet:
+            if netItem.name == startNet.name:
+                connectedSet.add(netItem)
+        return connectedSet
+
 
     def checkPinNetConnect(self, pinItem: shp.schematicPin, netItem: net.schematicNet):
         """
@@ -1796,8 +1813,8 @@ class schematicScene(editorScene):
         self.snapTuple = (self.snapGrid, self.snapGrid)
         self.snapDistance = 2 * self.snapGrid
         shapesList = list()
-        for item in itemsList[2:]:
-            itemShape = lj.schematicItems(self).create(item)
+        for itemDict in itemsList[2:]:
+            itemShape = lj.schematicItems(self).create(itemDict)
             if (
                 type(itemShape) == shp.schematicSymbol
                 and itemShape.counter > self.itemCounter
@@ -1907,26 +1924,33 @@ class schematicScene(editorScene):
                         item.labels[tempLabelName].labelVisible = False
             [labelItem.labelDefs() for labelItem in item.labels.values()]
 
-    def setNetProperties(self, item):
+    def setNetProperties(self, netItem:net.schematicNet):
         dlg = pdlg.netProperties(self.editorWindow)
         dlg.netStartPointEditX.setText(
-            str(round(item.mapToScene(item.draftLine.p1()).x()))
+            str(round(netItem.mapToScene(netItem.draftLine.p1()).x()))
         )
         dlg.netStartPointEditY.setText(
-            str(round(item.mapToScene(item.draftLine.p1()).y()))
+            str(round(netItem.mapToScene(netItem.draftLine.p1()).y()))
         )
         dlg.netEndPointEditX.setText(
-            str(round(item.mapToScene(item.draftLine.p2()).x()))
+            str(round(netItem.mapToScene(netItem.draftLine.p2()).x()))
         )
         dlg.netEndPointEditY.setText(
-            str(round(item.mapToScene(item.draftLine.p2()).y()))
+            str(round(netItem.mapToScene(netItem.draftLine.p2()).y()))
         )
-        if item.nameSet or item.nameAdded:
-            dlg.netNameEdit.setText(item.name)
+        if netItem.nameSet or netItem.nameAdded:
+            dlg.netNameEdit.setText(netItem.name)
+        findConnectedNets = self.findConnectedNetSet(netItem)
         if dlg.exec() == QDialog.Accepted:
-            item.name = dlg.netNameEdit.text().strip()
-            if item.name != "":
-                item.nameSet = True
+            netItem.name = dlg.netNameEdit.text().strip()
+            if netItem.name != "":
+                netItem.nameSet = True
+            for item in findConnectedNets:
+                item.highlighted = True
+                item.name = netItem.name
+                if item.nameSet:
+                    item.nameSet = False
+                item.nameAdded = True
 
     def setTextProperties(self, item):
         dlg = pdlg.noteTextEditProperties(self.editorWindow, item)

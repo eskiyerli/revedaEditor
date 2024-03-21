@@ -271,13 +271,12 @@ class schematicNet(QGraphicsItem):
         super().hoverEnterEvent(event)
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
-            sceneNetsSet = self.scene().findSceneNetsSet() - {self}
-            self._connectedNetsSet, _ = self.scene().traverseNets({self}, sceneNetsSet)
+            self._connectedNetsSet = self.scene().findConnectedNetSet(self)
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
-                if not (netItem.nameAdded or netItem.nameSet):
-                    netItem.nameAdded = True
-                    netItem.name = self._name
+                # if not (netItem.nameAdded or netItem.nameSet):
+                #     netItem.nameAdded = True
+                #     netItem.name = self._name
                 netItem.highlight()
 
             # Create flight lines and add them to the scene

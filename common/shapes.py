@@ -1298,6 +1298,9 @@ class schematicSymbol(symbolShape):
             if item.net.nameSet:
                 snapLine.name = item.net.name
                 snapLine.nameSet = True
+            if item.net.nameAdded:
+                snapLine.name = item.net.name
+                snapLine.nameAdded = True
             self.scene().addItem(snapLine)
             self._snapLines[item.pin].add(snapLine)
             self.scene().removeItem(item.net)
