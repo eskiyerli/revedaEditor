@@ -1179,7 +1179,10 @@ class schematicScene(editorScene):
     def mergeSplitNets(self, inputNet: net.schematicNet):
         self.mergeNets(inputNet)  # output is self._totalNet
         overlapNets = self._totalNet.findOverlapNets()
+        # inputNet splits overlapping nets
         for netItem in overlapNets:
+
+
             splitPoints = self.findSplitPoints(netItem)
             self.splitNets(netItem, splitPoints)
         splitPoints = self.findSplitPoints(self._totalNet)

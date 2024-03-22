@@ -272,21 +272,22 @@ class schematicNet(QGraphicsItem):
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
             self._connectedNetsSet = self.scene().findConnectedNetSet(self)
-            # Highlight the connected netItems
-            for netItem in self._connectedNetsSet:
-                # if not (netItem.nameAdded or netItem.nameSet):
-                #     netItem.nameAdded = True
-                #     netItem.name = self._name
-                netItem.highlight()
 
-            # Create flight lines and add them to the scene
-            for netItem in self._connectedNetsSet:
-                flightLine = netFlightLine(
-                    self.mapToScene(self._draftLine.center()),
-                    netItem.mapToScene(netItem.draftLine.center()),
-                )
-                self._flightLinesSet.add(flightLine)
-                self.scene().addItem(flightLine)
+            # # Highlight the connected netItems
+            # for netItem in self._connectedNetsSet:
+            #     # if not (netItem.nameAdded or netItem.nameSet):
+            #     #     netItem.nameAdded = True
+            #     #     netItem.name = self._name
+            #     netItem.highlight()
+            #
+            # # Create flight lines and add them to the scene
+            # for netItem in self._connectedNetsSet:
+            #     flightLine = netFlightLine(
+            #         self.mapToScene(self._draftLine.center()),
+            #         netItem.mapToScene(netItem.draftLine.center()),
+            #     )
+            #     self._flightLinesSet.add(flightLine)
+            #     self.scene().addItem(flightLine)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         super().hoverLeaveEvent(event)
@@ -351,10 +352,16 @@ class schematicNet(QGraphicsItem):
 
                 # Iterate over the parallel nets
                 for netItem in parallelNets:
+                    print(f'netItem name: {netItem.name}')
+                    print(f'netItem name set: {netItem.nameSet}')
                     # Update the initialRect by uniting it with each parallel net's
                     # sceneShapeRect
                     initialRect = initialRect.united(netItem.sceneShapeRect)
-
+                    nameTuple = (self.nameSet, netItem.nameSet)
+                    match nameTuple:
+                        case (False, True): # self name not set, other net set
+                            self.name = netItem.name
+                            self.nameAdded = True
                     # Remove each parallel net from the scene
                     if netItem.scene():
                         netItem.scene().removeItem(netItem)
@@ -369,13 +376,9 @@ class schematicNet(QGraphicsItem):
                 newNet = schematicNet(
                     self.snapToGrid(QPoint(x1, y1)), self.snapToGrid(QPoint(x2, y2))
                 )
-
-                # If self has a name, set the name and nameSet of the newNet
-                if self._nameSet or self._nameAdded:
-                    newNet.name = self._name
-                    newNet.nameSet = self._nameSet
-                    newNet.nameAdded = self._nameAdded
-
+                newNet.name = self.name
+                newNet.nameSet = self.nameSet
+                newNet.nameAdded = self.nameAdded
                 return self, newNet  # original net, new net
 
         # If there are no other nets or no parallel nets, return self
@@ -547,6 +550,7 @@ class guideLine(QGraphicsLineItem):
         self.setPen(schlyr.guideLinePen)
         self._name: str = ""
         self._nameSet: bool = False
+        self._nameAdded: bool = False
 
     @property
     def sceneEndPoints(self) -> list[QPoint]:
@@ -575,3 +579,12 @@ class guideLine(QGraphicsLineItem):
     def nameSet(self, value: bool):
         assert isinstance(value, bool)
         self._nameSet = value
+
+    @property
+    def nameAdded(self) -> bool:
+        return self._nameAdded
+
+    @nameAdded.setter
+    def nameAdded(self, value: bool):
+        assert isinstance(value, bool)
+        self._nameAdded = value

@@ -261,13 +261,16 @@ class schematicView(editorView):
             lines = self.scene.addStretchWires(
                 snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
             )
-            self.scene.removeItem(snapLine)
             if lines:
                 for line in lines:
                     if snapLine.nameSet:
                         line.name = snapLine.name
                         line.nameSet = True
+                    elif snapLine.nameAdded:
+                        line.name = snapLine.name
+                        line.nameAdded = True
                 self.scene.addListUndoStack(lines)
+            self.scene.removeItem(snapLine)
         # [self.scene.removeItem(netItem) for netItem in netsInView if netItem.draftLine.isNull()]
         netsInView = [
             netItem
@@ -301,16 +304,26 @@ class schematicView(editorView):
                 painter.drawEllipse(dotPoint, self._dotRadius, self._dotRadius)
 
     def keyPressEvent(self, event: QKeyEvent):
+        """
+        Handles the key press event for the editor view.
+
+        Args:
+            event (QKeyEvent): The key press event to handle.
+
+        """
         if event.key() == Qt.Key_Escape:
+            # Esc key pressed, remove snap rect and reset states
             self.scene.removeSnapRect()
             if self.scene._newNet is not None:
-                self.scene.checkNewNet(self.scene._newNet)
+                # New net creation mode, cancel creation
                 self.scene._newNet = None
             elif self.scene._stretchNet is not None:
+                # Stretch net mode, cancel stretch
                 self.scene._stretchNet.setSelected(False)
                 self.scene._stretchNet.stretch = False
                 self.scene.checkNewNet(self.scene._stretchNet)
-        self.scene.editModes.setMode("selectItem")
+            # Set the edit mode to select item
+            self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
 
 
