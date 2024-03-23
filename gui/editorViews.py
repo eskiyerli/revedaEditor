@@ -258,17 +258,15 @@ class schematicView(editorView):
             if isinstance(guideLineItem, net.guideLine)
         }
         for snapLine in viewSnapLinesSet:
-            lines = self.scene.addStretchWires(
+            # print(snapLine.name)
+            # print(snapLine.nameStrength)
+            lines: list[net.schematicNet] = self.scene.addStretchWires(
                 snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
             )
             if lines:
                 for line in lines:
-                    if snapLine.nameSet:
-                        line.name = snapLine.name
-                        line.nameSet = True
-                    elif snapLine.nameAdded:
-                        line.name = snapLine.name
-                        line.nameAdded = True
+                    line.inheritGuideLine(snapLine)
+
                 self.scene.addListUndoStack(lines)
             self.scene.removeItem(snapLine)
         # [self.scene.removeItem(netItem) for netItem in netsInView if netItem.draftLine.isNull()]

@@ -4,6 +4,7 @@ import json
 import inspect
 import itertools as itt
 import json
+
 # from hashlib import new
 import pathlib
 from collections import Counter
@@ -45,6 +46,7 @@ from PySide6.QtWidgets import (
 import pdk.layoutLayers
 import pdk.layoutLayers as laylyr
 import pdk.process as fabproc
+
 # import pdk.symLayers as symlyr
 import pdk.schLayers as schlyr
 import revedaEditor.backend.dataDefinitions as ddef
@@ -1181,9 +1183,8 @@ class schematicScene(editorScene):
         overlapNets = self._totalNet.findOverlapNets()
         # inputNet splits overlapping nets
         for netItem in overlapNets:
-
-
             splitPoints = self.findSplitPoints(netItem)
+            netItem.inherit(self._totalNet)
             self.splitNets(netItem, splitPoints)
         splitPoints = self.findSplitPoints(self._totalNet)
         if splitPoints:
@@ -1209,9 +1210,7 @@ class schematicScene(editorScene):
         splitNetList = []
         for i in range(len(orderedPoints) - 1):
             splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
-            splitNet.name = inputNet.name
-            splitNet.nameSet = inputNet.nameSet
-            splitNet.nameAdded = inputNet.nameAdded
+            splitNet.inherit(inputNet)
             splitNetList.append(splitNet)
             if inputNet.isSelected():
                 splitNet.setSelected(True)
@@ -1341,9 +1340,7 @@ class schematicScene(editorScene):
                     netItem.sceneEndPoints[1], netItem.sceneEndPoints[0]
                 )
         self._stretchNet.stretch = True
-        self._stretchNet.name = netItem.name
-        self._stretchNet.nameSet = netItem.nameSet
-        self._stretchNet.nameAdded = netItem.nameAdded
+        self._stretchNet.inherit(netItem)
         addDeleteStretchNetCommand = us.addDeleteShapeUndo(
             self, self._stretchNet, netItem
         )
@@ -1363,14 +1360,14 @@ class schematicScene(editorScene):
 
         return orderedPoints
 
-
-    def clearNetStatus(self, netsSet: set):
+    def clearNetStatus(self, netsSet: set[net.schematicNet]):
         """
         Clear all assigned net names
         """
         for netItem in netsSet:
-            netItem.nameAdded = False
             netItem.nameConflict = False
+            if netItem.nameStrength.value < 3:
+                netItem.nameStrength = net.netNameStrengthEnum.NONAME
 
     # netlisting related methods.
     def groupAllNets(self, sceneNetsSet: set[net.schematicNet]) -> None:
@@ -1385,7 +1382,6 @@ class schematicScene(editorScene):
             # first find nets connected to pins designating global nets.
             schematicSymbolSet = self.findSceneSymbolSet()
             globalNetsSet = self.findGlobalNets(schematicSymbolSet)
-
             sceneNetsSet -= globalNetsSet  # remove these nets from all nets set.
             # now remove nets connected to global nets from this set.
             sceneNetsSet = self.groupNamedNets(globalNetsSet, sceneNetsSet)
@@ -1395,7 +1391,10 @@ class schematicScene(editorScene):
             # use these nets as starting nets to find other nets connected to them
             sceneNetsSet = self.groupNamedNets(schemPinConNetsSet, sceneNetsSet)
             # now find the set of nets whose name is set by the user
-            namedNetsSet = set([netItem for netItem in sceneNetsSet if netItem.nameSet])
+            namedNetsSet = set(
+                [netItem for netItem in sceneNetsSet if netItem.nameStrength.value == 3]
+            )
+            # remove named nets from this remanining net set
             sceneNetsSet -= namedNetsSet
             # now remove already named net set from firstNetSet
             unnamedNets = self.groupNamedNets(namedNetsSet, sceneNetsSet)
@@ -1404,7 +1403,7 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(e)
 
-    def findGlobalNets(self, symbolSet: set[shp.schematicSymbol]) -> set:
+    def findGlobalNets(self, symbolSet: set[shp.schematicSymbol]) -> set[net.schematicNet]:
         """
         This method finds all nets connected to global pins.
         """
@@ -1423,7 +1422,7 @@ class schematicScene(editorScene):
                     if isinstance(netItem, net.schematicNet)
                 }
                 for netItem in pinNetSet:
-                    if netItem.nameSet or netItem.nameAdded:
+                    if netItem.nameStrength.value == 3:
                         # check if net is already named explicitly
                         if netItem.name != pinItem.pinName:
                             netItem.nameConflict = True
@@ -1436,12 +1435,12 @@ class schematicScene(editorScene):
                     else:
                         globalNetsSet.add(netItem)
                         netItem.name = pinItem.pinName
-                        netItem.nameAdded = True
+                        netItem.nameStrength = net.netNameStrengthEnum.INHERIT
             return globalNetsSet
         except Exception as e:
             self.logger.error(e)
 
-    def findSchPinNets(self):
+    def findSchPinNets(self) -> set[net.schematicNet]:
         # nets connected to schematic pins.
         schemPinConNetsSet = set()
         # first start from schematic pins
@@ -1453,7 +1452,7 @@ class schematicScene(editorScene):
                 if isinstance(netItem, net.schematicNet)
             }
             for netItem in pinNetSet:
-                if netItem.nameSet or netItem.nameAdded:  # check if net is named
+                if netItem.nameStrength.value == 3:  # check if net name is not set explicitly
                     if netItem.name == sceneSchemPin.pinName:
                         schemPinConNetsSet.add(netItem)
                     else:
@@ -1465,25 +1464,20 @@ class schematicScene(editorScene):
                 else:
                     schemPinConNetsSet.add(netItem)
                     netItem.name = sceneSchemPin.pinName
-                    netItem.nameAdded = True
+                    netItem.nameStrength = net.netNameStrengthEnum.INHERIT
                 netItem.update()
             schemPinConNetsSet.update(pinNetSet)
         return schemPinConNetsSet
 
-    def groupNamedNets(self, namedNetsSet, unnamedNetsSet):
+    def groupNamedNets(self, namedNetsSet:set[net.schematicNet], unnamedNetsSet:set[
+        net.schematicNet])-> set[net.schematicNet]:
         """
         Groups nets with the same name using namedNetsSet members as seeds and going
         through connections. Returns the set of still unnamed nets.
         """
         for netItem in namedNetsSet:
-            if self.schematicNets.get(netItem.name) is None:
-                self.schematicNets[netItem.name] = set()
-            connectedNets, unnamedNetsSet = self.traverseNets(
-                {
-                    netItem,
-                },
-                unnamedNetsSet,
-            )
+            self.schematicNets.setdefault(netItem.name, set())
+            connectedNets, unnamedNetsSet = self.traverseNets({netItem,},unnamedNetsSet)
             self.schematicNets[netItem.name] |= connectedNets
         # These are the nets not connected to any named net
         return unnamedNetsSet
@@ -1519,7 +1513,8 @@ class schematicScene(editorScene):
                 lastNet.name = "net" + str(nameCounter)
                 self.schematicNets[lastNet.name] = {lastNet}
 
-    def traverseNets(self, connectedSet, otherNetsSet):
+    def traverseNets(self, connectedSet:set[net.schematicNet], otherNetsSet:set[
+                net.schematicNet]) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
         """
         Start from a net and traverse the schematic to find all connected nets. If the connected net search
         is exhausted, remove those nets from the scene nets set and start again in another net until all
@@ -1529,21 +1524,9 @@ class schematicScene(editorScene):
         for netItem in connectedSet:
             for netItem2 in otherNetsSet:
                 if self.checkNetConnect(netItem, netItem2):
-                    if (
-                        (netItem2.nameSet or netItem2.nameAdded)
-                        and (netItem.nameSet or netItem.nameAdded)
-                        and (netItem.name != netItem2.name)
-                    ):
-                        self.editorWindow.messageLine.setText(
-                            "Error: multiple names assigned to same net"
-                        )
-                        netItem2.nameConflict = True
-                        netItem.nameConflict = True
-                        break
-                    else:
-                        netItem2.name = netItem.name
-                        netItem2.nameAdded = True
-                    newFoundConnectedSet.add(netItem2)
+                    netItem2.inherit(netItem)
+                    if not netItem2.nameConflict:
+                        newFoundConnectedSet.add(netItem2)
         # keep searching if you already found a net connected to the initial net
         if len(newFoundConnectedSet) > 0:
             connectedSet.update(newFoundConnectedSet)
@@ -1551,11 +1534,10 @@ class schematicScene(editorScene):
             self.traverseNets(connectedSet, otherNetsSet)
         return connectedSet, otherNetsSet
 
-    def findConnectedNetSet(self, startNet: net.schematicNet):
-        '''
+    def findConnectedNetSet(self, startNet: net.schematicNet) -> set[net.schematicNet]:
+        """
         find all the nets connected to a net including nets connected by name.
-        '''
-
+        """
         sceneNetSet = self.findSceneNetsSet()
         self.groupAllNets(sceneNetSet)
         connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
@@ -1563,8 +1545,7 @@ class schematicScene(editorScene):
         for netItem in otherNetsSet:
             if netItem.name == startNet.name:
                 connectedSet.add(netItem)
-        return connectedSet
-
+        return connectedSet - {startNet}
 
     def checkPinNetConnect(self, pinItem: shp.schematicPin, netItem: net.schematicNet):
         """
@@ -1791,10 +1772,13 @@ class schematicScene(editorScene):
 
     def saveSchematic(self, file: pathlib.Path):
         try:
-            topLevelItems = [item for item in self.items() if item.parentItem() is None]
+            topLevelItems = []
             # Insert a cellview item at the beginning of the list
             topLevelItems.insert(0, {"cellView": "schematic"})
             topLevelItems.insert(1, {"snapGrid": self.snapTuple})
+            topLevelItems.extend(
+                [item for item in self.items() if item.parentItem() is None]
+            )
             with file.open(mode="w") as f:
                 json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
             # if there is a parent editor, to reload the changes.
@@ -1927,7 +1911,7 @@ class schematicScene(editorScene):
                         item.labels[tempLabelName].labelVisible = False
             [labelItem.labelDefs() for labelItem in item.labels.values()]
 
-    def setNetProperties(self, netItem:net.schematicNet):
+    def setNetProperties(self, netItem: net.schematicNet):
         dlg = pdlg.netProperties(self.editorWindow)
         dlg.netStartPointEditX.setText(
             str(round(netItem.mapToScene(netItem.draftLine.p1()).x()))
@@ -1941,19 +1925,16 @@ class schematicScene(editorScene):
         dlg.netEndPointEditY.setText(
             str(round(netItem.mapToScene(netItem.draftLine.p2()).y()))
         )
-        if netItem.nameSet or netItem.nameAdded:
-            dlg.netNameEdit.setText(netItem.name)
-        findConnectedNets = self.findConnectedNetSet(netItem)
+        dlg.netNameEdit.setText(netItem.name)
+
         if dlg.exec() == QDialog.Accepted:
             netItem.name = dlg.netNameEdit.text().strip()
             if netItem.name != "":
-                netItem.nameSet = True
-            for item in findConnectedNets:
-                item.highlighted = True
-                item.name = netItem.name
-                if item.nameSet:
-                    item.nameSet = False
-                item.nameAdded = True
+                netItem.nameStrength = net.netNameStrengthEnum.SET
+                findConnectedNets = self.findConnectedNetSet(netItem)
+                for otherNet in findConnectedNets:
+                    otherNet.inherit(netItem)
+                    print(otherNet.name, otherNet.nameStrength)
 
     def setTextProperties(self, item):
         dlg = pdlg.noteTextEditProperties(self.editorWindow, item)
@@ -3316,8 +3297,7 @@ class layoutScene(editorScene):
                 )
         self._stretchPath.stretch = True
         self._stretchPath.name = pathItem.name
-        # self._stretchNet.nameSet = pathItem.nameSet
-        # self._stretchNet.nameAdded = pathItem.nameSet
+
         addDeleteStretchNetCommand = us.addDeleteShapeUndo(
             self, self._stretchPath, pathItem
         )

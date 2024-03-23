@@ -1253,12 +1253,7 @@ class schematicSymbol(symbolShape):
                             item.pin.mapToScene(item.pin.start),
                             item.net.sceneEndPoints[item.netEndIndex - 1],
                         )
-                        if item.net.nameSet:
-                            snapLine.name = item.net.name
-                            snapLine.nameSet = True
-                        if item.net.nameAdded:
-                            snapLine.name = item.net.name
-                            snapLine.nameAdded = True
+                        snapLine.inherit(item.net)
                         self.scene().addItem(snapLine)
                         self._snapLines[item.pin].add(snapLine)
                         self.scene().removeItem(item.net)
@@ -1271,9 +1266,16 @@ class schematicSymbol(symbolShape):
                                     snapLine.line().p2(),
                                 )
                             )
-        # if change == QGraphicsItem.ItemPositionHasChanged:
-        #     # Here you can perform custom actions after the position of the item has changed
-        #     print("Item position has changed to:", self.pos())
+        if change == QGraphicsItem.ItemPositionHasChanged: # adjust the net ends after move is finished.
+            if self._snapLines is not None:
+                for pin, snapLinesSet in self._snapLines.items():
+                    for snapLine in snapLinesSet:
+                        snapLine.setLine(
+                            QLineF(
+                                snapLine.mapFromScene(pin.mapToScene(pin.start)),
+                                snapLine.line().p2(),
+                            )
+                        )
 
         return super().itemChange(change, value)
 
@@ -1336,34 +1338,7 @@ class schematicSymbol(symbolShape):
 
         super().mousePressEvent(event)
         self._snapLines = None
-        # self._snapLines = dict()
-        # self.findPinNetIndexTuples()
-        # for item in self._pinNetIndexTupleSet:
-        #     self._snapLines.setdefault(item.pin, set())
-        #     snapLine = net.guideLine(
-        #         item.pin.mapToScene(item.pin.start),
-        #         item.net.sceneEndPoints[item.netEndIndex - 1],
-        #     )
-        #     if item.net.nameSet:
-        #         snapLine.name = item.net.name
-        #         snapLine.nameSet = True
-        #     if item.net.nameAdded:
-        #         snapLine.name = item.net.name
-        #         snapLine.nameAdded = True
-        #     self.scene().addItem(snapLine)
-        #     self._snapLines[item.pin].add(snapLine)
-        #     self.scene().removeItem(item.net)
 
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        # for pin, snapLinesSet in self._snapLines.items():
-        #     for snapLine in snapLinesSet:
-        #         snapLine.setLine(
-        #             QLineF(
-        #                 snapLine.mapFromScene(pin.mapToScene(pin.start)),
-        #                 snapLine.line().p2(),
-        #             )
-        #         )
-        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)
@@ -1603,9 +1578,8 @@ class schematicPin(symbolShape):
                 self.mapToScene(self.start),
                 tupleItem.net.sceneEndPoints[tupleItem.netEndIndex - 1],
             )
-            if tupleItem.net.nameSet:
-                snapLine.name = tupleItem.net.name
-                snapLine.nameSet = True
+            snapLine.inherit(tupleItem.net)
+
             self.scene().addItem(snapLine)
             self._snapLines.add(snapLine)
             self.scene().removeItem(tupleItem.net)
@@ -1621,13 +1595,11 @@ class schematicPin(symbolShape):
                     self.mapToScene(self.start).toPoint(),
                     snapLine.mapToScene(snapLine.line().p2()).toPoint(),
                 )
+                if lines:
+                    for line in lines:
+                        line.inherit(snapLine)
+                    self.scene().addListUndoStack(lines)
                 self.scene().removeItem(snapLine)
-        if lines:
-            for line in lines:
-                if snapLine.nameSet:
-                    line.name = snapLine.name
-                    line.nameSet = True
-            self.scene().addListUndoStack(lines)
         self._snapLines = dict()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:

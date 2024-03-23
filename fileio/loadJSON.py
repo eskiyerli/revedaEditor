@@ -31,7 +31,7 @@ import pdk.process as fabproc
 from PySide6.QtCore import QPoint, QLineF
 from PySide6.QtWidgets import QGraphicsScene
 
-from revedaEditor.common.net import schematicNet
+import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp
 import revedaEditor.common.labels as lbl
 import revedaEditor.common.layoutShapes as lshp
@@ -249,9 +249,13 @@ class schematicItems:
                 case "scn":
                     start = QPoint(item["st"][0], item["st"][1])
                     end = QPoint(item["end"][0], item["end"][1])
-                    netItem = schematicNet(start, end)
+                    netItem = net.schematicNet(start, end)
                     netItem.name = item["nam"]
-                    netItem.nameSet = item["ns"]
+                    match item["ns"]:
+                        case 3:
+                            netItem.nameStrength = net.netNameStrengthEnum.SET
+                        case _:
+                            netItem.nameStrength = net.netNameStrengthEnum.NONAME
                     return netItem
                 case "scp":
                     start = QPoint(item["st"][0], item["st"][1])
