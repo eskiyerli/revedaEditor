@@ -273,20 +273,14 @@ class schematicNet(QGraphicsItem):
         Returns:
             set: A set of netItems that overlap with self.sceneShapeRect.
         """
+        overlapNets = set()
         if self.scene():
             overlapNets = {
                 netItem
                 for netItem in self.scene().items(self.sceneShapeRect)
-                if isinstance(netItem, schematicNet) and netItem is not self
+                if isinstance(netItem, schematicNet)
             }
-            if self._nameSet or self._nameAdded:
-                for netItem in overlapNets:
-                    netItem.name = self._name
-                    netItem.nameSet = self._nameSet
-                    netItem.nameAdded = self._nameAdded
-        else:
-            overlapNets = set()
-        return overlapNets
+            return overlapNets - {self}
 
     def mergeNets(self) -> tuple["schematicNet", "schematicNet"]:
         """
@@ -319,7 +313,7 @@ class schematicNet(QGraphicsItem):
                         if self.scene():
                             self.scene().removeItem(netItem)
                     else:
-                        break # break out of the for loop
+                        break  # break out of the for loop
                 if not self.nameConflict:
                     # Adjust the initialRect by 2 pixels on each side
                     newNetPoints = initialRect.adjusted(2, 2, -2, -2)
@@ -495,11 +489,15 @@ class guideLine(QGraphicsLineItem):
         self.setPen(schlyr.guideLinePen)
         self._name: str = ""
         self._nameStrength: netNameStrengthEnum = netNameStrengthEnum.NONAME
-        # self._nameSet: bool = False
-        # self._nameAdded: bool = False
 
     @property
     def sceneEndPoints(self) -> list[QPoint]:
+        """
+        Returns a list of the end points of the net in scene coordinates.
+
+        Returns:
+            list[QPoint]: A list of the end points of the net in scene coordinates.
+        """
         return [
             self.mapToScene(self.line().p1()).toPoint(),
             self.mapToScene(self.line().p2()).toPoint(),

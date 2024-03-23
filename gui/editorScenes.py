@@ -1392,7 +1392,7 @@ class schematicScene(editorScene):
             sceneNetsSet = self.groupNamedNets(schemPinConNetsSet, sceneNetsSet)
             # now find the set of nets whose name is set by the user
             namedNetsSet = set(
-                [netItem for netItem in sceneNetsSet if netItem.nameStrength.value == 3]
+                [netItem for netItem in sceneNetsSet if netItem.nameStrength.value > 1]
             )
             # remove named nets from this remanining net set
             sceneNetsSet -= namedNetsSet
@@ -1538,8 +1538,8 @@ class schematicScene(editorScene):
         """
         find all the nets connected to a net including nets connected by name.
         """
+
         sceneNetSet = self.findSceneNetsSet()
-        self.groupAllNets(sceneNetSet)
         connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
         # now check if any other name is connected due to a common name:
         for netItem in otherNetsSet:
@@ -1931,10 +1931,9 @@ class schematicScene(editorScene):
             netItem.name = dlg.netNameEdit.text().strip()
             if netItem.name != "":
                 netItem.nameStrength = net.netNameStrengthEnum.SET
-                findConnectedNets = self.findConnectedNetSet(netItem)
-                for otherNet in findConnectedNets:
-                    otherNet.inherit(netItem)
-                    print(otherNet.name, otherNet.nameStrength)
+                self.findConnectedNetSet(netItem)
+                # for otherNet in findConnectedNets:
+                #     otherNet.inherit(netItem)
 
     def setTextProperties(self, item):
         dlg = pdlg.noteTextEditProperties(self.editorWindow, item)

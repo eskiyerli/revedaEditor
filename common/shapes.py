@@ -1588,8 +1588,8 @@ class schematicPin(symbolShape):
     #
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)
-        lines = []
-        if self._snapLines:
+        lines: list[net.schematicNet] = []
+        if hasattr(self, "snapLines"):
             for snapLine in self._snapLines:
                 lines = self.scene().addStretchWires(
                     self.mapToScene(self.start).toPoint(),
@@ -1597,7 +1597,7 @@ class schematicPin(symbolShape):
                 )
                 if lines:
                     for line in lines:
-                        line.inherit(snapLine)
+                        line.inheritGuideLine(snapLine)
                     self.scene().addListUndoStack(lines)
                 self.scene().removeItem(snapLine)
         self._snapLines = dict()

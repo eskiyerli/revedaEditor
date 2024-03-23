@@ -1961,15 +1961,14 @@ class schematicEditor(editorWindow):
         # create menu
         self.menuCreate.addAction(self.createInstAction)
         self.menuCreate.addAction(self.createNetAction)
-        self.menuCreate.addAction(self.createBusAction)
-        self.menuCreate.addAction(self.createLabelAction)
+        # self.menuCreate.addAction(self.createBusAction)
         self.menuCreate.addAction(self.createPinAction)
         self.menuCreate.addAction(self.createTextAction)
         self.menuCreate.addAction(self.createSymbolAction)
 
         # check menu
-        self.menuCheck.addAction(self.viewErrorsAction)
-        self.menuCheck.addAction(self.deleteErrorsAction)
+        # self.menuCheck.addAction(self.viewErrorsAction)
+        # self.menuCheck.addAction(self.deleteErrorsAction)
 
         # tools menu
         self.menuTools.addAction(self.hilightNetAction)
