@@ -57,7 +57,7 @@ class symbolItems:
         """
         Create symbol items from json file.
         """
-        if isinstance(item,dict):
+        if isinstance(item, dict):
             match item["type"]:
                 case "rect":
                     return self.createRectItem(item)
@@ -186,11 +186,13 @@ class schematicItems:
                     symbolInstance.viewName = item["view"]
                     symbolInstance.counter = item["ic"]
                     symbolInstance.instanceName = item["nam"]
-                    symbolInstance.angle = item.get("ang", 0)
                     symbolInstance.netlistIgnore = bool(item.get("ign", 0))
                     symbolInstance.labelDict = item["ld"]
                     symbolInstance.setPos(*item["loc"])
-                    [labelItem.labelDefs() for labelItem in symbolInstance.labels.values()]
+                    [
+                        labelItem.labelDefs()
+                        for labelItem in symbolInstance.labels.values()
+                    ]
                     libraryPath = self.libraryDict.get(item["lib"])
 
                     if libraryPath is None:
@@ -199,7 +201,9 @@ class schematicItems:
                         return symbolInstance
                     else:
                         # find the symbol file
-                        file = libraryPath.joinpath(item["cell"], f'{item["view"]}.json')
+                        file = libraryPath.joinpath(
+                            item["cell"], f'{item["view"]}.json'
+                        )
                         if not file.exists():
                             self.createDraftSymbol(item, symbolInstance)
                             self.scene.logger.warning(f"{item['lib']} cannot be found.")
@@ -218,20 +222,24 @@ class schematicItems:
                                         2:
                                     ]:  # skip first two entries.
                                         if jsonItem["type"] == "attr":
-                                            symbolAttributes[jsonItem["nam"]] = jsonItem[
-                                                "def"
-                                            ]
+                                            symbolAttributes[jsonItem["nam"]] = (
+                                                jsonItem["def"]
+                                            )
                                         else:
-                                            itemShapes.append(symbolShape.create(jsonItem))
+                                            itemShapes.append(
+                                                symbolShape.create(jsonItem)
+                                            )
                                     symbolInstance.shapes = itemShapes
                                     for labelItem in symbolInstance.labels.values():
                                         if (
                                             labelItem.labelName
                                             in symbolInstance.labelDict.keys()
                                         ):
-                                            labelItem.labelValue = symbolInstance.labelDict[
-                                                labelItem.labelName
-                                            ][0]
+                                            labelItem.labelValue = (
+                                                symbolInstance.labelDict[
+                                                    labelItem.labelName
+                                                ][0]
+                                            )
                                             labelItem.labelVisible = (
                                                 symbolInstance.labelDict[
                                                     labelItem.labelName
@@ -242,9 +250,12 @@ class schematicItems:
                                         labelItem.labelDefs()
                                         for labelItem in symbolInstance.labels.values()
                                     ]
+                                    symbolInstance.angle = item.get("ang", 0)
                                     return symbolInstance
                                 except json.decoder.JSONDecodeError:
-                                    self.scene.logger.error("Error: Invalid Symbol file")
+                                    self.scene.logger.error(
+                                        "Error: Invalid Symbol file"
+                                    )
 
                 case "scn":
                     start = QPoint(item["st"][0], item["st"][1])
@@ -254,6 +265,8 @@ class schematicItems:
                     match item["ns"]:
                         case 3:
                             netItem.nameStrength = net.netNameStrengthEnum.SET
+                        case 2:
+                            netItem.nameStrength = net.netNameStrengthEnum.INHERIT
                         case _:
                             netItem.nameStrength = net.netNameStrengthEnum.NONAME
                     return netItem
@@ -282,7 +295,6 @@ class schematicItems:
                         item["to"],
                     )
                     return text
-
 
     def createDraftSymbol(self, item: dict, symbolInstance: shp.schematicSymbol):
         rectItem = shp.symbolRectangle(
@@ -335,14 +347,18 @@ class layoutItems:
                             if pcellDef[0]["cellView"] != "pcell":
                                 self.scene.logger.error("Not a pcell cell")
                             else:
-                                pcellInstance = eval(f'pcells.{pcellDef[1]["reference"]}()')
+                                pcellInstance = eval(
+                                    f'pcells.{pcellDef[1]["reference"]}()'
+                                )
                                 pcellInstance(**item["params"])
                                 pcellInstance.libraryName = item["lib"]
                                 pcellInstance.cellName = item["cell"]
                                 pcellInstance.viewName = item["view"]
                                 pcellInstance.counter = item["ic"]
                                 pcellInstance.instanceName = item["nam"]
-                                pcellInstance.setPos(QPoint(item["loc"][0], item["loc"][1]))
+                                pcellInstance.setPos(
+                                    QPoint(item["loc"][0], item["loc"][1])
+                                )
                                 return pcellInstance
                         except json.decoder.JSONDecodeError:
                             print("Error: Invalid PCell file")

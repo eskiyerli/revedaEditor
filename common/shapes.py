@@ -505,6 +505,7 @@ class symbolArc(symbolShape):
         self._adjustment = int(self._pen.width() / 2)
         self._stretchSide = None
         self._findAngle()
+        self._brect = QRectF(0, 0, 0, 0)
 
     def _findAngle(self):
         self._arcAngle = self._arcLine.angle()
@@ -520,7 +521,7 @@ class symbolArc(symbolShape):
     def paint(self, painter, option, widget) -> None:
         if self.isSelected():
             painter.setPen(symlyr.selectedSymbolPen)
-            painter.drawRect(self.rect)
+            painter.drawRect(self.bRect)
             self.setZValue(symlyr.selectedSymbolLayer.z)
             if self._stretch:
                 painter.setPen(symlyr.stretchSymbolPen)
@@ -550,8 +551,48 @@ class symbolArc(symbolShape):
             painter.drawArc(self._rect, 270 * 16, 180 * 16)
 
     def boundingRect(self):
-        return self._rect.adjusted(-2, -2, 2, 2)
+        return self.bRect
 
+
+    @property
+    def bRect(self):
+        if self._arcType == symbolArc.arcTypes[0]:
+            brect = QRectF(
+                QRectF(
+                    self._rect.left(),
+                    self._rect.top(),
+                    self._rect.width(),
+                    0.5 * self._rect.height(),
+                )
+            ).adjusted(-2, -2, 2, 2)
+        elif self._arcType == symbolArc.arcTypes[1]:
+            brect = QRectF(
+                QRectF(
+                    self._rect.left(),
+                    self._rect.top(),
+                    0.5 * self._rect.width(),
+                    self._rect.height(),
+                )
+            ).adjusted(-2, -2, 2, 2)
+        elif self._arcType == symbolArc.arcTypes[2]:
+            brect =  QRectF(
+                self._rect.left(),
+                self._rect.top() + self._rect.height() * 0.5,
+                self._rect.width(),
+                0.5 * self._rect.height(),
+            ).adjusted(-2, -2, 2, 2)
+        elif self._arcType == symbolArc.arcTypes[3]:
+            brect = QRectF(
+                self._rect.left() + 0.5 * self._rect.width(),
+                self._rect.top(),
+                0.5 * self._rect.width(),
+                self._rect.height(),
+            ).adjusted(-2, -2, 2, 2)
+        return brect
+
+    @property
+    def adjustment(self):
+        return self._adjustment
     @property
     def rect(self):
         return self._rect
@@ -599,11 +640,11 @@ class symbolArc(symbolShape):
         self.rect.setWidth(self._width)
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self._height
 
     @height.setter
-    def height(self, height):
+    def height(self, height: int):
         self._height = height
         self.prepareGeometryChange()
         self.rect.setHeight(self._height)
@@ -935,9 +976,13 @@ class symbolPin(symbolShape):
             painter.setBrush(symlyr.symbolPinBrush)
         painter.setFont(QFont("Arial", 12))
         painter.drawRect(self._rect)
-        painter.drawText(
-            QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName
-        )
+        if (
+            str(type(self.scene()))
+            == "<class 'revedaEditor.gui.editorScenes.symbolScene'>"
+        ):
+            painter.drawText(
+                QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName
+            )
 
     def __repr__(self):
         return f"pin({self._start},{self._pinName}, {self._pinDir}, {self._pinType})"
@@ -1221,12 +1266,12 @@ class schematicSymbol(symbolShape):
         self.pinNetMap: dict[str, str] = dict()  # pinName: netName
         self._pinNetIndexTupleSet: set[pinNetIndexTuple] = set()
         self._snapLines: dict[symbolPin, set[net.schematicNet]] = dict()
+        self._shapeRectF = QRectF(0, 0, 0, 0)
+        self._borderRect = QRect(0, 0, 0, 0)
         self.addShapes()
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
-
-        self.dashLines = dict()
 
     def addShapes(self):
         for item in self._shapes:
@@ -1237,6 +1282,9 @@ class schematicSymbol(symbolShape):
                 self._pins[item.pinName] = item
             elif type(item) is symbolLabel:
                 self._labels[item.labelName] = item
+            # if type(item) is not symbolLabel:
+            #     self._shapeRectF = self._shapeRectF.united(item.boundingRect())
+            # self._borderRect = self._shapeRectF.toRect().normalized()
 
     def __repr__(self):
         return f"schematicSymbol({self._shapes})"
@@ -1266,7 +1314,9 @@ class schematicSymbol(symbolShape):
                                     snapLine.line().p2(),
                                 )
                             )
-        if change == QGraphicsItem.ItemPositionHasChanged: # adjust the net ends after move is finished.
+        if (
+            change == QGraphicsItem.ItemPositionHasChanged
+        ):  # adjust the net ends after move is finished.
             if self._snapLines is not None:
                 for pin, snapLinesSet in self._snapLines.items():
                     for snapLine in snapLinesSet:
@@ -1276,7 +1326,6 @@ class schematicSymbol(symbolShape):
                                 snapLine.line().p2(),
                             )
                         )
-
         return super().itemChange(change, value)
 
     def paint(self, painter, option, widget):
@@ -1286,15 +1335,20 @@ class schematicSymbol(symbolShape):
             self.setZValue(symlyr.draftLayer.z)
         if self.isSelected():
             painter.setPen(symlyr.selectedSymbolPen)
-            painter.drawRect(self.borderRect)
+            painter.drawRect(self.boundingRect())
             self.setZValue(symlyr.selectedSymbolLayer.z)
         if self.netlistIgnore:
             painter.setPen(schlyr.ignoreSymbolPen)
-            painter.drawLine(self.borderRect.bottomLeft(), self.borderRect.topRight())
-            painter.drawLine(self.borderRect.topLeft(), self.borderRect.bottomRight())
+            painter.drawLine(self.boundingRect().bottomLeft(), self.boundingRect().topRight())
+            painter.drawLine(self.boundingRect().topLeft(), self.boundingRect().bottomRight())
 
     def boundingRect(self):
         return self.childrenBoundingRect()
+
+    # def shape(self):
+    #     path = QPainterPath()
+    #     path.addRect(self._shapeRectF.toRect())
+    #     return path
 
     def findPinNetIndexTuples(self):
         # Create an empty set to store pin-net-index tuples
@@ -1304,12 +1358,16 @@ class schematicSymbol(symbolShape):
             # Find all the net items connected to the pin
             for netItem in self.scene().items(pinItem.sceneBoundingRect()):
                 if isinstance(netItem, net.schematicNet):
-                    connectList = list(map(pinItem.sceneBoundingRect().contains,
-                                            netItem.sceneEndPoints))
+                    connectList = list(
+                        map(
+                            pinItem.sceneBoundingRect().contains, netItem.sceneEndPoints
+                        )
+                    )
                     endIndex = connectList.index(True)
                     if any(connectList):
-                        self._pinNetIndexTupleSet.add(pinNetIndexTuple(pinItem, netItem,
-                                                                       endIndex))
+                        self._pinNetIndexTupleSet.add(
+                            pinNetIndexTuple(pinItem, netItem, endIndex)
+                        )
 
             # netsConnected = [
             #     netItem
@@ -1338,7 +1396,6 @@ class schematicSymbol(symbolShape):
 
         super().mousePressEvent(event)
         self._snapLines = None
-
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)
@@ -1399,6 +1456,8 @@ class schematicSymbol(symbolShape):
     def angle(self, value: float):
         self.setRotation(value)
         self._angle = value
+        for label in self.labels.values():
+            label.angle = -value
 
     @property
     def labels(self):
@@ -1439,10 +1498,6 @@ class schematicSymbol(symbolShape):
     def netlistIgnore(self, value: bool):
         assert isinstance(value, bool)
         self._netlistIgnore = value
-
-    @property
-    def borderRect(self):
-        return self.childrenBoundingRect().normalized().adjusted(-1, -1, 1, 1)
 
 
 class schematicPin(symbolShape):

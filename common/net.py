@@ -198,8 +198,8 @@ class schematicNet(QGraphicsItem):
     def __repr__(self):
         return f"schematicNet({self.sceneEndPoints})"
 
-    def itemChange(self, change, value):
-        return super().itemChange(change, value)
+    # def itemChange(self, change, value):
+    #     return super().itemChange(change, value)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         super().mousePressEvent(event)
@@ -231,27 +231,29 @@ class schematicNet(QGraphicsItem):
         super().hoverEnterEvent(event)
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
+            self._highlighted = True
             self._connectedNetsSet = self.scene().findConnectedNetSet(self)
 
-            # # Highlight the connected netItems
-            # for netItem in self._connectedNetsSet:
-            #     # if not (netItem.nameAdded or netItem.nameSet):
-            #     #     netItem.nameAdded = True
-            #     #     netItem.name = self._name
-            #     netItem.highlight()
-            #
-            # # Create flight lines and add them to the scene
-            # for netItem in self._connectedNetsSet:
-            #     flightLine = netFlightLine(
-            #         self.mapToScene(self._draftLine.center()),
-            #         netItem.mapToScene(netItem.draftLine.center()),
-            #     )
-            #     self._flightLinesSet.add(flightLine)
-            #     self.scene().addItem(flightLine)
+            # Highlight the connected netItems
+            for netItem in self._connectedNetsSet:
+                netItem.highlight()
+
+            # Create flight lines and add them to the scene
+            for netItem in self._connectedNetsSet:
+                flightLine = netFlightLine(
+                    self.mapToScene(self._draftLine.center()),
+                    netItem.mapToScene(netItem.draftLine.center()),
+                )
+                self._flightLinesSet.add(flightLine)
+                self.scene().addItem(flightLine)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         super().hoverLeaveEvent(event)
         if self._highlighted:
+            self._highlighted = False
+            # [netItem.unhighlight() for netItem in self._connectedNetsSet]
+            # [flightLine.removeFromScene() for flightLine in self._flightLinesSet]
+            # self._flightLinesSet = set()
             for flightLine in self._flightLinesSet:
                 self.scene().removeItem(flightLine)
             self._flightLinesSet = set()

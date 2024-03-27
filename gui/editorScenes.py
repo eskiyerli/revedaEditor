@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QGraphicsLineItem,
     QGraphicsItem,
+    QMainWindow,
 )
 
 import pdk.layoutLayers
@@ -984,7 +985,7 @@ class schematicScene(editorScene):
             selectNet=False,
             selectPin=False,
         )
-        self.itemCounter = 0
+        self.instanceCounter = 0
         self.netCounter = 0
         self.schematicNets = {}  # netName: list of nets with the same name
         self.viewRect = None
@@ -1181,14 +1182,15 @@ class schematicScene(editorScene):
     def mergeSplitNets(self, inputNet: net.schematicNet):
         self.mergeNets(inputNet)  # output is self._totalNet
         overlapNets = self._totalNet.findOverlapNets()
-        # inputNet splits overlapping nets
+        # # inputNet splits overlapping nets
         for netItem in overlapNets:
             splitPoints = self.findSplitPoints(netItem)
             netItem.inherit(self._totalNet)
-            self.splitNets(netItem, splitPoints)
-        splitPoints = self.findSplitPoints(self._totalNet)
-        if splitPoints:
-            self.splitNets(self._totalNet, splitPoints)
+            if len(splitPoints) > 2:
+                self.splitNets(netItem, splitPoints)
+        # splitPoints = self.findSplitPoints(self._totalNet)
+        # if len(splitPoints)>2:
+        #     self.splitNets(self._totalNet, splitPoints)
         # else:
         #     self.addUndoStack(self._totalNet)
 
@@ -1307,7 +1309,22 @@ class schematicScene(editorScene):
         return netEndPointsDict
 
     def findSplitPoints(self, targetNet: net.schematicNet) -> list[QPoint]:
+        """
+        This function finds the split points of a net.
+
+        Parameters:
+            targetNet (net.schematicNet): The net to find the split points of.
+
+        Returns:
+            list[QPoint]: A list of split points.
+
+        This function searches for nets that are orthogonally aligned with the target net and
+        for pins that are located within the target net's bounding rectangle. It returns a list
+        of split points that are found.
+        """
         splitPoints: set[QPoint | Any] = set()
+
+        # Find split points for nets that are orthogonally aligned with the target net.
         sceneRect = targetNet.sceneShapeRect
         rectItems = set(self.items(sceneRect))
 
@@ -1403,7 +1420,9 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(e)
 
-    def findGlobalNets(self, symbolSet: set[shp.schematicSymbol]) -> set[net.schematicNet]:
+    def findGlobalNets(
+        self, symbolSet: set[shp.schematicSymbol]
+    ) -> set[net.schematicNet]:
         """
         This method finds all nets connected to global pins.
         """
@@ -1452,7 +1471,9 @@ class schematicScene(editorScene):
                 if isinstance(netItem, net.schematicNet)
             }
             for netItem in pinNetSet:
-                if netItem.nameStrength.value == 3:  # check if net name is not set explicitly
+                if (
+                    netItem.nameStrength.value == 3
+                ):  # check if net name is not set explicitly
                     if netItem.name == sceneSchemPin.pinName:
                         schemPinConNetsSet.add(netItem)
                     else:
@@ -1469,15 +1490,21 @@ class schematicScene(editorScene):
             schemPinConNetsSet.update(pinNetSet)
         return schemPinConNetsSet
 
-    def groupNamedNets(self, namedNetsSet:set[net.schematicNet], unnamedNetsSet:set[
-        net.schematicNet])-> set[net.schematicNet]:
+    def groupNamedNets(
+        self, namedNetsSet: set[net.schematicNet], unnamedNetsSet: set[net.schematicNet]
+    ) -> set[net.schematicNet]:
         """
         Groups nets with the same name using namedNetsSet members as seeds and going
         through connections. Returns the set of still unnamed nets.
         """
         for netItem in namedNetsSet:
             self.schematicNets.setdefault(netItem.name, set())
-            connectedNets, unnamedNetsSet = self.traverseNets({netItem,},unnamedNetsSet)
+            connectedNets, unnamedNetsSet = self.traverseNets(
+                {
+                    netItem,
+                },
+                unnamedNetsSet,
+            )
             self.schematicNets[netItem.name] |= connectedNets
         # These are the nets not connected to any named net
         return unnamedNetsSet
@@ -1513,8 +1540,9 @@ class schematicScene(editorScene):
                 lastNet.name = "net" + str(nameCounter)
                 self.schematicNets[lastNet.name] = {lastNet}
 
-    def traverseNets(self, connectedSet:set[net.schematicNet], otherNetsSet:set[
-                net.schematicNet]) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
+    def traverseNets(
+        self, connectedSet: set[net.schematicNet], otherNetsSet: set[net.schematicNet]
+    ) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
         """
         Start from a net and traverse the schematic to find all connected nets. If the connected net search
         is exhausted, remove those nets from the scene nets set and start again in another net until all
@@ -1543,7 +1571,7 @@ class schematicScene(editorScene):
         connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
         # now check if any other name is connected due to a common name:
         for netItem in otherNetsSet:
-            if netItem.name == startNet.name:
+            if netItem.name == startNet.name and (netItem.nameStrength.value > 1):
                 connectedSet.add(netItem)
         return connectedSet - {startNet}
 
@@ -1713,7 +1741,7 @@ class schematicScene(editorScene):
         """
         instance = self.instSymbol(pos)
 
-        self.itemCounter += 1
+        self.instanceCounter += 1
         self.addUndoStack(instance)
         self.instanceSymbolTuple = None
         return instance
@@ -1736,7 +1764,7 @@ class schematicScene(editorScene):
 
                 symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes)
                 symbolInstance.setPos(pos)
-                symbolInstance.counter = self.itemCounter
+                symbolInstance.counter = self.instanceCounter
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
                 symbolInstance.libraryName = (
                     self.instanceSymbolTuple.libraryItem.libraryName
@@ -1765,12 +1793,21 @@ class schematicScene(editorScene):
                         )
                     )
                     if isinstance(shape, shp.schematicSymbol):
-                        self.itemCounter += 1
-                        shape.instanceName = f"I{self.itemCounter}"
-                        shape.counter = int(self.itemCounter)
+                        self.instanceCounter += 1
+                        shape.instanceName = f"I{self.instanceCounter}"
+                        shape.counter = int(self.instanceCounter)
                         [label.labelDefs() for label in shape.labels.values()]
 
     def saveSchematic(self, file: pathlib.Path):
+        """
+        Save the schematic to a file.
+
+        Args:
+            file (pathlib.Path): The file path to save the schematic to.
+
+        Raises:
+            Exception: If there was an error saving the schematic.
+        """
         try:
             topLevelItems = []
             # Insert a cellview item at the beginning of the list
@@ -1782,13 +1819,29 @@ class schematicScene(editorScene):
             with file.open(mode="w") as f:
                 json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
             # if there is a parent editor, to reload the changes.
+            print(self.editorWindow.parentEditor)
             if self.editorWindow.parentEditor is not None:
-                if isinstance(self.editorWindow.parentEditor, schematicEditor):
+                editorType = self.findEditorTypeString(self.editorWindow.parentEditor)
+                if editorType == "schematicEditor":
                     self.editorWindow.parentEditor.loadSchematic()
-                elif isinstance(self.editorWindow.parentEditor, symbolEditor):
-                    self.editorWindow.parentEditor.loadSymbol()
         except Exception as e:
             self.logger.error(e)
+
+    @staticmethod
+    def findEditorTypeString(editorWindow):
+        """
+        This function returns the type of the parent editor as a string.
+        The type of the parent editor is determined by finding the last dot in the
+        string representation of the type of the parent editor and returning the
+        string after the last dot. If there is no dot in the string representation
+        of the type of the parent editor, the entire string is returned.
+        """
+        index = str(type(editorWindow)).rfind(".")
+        if index == -1:
+            return str(type(editorWindow))
+        else:
+            print(str(type(editorWindow))[index + 1 : -2])
+            return str(type(editorWindow))[index + 1 : -2]
 
     def loadSchematicItems(self, itemsList: list[dict]) -> None:
         """
@@ -1804,11 +1857,11 @@ class schematicScene(editorScene):
             itemShape = lj.schematicItems(self).create(itemDict)
             if (
                 type(itemShape) == shp.schematicSymbol
-                and itemShape.counter > self.itemCounter
+                and itemShape.counter > self.instanceCounter
             ):
-                self.itemCounter = itemShape.counter
+                self.instanceCounter = itemShape.counter
                 # increment item counter for next symbol
-                self.itemCounter += 1
+                self.instanceCounter += 1
             shapesList.append(itemShape)
         self.undoStack.push(us.loadShapesUndo(self, shapesList))
 
@@ -1982,214 +2035,6 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(e)
 
-    def createSymbol(self) -> None:
-        """
-        Create a symbol view for a schematic.
-        """
-        oldSymbolItem = False
-
-        askViewNameDlg = pdlg.symbolNameDialog(
-            self.editorWindow.file.parent,
-            self.editorWindow.cellName,
-            self.editorWindow,
-        )
-        if askViewNameDlg.exec() == QDialog.Accepted:
-            symbolViewName = askViewNameDlg.symbolViewsCB.currentText()
-            if symbolViewName in askViewNameDlg.symbolViewNames:
-                oldSymbolItem = True
-            if oldSymbolItem:
-                deleteSymViewDlg = fd.deleteSymbolDialog(
-                    self.editorWindow.cellName, symbolViewName, self.editorWindow
-                )
-                if deleteSymViewDlg.exec() == QDialog.Accepted:
-                    self.generateSymbol(symbolViewName)
-            else:
-                self.generateSymbol(symbolViewName)
-
-    def generateSymbol(self, symbolViewName: str) -> None:
-        symbolWindow = None
-        libName = self.editorWindow.libName
-        cellName = self.editorWindow.cellName
-        libItem: scb.libraryItem = libm.getLibItem(
-            self.editorWindow.libraryView.libraryModel, libName
-        )
-        cellItem: scb.cellItem = libm.getCellItem(libItem, cellName)
-        libraryView = self.editorWindow.libraryView
-        schematicPins: list[shp.schematicPin] = list(self.findSceneSchemPinsSet())
-        schematicPinNames: list[str] = [pinItem.pinName for pinItem in schematicPins]
-        rectXDim: int = 0
-        rectYDim: int = 0
-
-        inputPins = [
-            pinItem.pinName
-            for pinItem in schematicPins
-            if pinItem.pinDir == shp.schematicPin.pinDirs[0]
-        ]
-
-        outputPins = [
-            pinItem.pinName
-            for pinItem in schematicPins
-            if pinItem.pinDir == shp.schematicPin.pinDirs[1]
-        ]
-
-        inoutPins = [
-            pinItem.pinName
-            for pinItem in schematicPins
-            if pinItem.pinDir == shp.schematicPin.pinDirs[2]
-        ]
-
-        dlg = pdlg.symbolCreateDialog(self.parent.parent)
-        dlg.leftPinsEdit.setText(", ".join(inputPins))
-        dlg.rightPinsEdit.setText(", ".join(outputPins))
-        dlg.topPinsEdit.setText(", ".join(inoutPins))
-        if dlg.exec() == QDialog.Accepted:
-            symbolViewItem = scb.createCellView(
-                self.editorWindow, symbolViewName, cellItem
-            )
-            libraryDict = self.editorWindow.libraryDict
-            # create symbol editor window with an empty items list
-            symbolWindow = symbolEditor(symbolViewItem, libraryDict, libraryView)
-            try:
-                leftPinNames = list(
-                    filter(
-                        None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.leftPinsEdit.text().split(",")
-                        ],
-                    )
-                )
-                rightPinNames = list(
-                    filter(
-                        None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.rightPinsEdit.text().split(",")
-                        ],
-                    )
-                )
-                topPinNames = list(
-                    filter(
-                        None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.topPinsEdit.text().split(",")
-                        ],
-                    )
-                )
-                bottomPinNames = list(
-                    filter(
-                        None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.bottomPinsEdit.text().split(",")
-                        ],
-                    )
-                )
-                stubLength = int(float(dlg.stubLengthEdit.text().strip()))
-                pinDistance = int(float(dlg.pinDistanceEdit.text().strip()))
-                rectXDim = (
-                    max(len(topPinNames), len(bottomPinNames)) + 1
-                ) * pinDistance
-                rectYDim = (
-                    max(len(leftPinNames), len(rightPinNames)) + 1
-                ) * pinDistance
-            except ValueError:
-                self.logger.error("Enter valid value")
-
-        # add window to open windows list
-        # libraryView.openViews[f"{libName}_{cellName}_{symbolViewName}"] = symbolWindow
-        if symbolWindow is not None:
-            symbolScene = symbolWindow.centralW.scene
-            symbolScene.rectDraw(QPoint(0, 0), QPoint(rectXDim, rectYDim))
-            symbolScene.labelDraw(
-                QPoint(int(0.25 * rectXDim), int(0.4 * rectYDim)),
-                "[@cellName]",
-                "NLPLabel",
-                "12",
-                "Center",
-                "R0",
-                "Instance",
-            )
-            symbolScene.labelDraw(
-                QPoint(int(rectXDim), int(-0.2 * rectYDim)),
-                "[@instName]",
-                "NLPLabel",
-                "12",
-                "Center",
-                "R0",
-                "Instance",
-            )
-            leftPinLocs = [
-                QPoint(-stubLength, (i + 1) * pinDistance)
-                for i in range(len(leftPinNames))
-            ]
-            rightPinLocs = [
-                QPoint(rectXDim + stubLength, (i + 1) * pinDistance)
-                for i in range(len(rightPinNames))
-            ]
-            bottomPinLocs = [
-                QPoint((i + 1) * pinDistance, rectYDim + stubLength)
-                for i in range(len(bottomPinNames))
-            ]
-            topPinLocs = [
-                QPoint((i + 1) * pinDistance, -stubLength)
-                for i in range(len(topPinNames))
-            ]
-            for i in range(len(leftPinNames)):
-                symbolScene.lineDraw(
-                    leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0)
-                )
-                symbolScene.addItem(
-                    schematicPins[schematicPinNames.index(leftPinNames[i])].toSymbolPin(
-                        leftPinLocs[i]
-                    )
-                )
-            for i in range(len(rightPinNames)):
-                symbolScene.lineDraw(
-                    rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0)
-                )
-                symbolScene.addItem(
-                    schematicPins[
-                        schematicPinNames.index(rightPinNames[i])
-                    ].toSymbolPin(rightPinLocs[i])
-                )
-            for i in range(len(topPinNames)):
-                symbolScene.lineDraw(
-                    topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength)
-                )
-                symbolScene.addItem(
-                    schematicPins[schematicPinNames.index(topPinNames[i])].toSymbolPin(
-                        topPinLocs[i]
-                    )
-                )
-            for i in range(len(bottomPinNames)):
-                symbolScene.lineDraw(
-                    bottomPinLocs[i], bottomPinLocs[i] + QPoint(0, -stubLength)
-                )
-                symbolScene.addItem(
-                    schematicPins[
-                        schematicPinNames.index(bottomPinNames[i])
-                    ].toSymbolPin(bottomPinLocs[i])
-                )  # symbol attribute generation for netlisting.
-            symbolScene.attributeList = list()  # empty attribute list
-
-            symbolScene.attributeList.append(
-                symenc.symbolAttribute(
-                    "XyceSymbolNetlistLine", "X@instName @cellName @pinList"
-                )
-            )
-            symbolScene.attributeList.append(
-                symenc.symbolAttribute("pinOrder", ", ".join(schematicPinNames))
-            )
-
-            symbolWindow.checkSaveCell()
-            libraryView.reworkDesignLibrariesView(self.appMainW.libraryDict)
-
-            openCellViewTuple = ddef.viewTuple(libName, cellName, symbolViewName)
-            self.appMainW.openViews[openCellViewTuple] = symbolWindow
-            symbolWindow.show()
-
     def goDownHier(self):
         if self.selectedItems() is not None:
             for item in self.selectedItems():
@@ -2220,12 +2065,22 @@ class schematicScene(editorScene):
                                 viewItem, cellItem, libItem
                             )
                         )
+
                         if self.editorWindow.appMainW.openViews[openViewTuple]:
                             childWindow = self.editorWindow.appMainW.openViews[
                                 openViewTuple
                             ]
                             childWindow.parentEditor = self.editorWindow
-                            childWindow.symbolToolbar.addAction(childWindow.goUpAction)
+                            childWindowType = self.findEditorTypeString(childWindow)
+
+                            if childWindowType == "symbolEditor":
+                                childWindow.symbolToolbar.addAction(
+                                    childWindow.goUpAction
+                                )
+                            elif childWindowType == "schematicEditor":
+                                childWindow.schematicToolbar.addAction(
+                                    childWindow.goUpAction
+                                )
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
 
@@ -2300,6 +2155,18 @@ class schematicScene(editorScene):
                 for item in self.items(selectionRect, mode=mode)
                 if isinstance(item, shp.schematicPin)
             ]
+
+    def renumberInstances(self):
+        symbolList = [
+            item for item in self.items() if isinstance(item, shp.schematicSymbol)
+        ]
+        self.instanceCounter = 0
+        for symbolInstance in symbolList:
+            symbolInstance.counter = self.instanceCounter
+            if symbolInstance.instanceName.startswith("I"):
+                symbolInstance.instanceName = f"I{symbolInstance.counter}"
+                self.instanceCounter += 1
+        self.reloadScene()
 
 
 class layoutScene(editorScene):

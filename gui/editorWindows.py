@@ -37,6 +37,7 @@ from PySide6.QtCore import (
     QRunnable,
     Qt,
     Slot,
+    QPoint,
 )
 from PySide6.QtGui import (
     QAction,
@@ -83,6 +84,7 @@ import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.fileio.gdsExport as gdse
 import revedaEditor.fileio.layoutEncoder as layenc
 import revedaEditor.fileio.loadJSON as lj
+import revedaEditor.fileio.symbolEncoder as symenc
 import revedaEditor.gui.editFunctions as edf
 import revedaEditor.gui.editorScenes as escn
 import revedaEditor.gui.fileDialogues as fd
@@ -92,6 +94,7 @@ import revedaEditor.gui.lsw as lsw
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.textEditor as ted
 import revedaEditor.gui.editorViews as eview
+
 import revedaEditor.resources.resources
 import pdk.pcells as pcells
 
@@ -1915,6 +1918,8 @@ class schematicEditor(editorWindow):
         self.hilightNetAction = QAction("Highlight Net", self)
         self.hilightNetAction.setToolTip("Highlight Selected Net Connections")
         self.hilightNetAction.setCheckable(True)
+        self.renumberInstanceAction = QAction("Renumber Instances", self)
+        self.renumberInstanceAction.setToolTip("Renumber Instances")
 
     def _createTriggers(self):
         super()._createTriggers()
@@ -1937,6 +1942,7 @@ class schematicEditor(editorWindow):
         self.selectNetAction.triggered.connect(self.selectNetClick)
         self.selectPinAction.triggered.connect(self.selectPinClick)
         self.removeSelectFilterAction.triggered.connect(self.removeSelectFilterClick)
+        self.renumberInstanceAction.triggered.connect(self.renumberInstanceClick)
 
     def _createMenuBar(self):
         super()._createMenuBar()
@@ -1947,7 +1953,6 @@ class schematicEditor(editorWindow):
     def _addActions(self):
         super()._addActions()
         # edit menu
-
         self.menuEdit.addAction(self.netNameAction)
 
         self.propertyMenu = self.menuEdit.addMenu("Properties")
@@ -1972,7 +1977,7 @@ class schematicEditor(editorWindow):
 
         # tools menu
         self.menuTools.addAction(self.hilightNetAction)
-        self.menuTools.addAction(self.netNameAction)
+        self.menuTools.addAction(self.renumberInstanceAction)
         # utilities Menu
         self.selectMenu = self.menuUtilities.addMenu("Selection")
         self.selectMenu.addAction(self.selectDeviceAction)
@@ -1980,8 +1985,8 @@ class schematicEditor(editorWindow):
         self.selectMenu.addAction(self.selectPinAction)
         self.selectMenu.addSeparator()
         self.selectMenu.addAction(self.removeSelectFilterAction)
-        # help menu
 
+        # help menu
         self.menuSimulation.addAction(self.netlistAction)
         if self._app.revedasim_path:
             self.menuSimulation.addAction(self.simulateAction)
@@ -2069,7 +2074,7 @@ class schematicEditor(editorWindow):
             self.centralW.scene.editModes.setMode("drawText")
 
     def createSymbolClick(self, s):
-        self.centralW.scene.createSymbol()
+        self.createSymbol()
 
     def objPropClick(self, s):
         self.centralW.scene.editModes.setMode("selectItem")
@@ -2080,6 +2085,9 @@ class schematicEditor(editorWindow):
 
         simguiw = smw.simMainWindow(self)
         simguiw.show()
+
+    def renumberInstanceClick(self, s):
+        self.centralW.scene.renumberInstances()
 
     def checkSaveCell(self):
         schematicNets = self.centralW.scene.findSceneNetsSet()
@@ -2250,6 +2258,215 @@ class schematicEditor(editorWindow):
         self.centralW.scene.selectModes.setMode("selectAll")
         self.messageLine.setText("Select All Objects")
 
+    def createSymbol(self) -> None:
+        """
+        Create a symbol view for a schematic.
+        """
+        oldSymbolItem = False
+
+        askViewNameDlg = pdlg.symbolNameDialog(
+            self.file.parent,
+            self.cellName,
+            self,
+        )
+        if askViewNameDlg.exec() == QDialog.Accepted:
+            symbolViewName = askViewNameDlg.symbolViewsCB.currentText()
+            if symbolViewName in askViewNameDlg.symbolViewNames:
+                oldSymbolItem = True
+            if oldSymbolItem:
+                deleteSymViewDlg = fd.deleteSymbolDialog(
+                    self.cellName, symbolViewName, self
+                )
+                if deleteSymViewDlg.exec() == QDialog.Accepted:
+                    self.generateSymbol(symbolViewName)
+            else:
+                self.generateSymbol(symbolViewName)
+
+    def generateSymbol(self, symbolViewName: str) -> None:
+        symbolWindow = None
+        libName = self.libName
+        cellName = self.cellName
+        libItem: scb.libraryItem = libm.getLibItem(
+            self.libraryView.libraryModel, libName
+        )
+        cellItem: scb.cellItem = libm.getCellItem(libItem, cellName)
+        libraryView = self.libraryView
+        schematicPins: list[shp.schematicPin] = list(
+            self.centralW.scene.findSceneSchemPinsSet())
+        schematicPinNames: list[str] = [pinItem.pinName for pinItem in schematicPins]
+        rectXDim: int = 0
+        rectYDim: int = 0
+
+        inputPins = [
+            pinItem.pinName
+            for pinItem in schematicPins
+            if pinItem.pinDir == shp.schematicPin.pinDirs[0]
+        ]
+
+        outputPins = [
+            pinItem.pinName
+            for pinItem in schematicPins
+            if pinItem.pinDir == shp.schematicPin.pinDirs[1]
+        ]
+
+        inoutPins = [
+            pinItem.pinName
+            for pinItem in schematicPins
+            if pinItem.pinDir == shp.schematicPin.pinDirs[2]
+        ]
+
+        dlg = pdlg.symbolCreateDialog(self)
+        dlg.leftPinsEdit.setText(", ".join(inputPins))
+        dlg.rightPinsEdit.setText(", ".join(outputPins))
+        dlg.topPinsEdit.setText(", ".join(inoutPins))
+        if dlg.exec() == QDialog.Accepted:
+            symbolViewItem = scb.createCellView(
+                self, symbolViewName, cellItem
+            )
+            libraryDict = self.libraryDict
+            # create symbol editor window with an empty items list
+            symbolWindow = symbolEditor(symbolViewItem, libraryDict, libraryView)
+            try:
+                leftPinNames = list(
+                    filter(
+                        None,
+                        [
+                            pinName.strip()
+                            for pinName in dlg.leftPinsEdit.text().split(",")
+                        ],
+                    )
+                )
+                rightPinNames = list(
+                    filter(
+                        None,
+                        [
+                            pinName.strip()
+                            for pinName in dlg.rightPinsEdit.text().split(",")
+                        ],
+                    )
+                )
+                topPinNames = list(
+                    filter(
+                        None,
+                        [
+                            pinName.strip()
+                            for pinName in dlg.topPinsEdit.text().split(",")
+                        ],
+                    )
+                )
+                bottomPinNames = list(
+                    filter(
+                        None,
+                        [
+                            pinName.strip()
+                            for pinName in dlg.bottomPinsEdit.text().split(",")
+                        ],
+                    )
+                )
+                stubLength = int(float(dlg.stubLengthEdit.text().strip()))
+                pinDistance = int(float(dlg.pinDistanceEdit.text().strip()))
+                rectXDim = (
+                    max(len(topPinNames), len(bottomPinNames)) + 1
+                ) * pinDistance
+                rectYDim = (
+                    max(len(leftPinNames), len(rightPinNames)) + 1
+                ) * pinDistance
+            except ValueError:
+                self.logger.error("Enter valid value")
+
+        # add window to open windows list
+        # libraryView.openViews[f"{libName}_{cellName}_{symbolViewName}"] = symbolWindow
+        if symbolWindow is not None:
+            symbolScene = symbolWindow.centralW.scene
+            symbolScene.rectDraw(QPoint(0, 0), QPoint(rectXDim, rectYDim))
+            symbolScene.labelDraw(
+                QPoint(int(0.25 * rectXDim), int(0.4 * rectYDim)),
+                "[@cellName]",
+                "NLPLabel",
+                "12",
+                "Center",
+                "R0",
+                "Instance",
+            )
+            symbolScene.labelDraw(
+                QPoint(int(rectXDim), int(-0.2 * rectYDim)),
+                "[@instName]",
+                "NLPLabel",
+                "12",
+                "Center",
+                "R0",
+                "Instance",
+            )
+            leftPinLocs = [
+                QPoint(-stubLength, (i + 1) * pinDistance)
+                for i in range(len(leftPinNames))
+            ]
+            rightPinLocs = [
+                QPoint(rectXDim + stubLength, (i + 1) * pinDistance)
+                for i in range(len(rightPinNames))
+            ]
+            bottomPinLocs = [
+                QPoint((i + 1) * pinDistance, rectYDim + stubLength)
+                for i in range(len(bottomPinNames))
+            ]
+            topPinLocs = [
+                QPoint((i + 1) * pinDistance, -stubLength)
+                for i in range(len(topPinNames))
+            ]
+            for i in range(len(leftPinNames)):
+                symbolScene.lineDraw(
+                    leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0)
+                )
+                symbolScene.addItem(
+                    schematicPins[schematicPinNames.index(leftPinNames[i])].toSymbolPin(
+                        leftPinLocs[i]
+                    )
+                )
+            for i in range(len(rightPinNames)):
+                symbolScene.lineDraw(
+                    rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0)
+                )
+                symbolScene.addItem(
+                    schematicPins[
+                        schematicPinNames.index(rightPinNames[i])
+                    ].toSymbolPin(rightPinLocs[i])
+                )
+            for i in range(len(topPinNames)):
+                symbolScene.lineDraw(
+                    topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength)
+                )
+                symbolScene.addItem(
+                    schematicPins[schematicPinNames.index(topPinNames[i])].toSymbolPin(
+                        topPinLocs[i]
+                    )
+                )
+            for i in range(len(bottomPinNames)):
+                symbolScene.lineDraw(
+                    bottomPinLocs[i], bottomPinLocs[i] + QPoint(0, -stubLength)
+                )
+                symbolScene.addItem(
+                    schematicPins[
+                        schematicPinNames.index(bottomPinNames[i])
+                    ].toSymbolPin(bottomPinLocs[i])
+                )  # symbol attribute generation for netlisting.
+            symbolScene.attributeList = list()  # empty attribute list
+
+            symbolScene.attributeList.append(
+                symenc.symbolAttribute(
+                    "XyceSymbolNetlistLine", "X@instName @cellName @pinList"
+                )
+            )
+            symbolScene.attributeList.append(
+                symenc.symbolAttribute("pinOrder", ", ".join(schematicPinNames))
+            )
+
+            symbolWindow.checkSaveCell()
+            libraryView.reworkDesignLibrariesView(self.appMainW.libraryDict)
+
+            openCellViewTuple = ddef.viewTuple(libName, cellName, symbolViewName)
+            self.appMainW.openViews[openCellViewTuple] = symbolWindow
+            symbolWindow.show()
+
 
 class symbolEditor(editorWindow):
     def __init__(
@@ -2419,6 +2636,8 @@ class symbolEditor(editorWindow):
                 self.centralW.scene.labelType = "NLPLabel"
             elif createLabelDlg.pyLType.isChecked():
                 self.centralW.scene.labelType = "PyLabel"
+
+
 
     def closeEvent(self, event):
         """
@@ -2835,20 +3054,7 @@ class configViewEdit(QMainWindow):
         self.saveAction.triggered.connect(self.saveClick)
 
     def updateClick(self):
-        self.centralWidget.configViewTable.updateModel()
-        self.configDict = dict()
-        newConfigDict = dict()
-        model = self.centralWidget.confModel
-        for i in range(model.rowCount()):
-            viewList = [
-                item.strip()
-                for item in model.itemFromIndex(model.index(i, 3)).text().split(",")
-            ]
-            self.configDict[model.item(i, 1).text()] = [
-                model.item(i, 0).text(),
-                model.item(i, 2).text(),
-                viewList,
-            ]
+        newConfigDict = self.updateConfigDict()
         if self.appMainW.libraryBrowser is None:
             self.appMainW.createLibraryBrowser()
         topSchematicWindow = schematicEditor(
@@ -2875,8 +3081,26 @@ class configViewEdit(QMainWindow):
             self.centralWidget.configViewTable
         )  # self.centralWidget.configDictGroup.setVisible(True)
 
+    def updateConfigDict(self):
+        self.centralWidget.configViewTable.updateModel()
+        self.configDict = dict()
+        newConfigDict = dict()
+        model = self.centralWidget.confModel
+        for i in range(model.rowCount()):
+            viewList = [
+                item.strip()
+                for item in model.itemFromIndex(model.index(i, 3)).text().split(",")
+            ]
+            self.configDict[model.item(i, 1).text()] = [
+                model.item(i, 0).text(),
+                model.item(i, 2).text(),
+                viewList,
+            ]
+        return newConfigDict
+
     def saveClick(self):
         configFilePathObj = self.viewItem.data(Qt.UserRole + 2)
+        self.updateConfigDict()
         items = list()
         items.insert(0, {"viewName": "config"})
         items.insert(1, {"reference": self.schViewItem.viewName})
