@@ -329,9 +329,8 @@ class layoutView(editorView):
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:
-            if self.scene.editModes.drawPath and self.scene._newPath:
-                self.scene._newNet = None
-
+            if self.scene._newPath is not None:
+                self.scene._newPath = None
             elif self.scene.editModes.drawRect and self.scene._newRect:
                 self.scene._newRect = None
             elif self.scene._stretchPath is not None:

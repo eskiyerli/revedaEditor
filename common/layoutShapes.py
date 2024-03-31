@@ -121,7 +121,7 @@ class layoutShape(QGraphicsItem):
         """
         Do not propagate event if shape needs to keep still.
         """
-        if (
+        if self.scene() and (
             self.scene().editModes.changeOrigin or self.scene().drawMode
         ):
             return False
@@ -434,7 +434,10 @@ class layoutInstance(layoutShape):
         """
         Do not propagate event if shape needs to keep still.
         """
-        if not (self.scene().selectModes.selectInstance or self.scene().selectModes.selectAll):
+        if not (
+            self.scene().selectModes.selectInstance
+            or self.scene().selectModes.selectAll
+        ):
             return False
         else:
             super().sceneEvent(event)
@@ -781,8 +784,6 @@ class layoutPath(layoutShape):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         if self._layer.selectable:
-            self.setFlag(QGraphicsItem.ItemIsMovable, True)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, True)
             eventPos = event.pos().toPoint()
             if self._stretch:
                 if (
@@ -796,9 +797,6 @@ class layoutPath(layoutShape):
                     self._stretchSide = "p2"
                     self.setCursor(Qt.SizeHorCursor)
                 self.scene().stretchPath(self, self._stretchSide)
-        else:
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, False)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()

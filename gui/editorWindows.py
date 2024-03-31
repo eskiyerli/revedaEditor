@@ -982,9 +982,10 @@ class editorWindow(QMainWindow):
         self.menuView = self.editorMenuBar.addMenu("&View")
         self.menuEdit = self.editorMenuBar.addMenu("&Edit")
         self.menuCreate = self.editorMenuBar.addMenu("C&reate")
-        self.menuCheck = self.editorMenuBar.addMenu("&Check")
+        self.menuOptions = self.editorMenuBar.addMenu("&Options")
+        # self.menuCheck = self.editorMenuBar.addMenu("&Check")
         self.menuTools = self.editorMenuBar.addMenu("&Tools")
-        self.menuWindow = self.editorMenuBar.addMenu("&Window")
+        # self.menuWindow = self.editorMenuBar.addMenu("&Window")
         self.menuUtilities = self.editorMenuBar.addMenu("&Utilities")
         self.menuHelp = self.editorMenuBar.addMenu("&Help")
 
@@ -1285,8 +1286,6 @@ class editorWindow(QMainWindow):
         self.menuView.addAction(self.zoomOutAction)
         self.menuView.addAction(self.panAction)
         self.menuView.addAction(self.redrawAction)
-        self.menuView.addAction(self.dispConfigAction)
-        self.menuView.addAction(self.selectConfigAction)
         self.menuView.addAction(self.panZoomConfigAction)
         # edit menu
         self.menuEdit.addAction(self.undoAction)
@@ -1304,7 +1303,9 @@ class editorWindow(QMainWindow):
         self.selectMenu.addAction(self.selectAllAction)
         self.selectMenu.addAction(self.deselectAllAction)
         self.menuTools.addAction(self.readOnlyCellAction)
-        self.menuCheck.addAction(self.viewCheckAction)
+        # self.menuCheck.addAction(self.viewCheckAction)
+        self.menuOptions.addAction(self.dispConfigAction)
+        self.menuOptions.addAction(self.selectConfigAction)
         self.menuHelp.addAction(self.helpAction)
         self.menuHelp.addAction(self.aboutAction)
 
@@ -1549,6 +1550,8 @@ class layoutEditor(editorWindow):
 
     def _addActions(self):
         super()._addActions()
+        self.propertyMenu = self.menuEdit.addMenu("Properties")
+        self.propertyMenu.addAction(self.objPropAction)
         self.menuEdit.addAction(self.stretchAction)
         self.menuCreate.addAction(self.createInstAction)
         self.menuCreate.addAction(self.createRectAction)

@@ -1,5 +1,3 @@
-import json
-
 # from hashlib import new
 import inspect
 import itertools as itt
@@ -10,7 +8,7 @@ import pathlib
 from collections import Counter
 from copy import deepcopy
 from functools import lru_cache
-from typing import Union, Any
+from typing import Union, Any, Type
 
 # import numpy as np
 from PySide6.QtCore import (
@@ -41,7 +39,6 @@ from PySide6.QtWidgets import (
     QMenu,
     QGraphicsLineItem,
     QGraphicsItem,
-    QMainWindow,
 )
 
 import pdk.layoutLayers
@@ -52,7 +49,6 @@ import pdk.process as fabproc
 import pdk.schLayers as schlyr
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
-import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.backend.undoStack as us
 import revedaEditor.common.labels as lbl
 import revedaEditor.common.layoutShapes as layp
@@ -142,7 +138,7 @@ class editorScene(QGraphicsScene):
             self.rotateAnItem(point, item, 90)
         self.editModes.setMode("selectItem")
 
-    def rotateAnItem(self, point: QPoint, item, angle):
+    def rotateAnItem(self, point: QPoint, item: QGraphicsItem, angle: int):
         rotationOriginPoint = item.mapFromScene(point)
         item.setTransformOriginPoint(rotationOriginPoint)
         item.angle += angle
@@ -304,6 +300,7 @@ class editorScene(QGraphicsScene):
         self.undoStack.push(undoCommand)
 
 
+# noinspection PyUnresolvedReferences
 class symbolScene(editorScene):
     """
     Scene for Symbol editor.
@@ -851,9 +848,8 @@ class symbolScene(editorScene):
         labelOrient = self.queryDlg.labelOrientCombo.currentText()
         labelUse = self.queryDlg.labelUseCombo.currentText()
         labelVisible = self.queryDlg.labelVisiCombo.currentText() == "Yes"
-        if self.queryDlg.normalType.isChecked():
-            labelType = lbl.symbolLabel.labelTypes[0]
-        elif self.queryDlg.NLPType.isChecked():
+        labelType = lbl.symbolLabel.labelTypes[0]
+        if self.queryDlg.NLPType.isChecked():
             labelType = lbl.symbolLabel.labelTypes[1]
         elif self.queryDlg.pyLType.isChecked():
             labelType = lbl.symbolLabel.labelTypes[2]
@@ -1073,7 +1069,7 @@ class schematicScene(editorScene):
                     self._newNet = net.schematicNet(
                         self.mousePressLoc, self.mousePressLoc
                     )
-                elif self.editModes.changeOrigin:  # change origin of the symbol
+                elif self.editModes.changeOrigin:  # change origin of the schematic
                     self.origin = self.mousePressLoc
                     self.editModes.changeOrigin = False
 
@@ -1087,7 +1083,9 @@ class schematicScene(editorScene):
                     self.newText = self.addNote(self.mousePressLoc)
                     # TODO: What is wrong here?
                     self.rotateAnItem(
-                        self.mousePressLoc, self.newText, float(self.noteOrient[1:])
+                        self.mousePressLoc,
+                        self.newText,
+                        int(float(self.noteOrient[1:])),
                     )
                     self.newText.setSelected(True)
                 elif self.editModes.rotateItem:
@@ -1196,7 +1194,8 @@ class schematicScene(editorScene):
 
     def splitNets(self, inputNet: net.schematicNet, splitPoints: list[QPoint]):
         """
-        After merging, splitNets splits the total merged net (_totalNet) back into individual nets. It:
+        After merging, splitNets splits the total merged net (_totalNet) back
+        into individual nets. It:
         1. Finds split points using findSplitPoints
         2. Inserts the start/end points of _totalNet
         3. Orders the points
@@ -1377,7 +1376,8 @@ class schematicScene(editorScene):
 
         return orderedPoints
 
-    def clearNetStatus(self, netsSet: set[net.schematicNet]):
+    @staticmethod
+    def clearNetStatus(netsSet: set[net.schematicNet]):
         """
         Clear all assigned net names
         """
@@ -1544,8 +1544,10 @@ class schematicScene(editorScene):
         self, connectedSet: set[net.schematicNet], otherNetsSet: set[net.schematicNet]
     ) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
         """
-        Start from a net and traverse the schematic to find all connected nets. If the connected net search
-        is exhausted, remove those nets from the scene nets set and start again in another net until all
+        Start from a net and traverse the schematic to find all connected nets.
+        If the connected net search
+        is exhausted, remove those nets from the scene nets set and start again
+        in another net until all
         the nets in the scene are exhausted.
         """
         newFoundConnectedSet = set()
@@ -1575,13 +1577,15 @@ class schematicScene(editorScene):
                 connectedSet.add(netItem)
         return connectedSet - {startNet}
 
-    def checkPinNetConnect(self, pinItem: shp.schematicPin, netItem: net.schematicNet):
+    @staticmethod
+    def checkPinNetConnect(pinItem: shp.schematicPin, netItem: net.schematicNet):
         """
         Determine if a pin is connected to a net.
         """
         return bool(pinItem.sceneBoundingRect().intersects(netItem.sceneBoundingRect()))
 
-    def checkNetConnect(self, netItem, otherNetItem):
+    @staticmethod
+    def checkNetConnect(netItem, otherNetItem):
         """
         Determine if a net is connected to another one. One net should end on the other net.
         """
@@ -1639,7 +1643,8 @@ class schematicScene(editorScene):
                     pinName: symbolItem.pinNetMap[pinName] for pinName in pinOrderList
                 }
 
-    def findSceneCells(self, symbolSet):
+    @staticmethod
+    def findSceneCells(symbolSet):
         """
         This function just goes through set of symbol items in the scene and
         checks if that symbol's cell is encountered first time. If so, it adds
@@ -1711,7 +1716,7 @@ class schematicScene(editorScene):
             self.logger.error(f"extend wires error{e}")
             return []
 
-    def addPin(self, pos: QPoint):
+    def addPin(self, pos: QPoint) -> shp.schematicPin:
         try:
             pin = shp.schematicPin(pos, self.pinName, self.pinDir, self.pinType)
             self.addUndoStack(pin)
@@ -1719,7 +1724,7 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(f"Pin add error: {e}")
 
-    def addNote(self, pos: QPoint):
+    def addNote(self, pos: QPoint) -> shp.text:
         """
         Changed the method name not to clash with qgraphicsscene addText method.
         """
@@ -1849,14 +1854,13 @@ class schematicScene(editorScene):
         """
         snapGrid = itemsList[1].get("snapGrid")
         self.majorGrid = snapGrid[0]  # dot/line grid spacing
-        self.snapGrid = snapGrid[1]  # snapping grid size
-        self.snapTuple = (self.snapGrid, self.snapGrid)
-        self.snapDistance = 2 * self.snapGrid
+        self.snapTuple = (snapGrid[1], snapGrid[1])
+        self.snapDistance = 2 * snapGrid[1]
         shapesList = list()
         for itemDict in itemsList[2:]:
             itemShape = lj.schematicItems(self).create(itemDict)
             if (
-                type(itemShape) == shp.schematicSymbol
+                isinstance(itemShape, shp.schematicSymbol)
                 and itemShape.counter > self.instanceCounter
             ):
                 self.instanceCounter = itemShape.counter
@@ -1935,8 +1939,8 @@ class schematicScene(editorScene):
             item.instanceName = dlg.instNameEdit.text().strip()
             item.angle = float(dlg.angleEdit.text().strip())
             location = QPoint(
-                float(dlg.xLocationEdit.text().strip()),
-                float(dlg.yLocationEdit.text().strip()),
+                int(float(dlg.xLocationEdit.text().strip())),
+                int(float(dlg.yLocationEdit.text().strip())),
             )
             item.setPos(self.snapToGrid(location - self.origin, self.snapTuple))
             tempDoc = QTextDocument()
@@ -2296,24 +2300,35 @@ class layoutScene(editorScene):
         try:
             # Get the keyboard modifiers
             modifiers = QGuiApplication.keyboardModifiers()
-
             # Get the bounding rectangle of the view
             self.viewRect = self.parent.view.mapToScene(
                 self.parent.view.viewport().rect()
             ).boundingRect()
 
             if mouse_event.button() == Qt.LeftButton:
-                if self.editModes.drawPath and self._newPath is not None:
-                    if self._newPath.draftLine.isNull():
-                        self.removeItem(self._newPath)
-                        self.undoStack.removeLastCommand()
-                    else:
+                if self.editModes.drawPath:
+                    self.editorWindow.messageLine.setText("Wire mode")
+                    if self._newPath:
+                        if self._newPath.draftLine.isNull():
+                            self.removeItem(self._newPath)
+                            self.undoStack.removeLastCommand()
                         self._newPath = None
+                    # Create a new path
+                    self._newPath = lshp.layoutPath(
+                        QLineF(self.mousePressLoc, self.mousePressLoc),
+                        self.newPathTuple.layer,
+                        self.newPathTuple.width,
+                        self.newPathTuple.startExtend,
+                        self.newPathTuple.endExtend,
+                        self.newPathTuple.mode,
+                    )
+                    self._newPath.name = self.newPathTuple.name
+                    # self._newPath.setSelected(True)
+
                 elif self.editModes.drawRect and self._newRect is not None:
                     self._newRect.end = self.mousePressLoc
                     self._newRect.setSelected(False)
                     self._newRect = None
-
                 elif self.editModes.drawRuler:
                     if self._newRuler is None:
                         self._newRuler = lshp.layoutRuler(
@@ -2327,14 +2342,28 @@ class layoutScene(editorScene):
                     else:
                         self._newRuler = None
 
-                elif self.editModes.drawPin and self.newLabel is None:
-                    # Create a new pin
-                    self.newPin = lshp.layoutPin(
-                        self.mousePressLoc,
-                        self.mousePressLoc,
-                        *self.newPinTuple,
-                    )
-                    self.addUndoStack(self.newPin)
+                elif self.editModes.drawPin:
+                    if self.newLabel is None:
+                        if self.newPin is None:
+                            # Create a new pin
+                            self.newPin = lshp.layoutPin(
+                                self.mousePressLoc,
+                                self.mousePressLoc,
+                                *self.newPinTuple,
+                            )
+                            self.addUndoStack(self.newPin)
+                        else:
+                            self.newLabel = lshp.layoutLabel(
+                                self.mouseReleaseLoc,
+                                *self.newLabelTuple,
+                            )
+                            self.addUndoStack(self.newLabel)
+                            self.newPin.label = self.newLabel
+                            self.newPin = None
+                    else:
+                        self.newLabel.start = self.mousePressLoc
+                        self.newLabel = None
+
                 elif self.editModes.addLabel and self.newLabel is not None:
                     self.newLabelTuple = None
                     self.newLabel = None
@@ -2343,7 +2372,6 @@ class layoutScene(editorScene):
                     self.arrayViaTuple = None
                     self._arrayVia = None
                     self.editModes.setMode("selectItem")
-
                 elif self.editModes.selectItem:
                     # Select scene items
                     self.selectSceneItems(modifiers)
@@ -2368,7 +2396,6 @@ class layoutScene(editorScene):
         Returns:
             None
         """
-
         # Get the current mouse position
         self.mouseMoveLoc = mouse_event.scenePos().toPoint()
         # Call the parent class's mouseMoveEvent method
@@ -2376,13 +2403,8 @@ class layoutScene(editorScene):
         # Get the keyboard modifiers
         modifiers = QGuiApplication.keyboardModifiers()
         if mouse_event.buttons() == Qt.LeftButton:
-            # Handle drawing rectangle mode
-
-            # Handle drawing pin mode
-            if self.editModes.drawPin and self.newPin is not None:
-                self.newPin.end = self.mouseMoveLoc
             # Handle selecting item mode with shift modifier
-            elif self.editModes.selectItem and modifiers == Qt.ShiftModifier:
+            if self.editModes.selectItem and modifiers == Qt.ShiftModifier:
                 self.selectionRectItem.setRect(
                     QRectF(self.mousePressLoc, self.mouseMoveLoc)
                 )
@@ -2392,9 +2414,13 @@ class layoutScene(editorScene):
                     self.addUndoStack(self._newRect)
                 self._newRect.end = self.mouseMoveLoc
             # Handle drawing pin mode with no new pin
-            elif self.editModes.drawPin and self.newPin is None:
-                if self.newLabel is not None:
-                    self.newLabel.start = self.mouseMoveLoc
+            elif self.editModes.drawPin:
+                if self.newPin is not None:
+                    print(self.newPin)
+                    self.newPin.end = self.mouseMoveLoc
+                else:
+                    if self.newLabel is not None:
+                        self.newLabel.start = self.mouseMoveLoc
             # Handle drawing path mode
             elif self.editModes.drawPath and self._newPath is not None:
                 self._newPath.draftLine = QLineF(
@@ -2488,20 +2514,7 @@ class layoutScene(editorScene):
         modifiers = QGuiApplication.keyboardModifiers()
         try:
             if mouse_event.button() == Qt.LeftButton:
-                if self.editModes.drawPath:
-                    self.editorWindow.messageLine.setText("Wire mode")
-                    # Create a new path
-                    self._newPath = lshp.layoutPath(
-                        QLineF(self.mouseReleaseLoc, self.mouseReleaseLoc),
-                        self.newPathTuple.layer,
-                        self.newPathTuple.width,
-                        self.newPathTuple.startExtend,
-                        self.newPathTuple.endExtend,
-                        self.newPathTuple.mode,
-                    )
-                    self._newPath.name = self.newPathTuple.name
-                    self._newPath.setSelected(True)
-                elif self.editModes.drawRect:
+                if self.editModes.drawRect:
                     self.editorWindow.messageLine.setText("Rectangle mode.")
                     # Create a new rectangle
                     self._newRect = lshp.layoutRect(
@@ -2510,20 +2523,20 @@ class layoutScene(editorScene):
                         self.selectEdLayer,
                     )
 
-                elif (
-                    self.editModes.drawPin
-                ):  # finish pin editing and start label editing
-                    if self.newPin is not None and self.newLabel is None:
-                        self.newLabel = lshp.layoutLabel(
-                            self.mouseReleaseLoc,
-                            *self.newLabelTuple,
-                        )
-                        self.addUndoStack(self.newLabel)
-                        self.newPin.label = self.newLabel
-                        self.newPin = None
-                    elif self.newPin is None and self.newLabel is not None:
-                        # finish label editing
-                        self.newLabel = None
+                # elif (
+                #     self.editModes.drawPin
+                # ):  # finish pin editing and start label editing
+                #     if self.newPin is not None and self.newLabel is None:
+                #         self.newLabel = lshp.layoutLabel(
+                #             self.mouseReleaseLoc,
+                #             *self.newLabelTuple,
+                #         )
+                #         self.addUndoStack(self.newLabel)
+                #         self.newPin.label = self.newLabel
+                #         self.newPin = None
+                #     elif self.newPin is None and self.newLabel is not None:
+                #         # finish label editing
+                #         self.newLabel = None
 
                 elif self.editModes.drawPolygon:
                     if self._newPolygon is None:
@@ -2575,18 +2588,18 @@ class layoutScene(editorScene):
         except Exception as e:
             self.logger.error(f"mouse double click error: {e}")
 
-    def drawInstance(self, pos: QPoint):
-        """
-        Add an instance of a symbol to the scene.
-        """
-        try:
-            instance = self.instLayout()
-            self.itemCounter += 1
-            undoCommand = us.addShapeUndo(self, instance)
-            self.undoStack.push(undoCommand)
-            return instance
-        except Exception as e:
-            self.logger.error(f"Cannot draw instance: {e}")
+    # def drawInstance(self):
+    #     """
+    #     Add an instance of a symbol to the scene.
+    #     """
+    #     try:
+    #         instance = self.instLayout()
+    #         self.itemCounter += 1
+    #         undoCommand = us.addShapeUndo(self, instance)
+    #         self.undoStack.push(undoCommand)
+    #         return instance
+    #     except Exception as e:
+    #         self.logger.error(f"Cannot draw instance: {e}")
 
     def instLayout(self):
         """
@@ -2664,7 +2677,7 @@ class layoutScene(editorScene):
         Save the layout cell items to a file.
 
         Args:
-            fileName (pathlib.Path): filepath object for layout file.
+            filePathObj (pathlib.Path): filepath object for layout file.
 
         Returns:
             None
@@ -2886,22 +2899,22 @@ class layoutScene(editorScene):
         dlg.pathNameEdit.setText(item.name)
         roundingFactor = len(str(fabproc.dbu)) - 1
         dlg.startExtendEdit.setText(
-            str(round((item.startExtend) / fabproc.dbu, roundingFactor))
+            str(round(item.startExtend / fabproc.dbu, roundingFactor))
         )
         dlg.endExtendEdit.setText(
-            str(round((item.endExtend) / fabproc.dbu, roundingFactor))
+            str(round(item.endExtend / fabproc.dbu, roundingFactor))
         )
         dlg.p1PointEditX.setText(
-            str(round((item.draftLine.p1().x()) / fabproc.dbu, roundingFactor))
+            str(round(item.draftLine.p1().x() / fabproc.dbu, roundingFactor))
         )
         dlg.p1PointEditY.setText(
-            str(round((item.draftLine.p1().y()) / fabproc.dbu, roundingFactor))
+            str(round(item.draftLine.p1().y() / fabproc.dbu, roundingFactor))
         )
         dlg.p2PointEditX.setText(
-            str(round((item.draftLine.p2().x()) / fabproc.dbu, roundingFactor))
+            str(round(item.draftLine.p2().x() / fabproc.dbu, roundingFactor))
         )
         dlg.p2PointEditY.setText(
-            str(round((item.draftLine.p2().y()) / fabproc.dbu, roundingFactor))
+            str(round(item.draftLine.p2().y() / fabproc.dbu, roundingFactor))
         )
         angle = item.angle
         if dlg.exec() == QDialog.Accepted:
@@ -2958,8 +2971,12 @@ class layoutScene(editorScene):
         dlg.pinName.setText(item.pinName)
         dlg.pinDir.setCurrentText(item.pinDir)
         dlg.pinType.setCurrentText(item.pinType)
+
         dlg.pinLayerCB.addItems(
-            [f"{item.name} [{item.layer.purpose}]" for item in laylyr.pdkPinLayers]
+            [
+                f"{pinLayer.name} [{pinLayer.purpose}]"
+                for pinLayer in laylyr.pdkPinLayers
+            ]
         )
         dlg.pinLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.pinBottomLeftX.setText(str(item.mapToScene(item.start).x() / fabproc.dbu))
