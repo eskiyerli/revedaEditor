@@ -57,7 +57,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
         start: QPoint,
         labelDefinition: str,
         labelType: str,
-        labelHeight: str,
+        labelHeight: int,
         labelAlign: str,
         labelOrient: str,
         labelUse: str,
@@ -80,7 +80,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._labelUse = labelUse
         self._labelType = labelType
         self._labelFont = QFont("Arial")
-        self._labelFont.setPointSize(int(float(self._labelHeight)))
+        self._labelFont.setPointSize(self._labelHeight)
         self._labelFont.setKerning(False)
         self._labelVisible: bool = False
 
@@ -194,7 +194,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
     def labelHeight(self, labelHeight):
         self.prepareGeometryChange()
         self._labelHeight = labelHeight
-        self._labelFont.setPointSize(int(float(labelHeight)))
+        self._labelFont.setPointSize(labelHeight)
         self.setFont(self._labelFont)
 
     @property

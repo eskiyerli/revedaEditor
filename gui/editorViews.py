@@ -331,11 +331,16 @@ class layoutView(editorView):
         if event.key() == Qt.Key_Escape:
             if self.scene._newPath is not None:
                 self.scene._newPath = None
-            elif self.scene.editModes.drawRect and self.scene._newRect:
+            elif self.scene._newRect:
                 self.scene._newRect = None
             elif self.scene._stretchPath is not None:
                 self.scene._stretchPath.setSelected(False)
                 self.scene._stretchPath.stretch = False
                 self.scene._stretchPath = None
+            elif self.scene._newPolygon:
+                self.scene.removeItem(self.scene._polygonGuideLine)
+                self.scene._newPolygon.points.pop(0) # remove first duplicate point
+                self.scene._newPolygon = None
+
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)

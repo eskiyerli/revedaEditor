@@ -98,7 +98,7 @@ class layoutShape(QGraphicsItem):
     def angle(self, value):
         self._angle = value
         self.prepareGeometryChange()
-        self.setRotation(value)  # self.update(self.boundingRect())
+        self.setRotation(value)
 
     @property
     def stretch(self):
@@ -107,6 +107,7 @@ class layoutShape(QGraphicsItem):
     @stretch.setter
     def stretch(self, value: bool):
         self._stretch = value
+
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -797,27 +798,6 @@ class layoutPath(layoutShape):
                     self._stretchSide = "p2"
                     self.setCursor(Qt.SizeHorCursor)
                 self.scene().stretchPath(self, self._stretchSide)
-
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        eventPos = event.pos().toPoint()
-        # if self.stretch:
-        #     self.prepareGeometryChange()
-        #     if self._stretchSide == "p1":
-        #         self.draftLine.setP1(eventPos)
-        #     elif self._stretchSide == "p2":
-        #         self.draftLine.setP2(eventPos)
-        #     self._rectCorners(self.angle)
-        # else:
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        #     self.setFlag(QGraphicsItem.ItemIsMovable, True)
-        super().mouseReleaseEvent(event)
-
-    #     if self.stretch:
-    #         self._stretch = False
-    #         self._stretchSide = None
-    #         self.setCursor(Qt.ArrowCursor)
 
 
 class layoutRuler(layoutShape):
@@ -1722,8 +1702,9 @@ class layoutPolygon(layoutShape):
         self._layer = layer
         self._definePensBrushes()
         self._polygon = QPolygonF(self._points)
-        self._selectedCorner = None
-        self._selectedCornerIndex = None
+        self._selectedCorner= QPoint(99999, 99999)
+        self._selectedCornerIndex = 999
+        self.setZValue(self._layer.z)
 
     def __repr__(self):
         return f"layoutPolygon({self._points}, {self._layer})"
@@ -1732,7 +1713,8 @@ class layoutPolygon(layoutShape):
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.setBrush(self._selectedBrush)
-            if self._selectedCorner is not None:
+
+            if self._stretch and self._selectedCorner != QPoint(99999, 99999):
                 painter.drawEllipse(self._selectedCorner, 5, 5)
         else:
             painter.setPen(self._pen)
@@ -1809,7 +1791,7 @@ class layoutPolygon(layoutShape):
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
-        if self._stretch and self._selectedCorner:
+        if self._stretch and self._selectedCornerIndex != 999:
             self._points[self._selectedCornerIndex] = eventPos
             self.points = self._points
         else:
@@ -1822,3 +1804,4 @@ class layoutPolygon(layoutShape):
             self._stretch = False
             self._stretchSide = None
             self.setCursor(Qt.ArrowCursor)
+            self._selectedCornerIndex = 999

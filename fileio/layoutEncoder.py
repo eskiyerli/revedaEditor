@@ -27,6 +27,7 @@ import json
 import inspect
 import pdk.layoutLayers as laylyr
 import revedaEditor.common.layoutShapes as lshp
+from pdk.pcells import baseCell
 
 
 class layoutEncoder(json.JSONEncoder):
@@ -122,14 +123,13 @@ class layoutEncoder(json.JSONEncoder):
                 }
             case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
-                    case lshp.layoutPcell:
+                    case baseCell:
                         init_args = inspect.signature(
                             item.__class__.__init__
                         ).parameters
                         args_used = [param for param in init_args if (param != "self")]
 
                         argDict = {arg: getattr(item, arg) for arg in args_used}
-                        # print(argDict)
                         itemDict = {
                             "type": "Pcell",
                             "lib": item.libraryName,

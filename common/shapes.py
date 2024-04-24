@@ -861,21 +861,22 @@ class symbolPolygon(symbolShape):
         super().__init__()
         self._points = points
         self._polygon = QPolygonF(self._points)
-        self._selectedCorner = None
-        self._selectedCornerIndex = None
+        self._selectedCorner = QPoint(0,0)
+        self._selectedCornerIndex = 999
+        self.setZValue(symlyr.symbolLayer.z)
 
     def __repr__(self):
         return f"symbolPolygon({self._points})"
 
+
     def paint(self, painter, option, widget):
         if self.isSelected():
             painter.setPen(symlyr.selectedSymbolPen)
-            self.setZValue(symlyr.selectedSymbolLayer.z)
-            if self._selectedCorner is not None:
+            if self._stretch and self._selectedCorner != QPoint(99999, 99999):
                 painter.drawEllipse(self._selectedCorner, 5, 5)
         else:
             painter.setPen(symlyr.symbolPen)
-            self.setZValue(symlyr.symbolLayer.z)
+
         painter.drawPolygon(self._polygon)
 
     def boundingRect(self) -> QRectF:
@@ -921,10 +922,10 @@ class symbolPolygon(symbolShape):
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         eventPos = event.pos().toPoint()
-        if self._stretch:
-            if self._selectedCorner is not None:
-                self._points[self._selectedCornerIndex] = eventPos
-                self.points = self._points
+        if self._stretch and self._selectedCornerIndex != 999:
+            self._points[self._selectedCornerIndex] = eventPos
+            self.points = self._points
+            self._selectedCorner = eventPos
         else:
             super().mouseMoveEvent(event)
 
@@ -935,6 +936,8 @@ class symbolPolygon(symbolShape):
             self._stretch = False
             self._stretchSide = None
             self.setCursor(Qt.ArrowCursor)
+            self._selectedCorner = QPoint(99999,99999)
+            self._selectedCornerIndex = 999
 
 
 class symbolPin(symbolShape):
@@ -996,6 +999,15 @@ class symbolPin(symbolShape):
         self.prepareGeometryChange()
         self._start = start
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
+
+    @property
+    def rect(self)->QRect:
+        return self._rect
+
+    @rect.setter
+    def rect(self, inputRect:QRect):
+        self._rect = inputRect
+        self._start = inputRect.center()
 
     @property
     def pinName(self):

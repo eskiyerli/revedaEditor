@@ -2,6 +2,7 @@
 import inspect
 import itertools as itt
 import json
+import os
 
 # from hashlib import new
 import pathlib
@@ -41,6 +42,7 @@ from PySide6.QtWidgets import (
     QGraphicsItem,
 )
 
+if os.environ.get('')
 import pdk.layoutLayers
 import pdk.layoutLayers as laylyr
 import pdk.process as fabproc
@@ -63,6 +65,7 @@ import revedaEditor.gui.editFunctions as edf
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.propertyDialogues as pdlg
+import pdk.pcells as pcells
 
 
 # import os
@@ -658,7 +661,7 @@ class symbolScene(editorScene):
                 self.queryDlg.rectHeightLine.setText(str(height))  # str(height))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateRectangleShape(item)
-            if isinstance(item, shp.symbolCircle):
+            elif isinstance(item, shp.symbolCircle):
                 self.queryDlg = pdlg.circlePropertyDialog(self.editorWindow)
                 centre = item.mapToScene(item.centre).toTuple()
                 radius = item.radius
@@ -667,7 +670,7 @@ class symbolScene(editorScene):
                 self.queryDlg.radiusEdit.setText(str(radius))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateCircleShape(item)
-            if isinstance(item, shp.symbolArc):
+            elif isinstance(item, shp.symbolArc):
                 self.queryDlg = pdlg.arcPropertyDialog(self.editorWindow)
                 sceneStartPoint = item.mapToScene(item.start)
                 self.queryDlg.startXEdit.setText(str(sceneStartPoint.x()))
@@ -718,6 +721,13 @@ class symbolScene(editorScene):
                 self.queryDlg.labelYLine.setText(str(sceneStartPoint.y()))
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLabelShape(item)
+            elif isinstance(item, shp.symbolPolygon):
+                pointsTupleList = [(point.x(), point.y()) for point in
+                                   item.points]
+                self.queryDlg = pdlg.symbolPolygonProperties(self.editorWindow, pointsTupleList)
+                if self.queryDlg.exec() == QDialog.Accepted:
+                    self.updatePolygonShape(item)
+
 
     def updateRectangleShape(self, item: shp.symbolRectangle):
         """
@@ -820,6 +830,17 @@ class symbolScene(editorScene):
         undoCommand = us.updateSymPinUndo(item, origItemList, newItemList)
         self.undoStack.push(undoCommand)
 
+    def updatePolygonShape(self, item):
+
+        tempPoints = []
+        for i in range(self.queryDlg.tableWidget.rowCount()):
+            xcoor = self.queryDlg.tableWidget.item(i,1).text()
+            ycoor = self.queryDlg.tableWidget.item(i,2).text()
+            if xcoor != '' and ycoor != '':
+                tempPoints.append(QPointF(float(xcoor),
+                                          float(ycoor)))
+        item.points = tempPoints
+
     def updateLabelShape(self, item: lbl.symbolLabel):
         """
         update label with new values.
@@ -915,9 +936,19 @@ class symbolScene(editorScene):
         items = self.items()
         if hasattr(self, "attributeList"):
             items.extend(self.attributeList)
-        items = json.loads(json.dumps(items, cls=symenc.symbolEncoder))
+        itemsList = json.loads(json.dumps(items, cls=symenc.symbolEncoder))
         self.clear()
-        self.loadSymbol(items)
+        for item in itemsList:
+            if item is not None:
+                if item["type"] in self.symbolShapes:
+                    itemShape = lj.symbolItems(self).create(item)
+                    # items should be always visible in symbol view
+                    if isinstance(itemShape, lbl.symbolLabel):
+                        itemShape.setOpacity(1)
+                    self.addItem(itemShape)
+                elif item["type"] == "attr":
+                    attr = lj.symbolItems(self).createSymbolAttribute(item)
+                    self.attributeList.append(attr)
 
     def viewSymbolProperties(self):
         """
@@ -931,7 +962,7 @@ class symbolScene(editorScene):
         if symbolPropDialogue.exec() == QDialog.Accepted:
             for i, item in enumerate(symbolPropDialogue.labelItemList):
                 # label name is not changed.
-                item.labelHeight = symbolPropDialogue.labelHeightList[i].text()
+                item.labelHeight = int(float(symbolPropDialogue.labelHeightList[i].text()))
                 item.labelAlign = symbolPropDialogue.labelAlignmentList[i].currentText()
                 item.labelOrient = symbolPropDialogue.labelOrientationList[
                     i
@@ -1766,8 +1797,8 @@ class schematicScene(editorScene):
                         itemAttributes[item["nam"]] = item["def"]
                     else:
                         itemShapes.append(lj.symbolItems(self).create(item))
-
                 symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes)
+
                 symbolInstance.setPos(pos)
                 symbolInstance.counter = self.instanceCounter
                 symbolInstance.instanceName = f"I{symbolInstance.counter}"
@@ -1778,6 +1809,7 @@ class schematicScene(editorScene):
                 symbolInstance.viewName = self.instanceSymbolTuple.viewItem.viewName
                 for labelItem in symbolInstance.labels.values():
                     labelItem.labelDefs()
+
                 return symbolInstance
         except Exception as e:
             self.logger.warning(f"instantiation error: {e}")
@@ -2222,7 +2254,7 @@ class layoutScene(editorScene):
         )
         self.newInstance = None
         self.layoutInstanceTuple = None
-
+        self._scale =
         self.itemCounter = 0
         self._newPath = None
         self._stretchPath = None
@@ -2416,7 +2448,6 @@ class layoutScene(editorScene):
             # Handle drawing pin mode with no new pin
             elif self.editModes.drawPin:
                 if self.newPin is not None:
-                    print(self.newPin)
                     self.newPin.end = self.mouseMoveLoc
                 else:
                     if self.newLabel is not None:
@@ -2470,7 +2501,7 @@ class layoutScene(editorScene):
                 if self.newInstance is None:
                     self.newInstance = self.instLayout()
                     # if new instance is a pcell, start a dialogue for pcell parameters
-                    if isinstance(self.newInstance, lshp.layoutPcell):
+                    if isinstance(self.newInstance, pdk.pcells.baseCell):
                         dlg = ldlg.pcellInstanceDialog(self.editorWindow)
                         dlg.pcellLibName.setText(self.newInstance.libraryName)
                         dlg.pcellCellName.setText(self.newInstance.cellName)
@@ -2573,20 +2604,20 @@ class layoutScene(editorScene):
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
 
-    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseDoubleClickEvent(event)
-        self.mouseDoubleClickLoc = event.scenePos().toPoint()
-        try:
-            if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
-                self._newPolygon.polygon.remove(0)
-                self._newPolygon.points.pop(0)
-                self.editModes.setMode("selectItem")
-                self._newPolygon = None
-                self.removeItem(self._polygonGuideLine)
-                self._polygonGuideLine = None
-
-        except Exception as e:
-            self.logger.error(f"mouse double click error: {e}")
+    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    #     super().mouseDoubleClickEvent(event)
+    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
+    #     try:
+    #         if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
+    #             self._newPolygon.polygon.remove(0)
+    #             self._newPolygon.points.pop(0)
+    #             self.editModes.setMode("selectItem")
+    #             self._newPolygon = None
+    #             self.removeItem(self._polygonGuideLine)
+    #             self._polygonGuideLine = None
+    #
+    #     except Exception as e:
+    #         self.logger.error(f"mouse double click error: {e}")
 
     # def drawInstance(self):
     #     """
@@ -2772,34 +2803,34 @@ class layoutScene(editorScene):
                         case lshp.layoutInstance:
                             self.layoutInstanceProperties(item)
                         case _:
-                            if item.__class__.__bases__[0] == lshp.layoutPcell:
+                            if item.__class__.__bases__[0] == pdk.pcells.baseCell:
                                 self.layoutPCellProperties(item)
 
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
-
     def layoutPolygonProperties(self, item):
-        dlg = ldlg.layoutPolygonProperties(self.editorWindow, len(item.points))
+        pointsTupleList = [(point.x()/fabproc.dbu, point.y()/fabproc.dbu) for point in
+                           item.points]
+        dlg = ldlg.layoutPolygonProperties(self.editorWindow, pointsTupleList)
         dlg.polygonLayerCB.addItems(
             [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
         )
         dlg.polygonLayerCB.setCurrentText(
             f"{item.layer.name} [" f"{item.layer.purpose}]"
         )
-        for i, point in enumerate(item.points):
-            dlg.pointXEdits[i].setText(str(point.x() / fabproc.dbu))
-            dlg.pointYEdits[i].setText(str(point.y() / fabproc.dbu))
+
         if dlg.exec() == QDialog.Accepted:
+
             item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
             tempPoints = []
-            for i in range(dlg.polygonGroupLayout.rowCount() - 2):
-                xedit = dlg.polygonGroupLayout.itemAtPosition(i + 2, 1).widget().text()
-                yedit = dlg.polygonGroupLayout.itemAtPosition(i + 2, 2).widget().text()
-                if xedit != "" and yedit != "":
-                    tempPoints.append(
-                        QPointF(float(xedit) * fabproc.dbu, float(yedit) * fabproc.dbu)
-                    )
+            for i in range(dlg.tableWidget.rowCount()):
+                xcoor = dlg.tableWidget.item(i,1).text()
+                ycoor = dlg.tableWidget.item(i,2).text()
+                if xcoor != '' and ycoor != '':
+                    tempPoints.append(QPointF(float(xcoor)*fabproc.dbu,
+                                              float(ycoor)*fabproc.dbu))
             item.points = tempPoints
+
 
     def layoutRectProperties(self, item):
         dlg = ldlg.layoutRectProperties(self.editorWindow)
@@ -3063,7 +3094,6 @@ class layoutScene(editorScene):
                     .text()
                 )
                 instParamDict[labelText] = paramValue
-
             item(**instParamDict)
 
     def extractPcellInstanceParameters(self, instance: lshp.layoutPcell) -> dict:
@@ -3200,14 +3230,14 @@ class layoutScene(editorScene):
         xmove = mouseLoc.x() - start.x()
         ymove = mouseLoc.y() - start.y()
 
-        # Determine the new end point of the vector based on the mouse movement
-        if xmove >= 0 and ymove >= 0:
-            vector.end = QPoint(start.x(), start.y() + ymove)
-        elif xmove >= 0 and ymove < 0:
-            vector.end = QPoint(start.x() + xmove, start.y())
-        elif xmove < 0 and ymove < 0:
-            vector.end = QPoint(start.x(), start.y() + ymove)
-        elif xmove < 0 and ymove >= 0:
-            vector.end = QPoint(start.x() + xmove, start.y())
-
-        vector.setTransform(transform)
+    #     # Determine the new end point of the vector based on the mouse movement
+    #     if xmove >= 0 and ymove >= 0:
+    #         vector.end = QPoint(start.x(), start.y() + ymove)
+    #     elif xmove >= 0 and ymove < 0:
+    #         vector.end = QPoint(start.x() + xmove, start.y())
+    #     elif xmove < 0 and ymove < 0:
+    #         vector.end = QPoint(start.x(), start.y() + ymove)
+    #     elif xmove < 0 and ymove >= 0:
+    #         vector.end = QPoint(start.x() + xmove, start.y())
+    #
+    #     vector.setTransform(transform)
