@@ -10,6 +10,7 @@ from collections import Counter
 from copy import deepcopy
 from functools import lru_cache
 from typing import Union, Any, Type
+from dotenv import load_dotenv
 
 # import numpy as np
 from PySide6.QtCore import (
@@ -42,13 +43,6 @@ from PySide6.QtWidgets import (
     QGraphicsItem,
 )
 
-if os.environ.get('')
-import pdk.layoutLayers
-import pdk.layoutLayers as laylyr
-import pdk.process as fabproc
-
-# import pdk.symLayers as symlyr
-import pdk.schLayers as schlyr
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.undoStack as us
@@ -65,8 +59,19 @@ import revedaEditor.gui.editFunctions as edf
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.propertyDialogues as pdlg
-import pdk.pcells as pcells
 
+load_dotenv()
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.layoutLayers as laylyr
+    import pdk.process as fabproc
+    import pdk.schLayers as schlyr
+    import pdk.pcells as pcells
+else:
+    import defaultPdk.layoutLayers as laylyr
+    import defaultPdk.process as fabproc
+    import defaultPdk.schLayers as schlyr
+    import defaultPdk.pcells as pcells
 
 # import os
 # if os.environ.get('REVEDASIM_PATH'):
@@ -722,12 +727,12 @@ class symbolScene(editorScene):
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updateLabelShape(item)
             elif isinstance(item, shp.symbolPolygon):
-                pointsTupleList = [(point.x(), point.y()) for point in
-                                   item.points]
-                self.queryDlg = pdlg.symbolPolygonProperties(self.editorWindow, pointsTupleList)
+                pointsTupleList = [(point.x(), point.y()) for point in item.points]
+                self.queryDlg = pdlg.symbolPolygonProperties(
+                    self.editorWindow, pointsTupleList
+                )
                 if self.queryDlg.exec() == QDialog.Accepted:
                     self.updatePolygonShape(item)
-
 
     def updateRectangleShape(self, item: shp.symbolRectangle):
         """
@@ -834,11 +839,10 @@ class symbolScene(editorScene):
 
         tempPoints = []
         for i in range(self.queryDlg.tableWidget.rowCount()):
-            xcoor = self.queryDlg.tableWidget.item(i,1).text()
-            ycoor = self.queryDlg.tableWidget.item(i,2).text()
-            if xcoor != '' and ycoor != '':
-                tempPoints.append(QPointF(float(xcoor),
-                                          float(ycoor)))
+            xcoor = self.queryDlg.tableWidget.item(i, 1).text()
+            ycoor = self.queryDlg.tableWidget.item(i, 2).text()
+            if xcoor != "" and ycoor != "":
+                tempPoints.append(QPointF(float(xcoor), float(ycoor)))
         item.points = tempPoints
 
     def updateLabelShape(self, item: lbl.symbolLabel):
@@ -962,7 +966,9 @@ class symbolScene(editorScene):
         if symbolPropDialogue.exec() == QDialog.Accepted:
             for i, item in enumerate(symbolPropDialogue.labelItemList):
                 # label name is not changed.
-                item.labelHeight = int(float(symbolPropDialogue.labelHeightList[i].text()))
+                item.labelHeight = int(
+                    float(symbolPropDialogue.labelHeightList[i].text())
+                )
                 item.labelAlign = symbolPropDialogue.labelAlignmentList[i].currentText()
                 item.labelOrient = symbolPropDialogue.labelOrientationList[
                     i
@@ -2208,7 +2214,7 @@ class schematicScene(editorScene):
 class layoutScene(editorScene):
     def __init__(self, parent):
         super().__init__(parent)
-        self.selectEdLayer = pdk.layoutLayers.pdkAllLayers[0]
+        self.selectEdLayer = laylyr.pdkAllLayers[0]
         self.layoutShapes = [
             "Inst",
             "Rect",
@@ -2254,7 +2260,7 @@ class layoutScene(editorScene):
         )
         self.newInstance = None
         self.layoutInstanceTuple = None
-        self._scale =
+        self._scale = fabproc.dbu
         self.itemCounter = 0
         self._newPath = None
         self._stretchPath = None
@@ -2315,6 +2321,25 @@ class layoutScene(editorScene):
     # 7. Add instance
     # 8. select item/s
     # 9. rotate item/s
+
+    @staticmethod
+    def toLayoutCoord(point: [QPoint | QPointF]) -> QPoint | QPointF:
+        """
+        Converts a point in scene coordinates to layout coordinates by dividing it to
+        fabproc.dbu.
+        """
+        point /= fabproc.dbu
+        return point
+
+    @staticmethod
+    def toSceneCoord(point: [QPoint | QPointF]) -> QPoint | QPointF:
+        """
+        Converts a point in layout coordinates to scene coordinates by multiplying it with
+        fabproc.dbu.
+        """
+        point *= fabproc.dbu
+        return point
+
     def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         """
         Handle the mouse press event.
@@ -2483,7 +2508,8 @@ class layoutScene(editorScene):
                     self._arrayVia = lshp.layoutViaArray(
                         self.mouseMoveLoc,
                         singleVia,
-                        self.arrayViaTuple.spacing,
+                        self.arrayViaTuple.xs,
+                        self.arrayViaTuple.ys,
                         self.arrayViaTuple.xnum,
                         self.arrayViaTuple.ynum,
                     )
@@ -2501,7 +2527,7 @@ class layoutScene(editorScene):
                 if self.newInstance is None:
                     self.newInstance = self.instLayout()
                     # if new instance is a pcell, start a dialogue for pcell parameters
-                    if isinstance(self.newInstance, pdk.pcells.baseCell):
+                    if isinstance(self.newInstance, pcells.baseCell):
                         dlg = ldlg.pcellInstanceDialog(self.editorWindow)
                         dlg.pcellLibName.setText(self.newInstance.libraryName)
                         dlg.pcellCellName.setText(self.newInstance.cellName)
@@ -2530,13 +2556,12 @@ class layoutScene(editorScene):
                 self._stretchPath.draftLine = QLineF(
                     self._stretchPath.draftLine.p1(), self.mouseMoveLoc
                 )
-        # Calculate the cursor position in real units
-        cursorPositionX = (self.mouseMoveLoc - self.origin).x() / fabproc.dbu
-        cursorPositionY = (self.mouseMoveLoc - self.origin).y() / fabproc.dbu
+        # Calculate the cursor position in layout units
+        cursorPosition = self.toLayoutCoord(self.mouseMoveLoc - self.origin)
 
         # Show the cursor position in the status line
         self.statusLine.showMessage(
-            f"Cursor Position: ({cursorPositionX}, {cursorPositionY})"
+            f"Cursor Position: ({cursorPosition.x()}, {cursorPosition.y()})"
         )
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
@@ -2553,21 +2578,6 @@ class layoutScene(editorScene):
                         self.mouseReleaseLoc,
                         self.selectEdLayer,
                     )
-
-                # elif (
-                #     self.editModes.drawPin
-                # ):  # finish pin editing and start label editing
-                #     if self.newPin is not None and self.newLabel is None:
-                #         self.newLabel = lshp.layoutLabel(
-                #             self.mouseReleaseLoc,
-                #             *self.newLabelTuple,
-                #         )
-                #         self.addUndoStack(self.newLabel)
-                #         self.newPin.label = self.newLabel
-                #         self.newPin = None
-                #     elif self.newPin is None and self.newLabel is not None:
-                #         # finish label editing
-                #         self.newLabel = None
 
                 elif self.editModes.drawPolygon:
                     if self._newPolygon is None:
@@ -2603,34 +2613,6 @@ class layoutScene(editorScene):
 
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
-
-    # def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-    #     super().mouseDoubleClickEvent(event)
-    #     self.mouseDoubleClickLoc = event.scenePos().toPoint()
-    #     try:
-    #         if event.button() == Qt.LeftButton and self.editModes.drawPolygon:
-    #             self._newPolygon.polygon.remove(0)
-    #             self._newPolygon.points.pop(0)
-    #             self.editModes.setMode("selectItem")
-    #             self._newPolygon = None
-    #             self.removeItem(self._polygonGuideLine)
-    #             self._polygonGuideLine = None
-    #
-    #     except Exception as e:
-    #         self.logger.error(f"mouse double click error: {e}")
-
-    # def drawInstance(self):
-    #     """
-    #     Add an instance of a symbol to the scene.
-    #     """
-    #     try:
-    #         instance = self.instLayout()
-    #         self.itemCounter += 1
-    #         undoCommand = us.addShapeUndo(self, instance)
-    #         self.undoStack.push(undoCommand)
-    #         return instance
-    #     except Exception as e:
-    #         self.logger.error(f"Cannot draw instance: {e}")
 
     def instLayout(self):
         """
@@ -2803,14 +2785,14 @@ class layoutScene(editorScene):
                         case lshp.layoutInstance:
                             self.layoutInstanceProperties(item)
                         case _:
-                            if item.__class__.__bases__[0] == pdk.pcells.baseCell:
+                            if item.__class__.__bases__[0] == pcells.baseCell:
                                 self.layoutPCellProperties(item)
 
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
+
     def layoutPolygonProperties(self, item):
-        pointsTupleList = [(point.x()/fabproc.dbu, point.y()/fabproc.dbu) for point in
-                           item.points]
+        pointsTupleList = [self.toLayoutCoord(point) for point in item.points]
         dlg = ldlg.layoutPolygonProperties(self.editorWindow, pointsTupleList)
         dlg.polygonLayerCB.addItems(
             [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
@@ -2824,13 +2806,13 @@ class layoutScene(editorScene):
             item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
             tempPoints = []
             for i in range(dlg.tableWidget.rowCount()):
-                xcoor = dlg.tableWidget.item(i,1).text()
-                ycoor = dlg.tableWidget.item(i,2).text()
-                if xcoor != '' and ycoor != '':
-                    tempPoints.append(QPointF(float(xcoor)*fabproc.dbu,
-                                              float(ycoor)*fabproc.dbu))
+                xcoor = dlg.tableWidget.item(i, 1).text()
+                ycoor = dlg.tableWidget.item(i, 2).text()
+                if xcoor != "" and ycoor != "":
+                    tempPoints.append(
+                        self.toSceneCoord(QPointF(float(xcoor), float(ycoor)))
+                    )
             item.points = tempPoints
-
 
     def layoutRectProperties(self, item):
         dlg = ldlg.layoutRectProperties(self.editorWindow)
@@ -2883,9 +2865,10 @@ class layoutScene(editorScene):
                 item.width = float(dlg.singleViaWidthEdit.text()) * fabproc.dbu
                 item.height = float(dlg.singleViaHeightEdit.text()) * fabproc.dbu
                 item.start = item.mapFromScene(
-                    QPointF(
-                        float(dlg.startXEdit.text()) * fabproc.dbu,
-                        float(dlg.startYEdit.text()) * fabproc.dbu,
+                    self.toSceneCoord(
+                        QPointF(
+                            float(dlg.startXEdit.text()), float(dlg.startYEdit.text())
+                        )
                     )
                 )
                 item.xnum = 1
@@ -2900,9 +2883,10 @@ class layoutScene(editorScene):
                 item.width = float(dlg.arrayViaWidthEdit.text()) * fabproc.dbu
                 item.height = float(dlg.arrayViaHeightEdit.text()) * fabproc.dbu
                 item.start = item.mapFromScene(
-                    QPointF(
-                        float(dlg.startXEdit.text()) * fabproc.dbu,
-                        float(dlg.startYEdit.text()) * fabproc.dbu,
+                    self.toLayoutCoord(
+                        QPointF(
+                            float(dlg.startXEdit.text()), float(dlg.startYEdit.text())
+                        )
                     )
                 )
                 item.xnum = int(dlg.arrayXNumEdit.text())
@@ -2954,13 +2938,17 @@ class layoutScene(editorScene):
             item.width = fabproc.dbu * float(dlg.pathWidth.text())
             item.startExtend = fabproc.dbu * float(dlg.startExtendEdit.text())
             item.endExtend = fabproc.dbu * float(dlg.endExtendEdit.text())
-            p1 = QPointF(
-                fabproc.dbu * float(dlg.p1PointEditX.text()),
-                fabproc.dbu * float(dlg.p1PointEditY.text()),
+            p1 = self.toSceneCoord(
+                QPointF(
+                    float(dlg.p1PointEditX.text()),
+                    float(dlg.p1PointEditY.text()),
+                )
             )
-            p2 = QPointF(
-                fabproc.dbu * float(dlg.p2PointEditX.text()),
-                fabproc.dbu * float(dlg.p2PointEditY.text()),
+            p2 = self.toSceneCoord(
+                QPointF(
+                    float(dlg.p2PointEditX.text()),
+                    float(dlg.p2PointEditY.text()),
+                )
             )
             item.draftLine = QLineF(p1, p2)
             item.angle = angle
@@ -2989,9 +2977,11 @@ class layoutScene(editorScene):
             item.labelOrient = dlg.labelOrientCB.currentText()
             item.start = item.snapToGrid(
                 item.mapFromScene(
-                    QPointF(
-                        float(dlg.labelTopLeftX.text()) * fabproc.dbu,
-                        float(dlg.labelTopLeftY.text()) * fabproc.dbu,
+                    self.toSceneCoord(
+                        QPointF(
+                            float(dlg.labelTopLeftX.text()),
+                            float(dlg.labelTopLeftY.text()),
+                        )
                     )
                 ),
                 self.snapTuple,
@@ -3022,18 +3012,22 @@ class layoutScene(editorScene):
             item.label.labelText = dlg.pinName.text()
             item.start = item.snapToGrid(
                 item.mapFromScene(
-                    QPointF(
-                        float(dlg.pinBottomLeftX.text()) * fabproc.dbu,
-                        float(dlg.pinBottomLeftY.text()) * fabproc.dbu,
+                    self.toSceneCoord(
+                        QPointF(
+                            float(dlg.pinBottomLeftX.text()),
+                            float(dlg.pinBottomLeftY.text()),
+                        )
                     )
                 ),
                 self.snapTuple,
             )
             item.end = item.snapToGrid(
                 item.mapFromScene(
-                    QPointF(
-                        float(dlg.pinTopRightX.text()) * fabproc.dbu,
-                        float(dlg.pinTopRightY.text()) * fabproc.dbu,
+                    self.toSceneCoord(
+                        QPointF(
+                            float(dlg.pinTopRightX.text()),
+                            float(dlg.pinTopRightY.text()),
+                        )
                     )
                 ),
                 self.snapTuple,
@@ -3086,8 +3080,9 @@ class layoutScene(editorScene):
                 labelText = (
                     dlg.instanceParamsLayout.itemAt(row, QFormLayout.LabelRole)
                     .widget()
-                    .text()
-                )
+                    .text().replace("&","")
+                ) # why & is added?
+                print(labelText)
                 paramValue = (
                     dlg.instanceParamsLayout.itemAt(row, QFormLayout.FieldRole)
                     .widget()

@@ -208,7 +208,8 @@ class singleViaTuple(NamedTuple):
 
 class arrayViaTuple(NamedTuple):
     singleViaTuple: singleViaTuple
-    spacing: float
+    xs: float
+    ys: float
     xnum: int
     ynum: int
 

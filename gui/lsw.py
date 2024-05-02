@@ -94,7 +94,7 @@ class layerViewTable(QTableView):
         self.setModel(self._model)
         self.resizeColumnsToContents()
         self.setShowGrid(False)
-        self.setMaximumWidth(280)
+        self.setMaximumWidth(400)
         self.setSelectionBehavior(QTableView.SelectRows)
         self.verticalHeader().setVisible(False)
         selection_model = self.selectionModel()

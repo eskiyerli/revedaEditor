@@ -131,7 +131,7 @@ class gdsExporter:
                     origin=item.start.toTuple(),
                     columns=item.xnum,
                     rows=item.ynum,
-                    spacing=(item.spacing + item.width, item.spacing + item.height),
+                    spacing=(item.xs + item.width, item.ys + item.height),
                 )
                 parentCell.add(viaArray)
             case _:  # now check super class types:

@@ -1492,7 +1492,8 @@ class layoutEditor(editorWindow):
                     fabproc.dbu * float(dlg.singleViaHeightEdit.text().strip()),
                 )
                 self.centralW.scene.arrayViaTuple = ddef.arrayViaTuple(
-                    singleViaTuple, fabproc.dbu * float(selViaDefTuple.minSpacing), 1, 1
+                    singleViaTuple, fabproc.dbu * float(selViaDefTuple.minSpacing),
+                    fabproc.dbu * float(selViaDefTuple.minSpacing), 1, 1
                 )
             else:
                 selViaDefTuple = [
@@ -1508,6 +1509,7 @@ class layoutEditor(editorWindow):
                 )
                 self.centralW.scene.arrayViaTuple = ddef.arrayViaTuple(
                     singleViaTuple,
+                    fabproc.dbu * float(dlg.arrayViaSpacingEdit.text().strip()),
                     fabproc.dbu * float(dlg.arrayViaSpacingEdit.text().strip()),
                     int(float(dlg.arrayXNumEdit.text().strip())),
                     int(float(dlg.arrayYNumEdit.text().strip())),

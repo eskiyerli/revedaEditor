@@ -494,7 +494,8 @@ class layoutItems:
         viaArray = lshp.layoutViaArray(
             QPoint(item["st"][0], item["st"][1]),
             via,
-            item["sp"],
+            item["xs"],
+            item["ys"],
             item["xn"],
             item["yn"],
         )

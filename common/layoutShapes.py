@@ -52,6 +52,7 @@ from PySide6.QtWidgets import (
 import revedaEditor.backend.dataDefinitions as ddef
 
 
+
 class layoutShape(QGraphicsItem):
     def __init__(self) -> None:
         super().__init__()
@@ -1539,7 +1540,8 @@ class layoutViaArray(layoutShape):
         self,
         start: QPoint,
         via: layoutVia,
-        spacing: float,
+        xs: float,
+        ys: float,
         xnum: int,
         ynum: int,
     ):
@@ -1548,7 +1550,8 @@ class layoutViaArray(layoutShape):
         self._via = via  # prototype via
         self._xnum = xnum
         self._ynum = ynum
-        self._spacing = spacing
+        self._xs = xs
+        self._ys = ys
         self._placeVias(via, xnum, ynum)
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
@@ -1562,8 +1565,8 @@ class layoutViaArray(layoutShape):
         for i, j in itertools.product(range(xnum), range(ynum)):
             item = layoutVia(
                 QPoint(
-                    self._start.x() + i * (self._spacing + via.width),
-                    self._start.y() + j * (self._spacing + via.height),
+                    self._start.x() + i * (self._xs + via.width),
+                    self._start.y() + j * (self._ys + via.height),
                 ),
                 self._via.viaDefTuple,
                 via.width,
@@ -1652,13 +1655,24 @@ class layoutViaArray(layoutShape):
         self._rect = self.childrenBoundingRect()
 
     @property
-    def spacing(self) -> float:
-        return self._spacing
+    def xs(self) -> float:
+        return self._xs
 
-    @spacing.setter
-    def spacing(self, value: float):
+    @xs.setter
+    def xs(self, value: float):
         self.prepareGeometryChange()
-        self._spacing = value
+        self._xs = value
+        self._placeVias(self._via, self._xnum, self._ynum)
+        self._rect = self.childrenBoundingRect()
+
+    @property
+    def ys(self) -> float:
+        return self._ys
+
+    @ys.setter
+    def ys(self, value: float):
+        self.prepareGeometryChange()
+        self._ys = value
         self._placeVias(self._via, self._xnum, self._ynum)
         self._rect = self.childrenBoundingRect()
 

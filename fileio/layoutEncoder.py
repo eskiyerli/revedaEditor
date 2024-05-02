@@ -77,7 +77,8 @@ class layoutEncoder(json.JSONEncoder):
                     "type": "Via",
                     "st": item.mapToScene(item.start).toTuple(),
                     "via": viaDict,
-                    "sp": item.spacing,
+                    "xs": item.xs,
+                    "ys": item.ys,
                     "xn": item.xnum,
                     "yn": item.ynum,
                 }
