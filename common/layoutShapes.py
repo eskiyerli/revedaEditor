@@ -51,8 +51,6 @@ from PySide6.QtWidgets import (
 
 import revedaEditor.backend.dataDefinitions as ddef
 
-
-
 class layoutShape(QGraphicsItem):
     def __init__(self) -> None:
         super().__init__()
@@ -109,6 +107,12 @@ class layoutShape(QGraphicsItem):
     def stretch(self, value: bool):
         self._stretch = value
 
+    @property
+    def view(self):
+        if self.scene():
+            return self.scene().views()[0]
+        else:
+            return None
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -177,11 +181,14 @@ class layoutRect(layoutShape):
         self._stretchSide = None
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
         self._definePensBrushes()
+        self.setZValue(self._layer.z)
+
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
         self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
+            QPixmap(self._layer.btexture).scaled(10,
+                                                 10).toImage()
         )
         self._brush = QBrush(self._layer.bcolor, self._bitmap)
         self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
@@ -523,6 +530,7 @@ class layoutLine(layoutShape):
             .normalized()
             .adjusted(-2, -2, 2, 2)
         )
+        self.setZValue(self._layer.z)
 
     def __repr__(self):
         return f"layoutLine({self._draftLine}, {self._layer}, {self._width})"
@@ -577,6 +585,7 @@ class layoutPath(layoutShape):
         self._rect = QRectF(0, 0, 0, 0)
         self._angle = 0
         self._rectCorners(self._draftLine.angle())
+        self.setZValue(self._layer.z)
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
@@ -848,6 +857,7 @@ class layoutRuler(layoutShape):
         self._createRulerTicks()
         # self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.update(self.boundingRect())
+        self.setZValue(999)
 
     def __repr__(self):
         return (
@@ -1034,6 +1044,7 @@ class layoutLabel(layoutShape):
         elif self._labelAlign == layoutLabel.labelAlignments[2]:
             self._labelOptions.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.setOrient()
+        self.setZValue(self._layer.z)
 
     def fontDefinition(self, fontFamily, fontStyle):
         self._labelFont = QFont(fontFamily)
@@ -1054,12 +1065,12 @@ class layoutLabel(layoutShape):
 
     def definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
+        _bitmap = QBitmap.fromImage(
+            QPixmap(self._layer.btexture).scaled(100, 100).toImage(),
+        Qt.ColorOnly)
+        self._brush = QBrush(self._layer.bcolor, _bitmap)
         self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+        self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
 
     def setOrient(self):
         self.setTransformOriginPoint(self.mapFromScene(self._start))
@@ -1103,10 +1114,8 @@ class layoutLabel(layoutShape):
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.drawRect(self.boundingRect())
-            self.setZValue(99)
         else:
             painter.setPen(self._pen)
-            self.setZValue(self._layer.z)
         painter.drawText(
             QPoint(self._start.x(), self._start.y() + self._rect.height()),
             self._labelText,
@@ -1235,7 +1244,6 @@ class layoutPin(layoutShape):
         layer: ddef.layLayer,
     ):
         super().__init__()
-
         self._pinName = pinName
         self._pinDir = pinDir
         self._pinType = pinType
@@ -1248,6 +1256,7 @@ class layoutPin(layoutShape):
         self._label = None
         self._stretchSide = None
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
+        self.setZValue(self._layer.z)
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
@@ -1437,6 +1446,7 @@ class layoutVia(layoutShape):
         self._width = width
         self._height = height
         self._definePensBrushes()
+        self.setZValue(self._layer.z)
 
     def _definePensBrushes(self):
         self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)

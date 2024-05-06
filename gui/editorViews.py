@@ -45,6 +45,8 @@ class editorView(QGraphicsView):
         self._right: QPoint = QPoint(0, 0)
         self._top: QPoint = QPoint(0, 0)
         self._bottom: QPoint = QPoint(0, 0)
+        self.viewRect = QRect(0, 0, 0, 0)
+        self.zoomFactor = 1.0
         self.init_UI()
 
     def init_UI(self):
@@ -79,8 +81,8 @@ class editorView(QGraphicsView):
         oldPos = self.mapToScene(self.viewport().rect().center())
 
         # Perform the zoom
-        zoomFactor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
-        self.scale(zoomFactor, zoomFactor)
+        self.zoomFactor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
+        self.scale(self.zoomFactor, self.zoomFactor)
 
         # Get the new center point of the view
         newPos = self.mapToScene(self.viewport().rect().center())
@@ -326,6 +328,37 @@ class layoutView(editorView):
         self.scene = scene
         self.parent = parent
         super().__init__(self.scene, self.parent)
+
+    def findCoords(self):
+        """
+        Calculate the coordinates for drawing lines or points on a grid.
+
+        Returns:
+            tuple: A tuple containing the x and y coordinates for drawing the lines or points.
+        """
+        x_coords = range(self._left, self._right, self.majorGrid)
+        y_coords = range(self._top, self._bottom, self.majorGrid)
+
+        if 160 <= len(x_coords) < 320:
+            # Create a range of x and y coordinates for drawing the lines
+            x_coords = range(self._left, self._right, self.majorGrid * 2)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 2)
+        elif 320 <= len(x_coords) < 640:
+            x_coords = range(self._left, self._right, self.majorGrid * 4)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 4)
+        elif 640 <= len(x_coords) < 1280:
+            x_coords = range(self._left, self._right, self.majorGrid * 8)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 8)
+        elif 1280 <= len(x_coords) < 2560:
+            x_coords = range(self._left, self._right, self.majorGrid * 16)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 16)
+        elif len(x_coords) >= 2560:  # grid dots are too small to see
+            x_coords = range(self._left, self._right, self.majorGrid * 32)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 32)
+        elif len(x_coords) >= 5120:  # grid dots are too small to see
+            x_coords = range(self._left, self._right, self.majorGrid * 64)
+            y_coords = range(self._top, self._bottom, self.majorGrid * 64)
+        return x_coords, y_coords
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:

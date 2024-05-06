@@ -46,7 +46,7 @@ def parseLyp(lypFile):
 
     with lypFileObj.parent.joinpath("layoutLayers.py").open("w") as file:
         try:
-            for layerItem in root.iterfind("properties"):
+            for i, layerItem in enumerate(root.iterfind("properties")):
                 pcolor = QColor.fromString(layerItem.find("frame-color").text.upper())
                 bcolor = QColor.fromString(layerItem.find("fill-color").text.upper())
                 btexture = f'{layerItem.find("dither-pattern").text}.png'
@@ -66,7 +66,7 @@ def parseLyp(lypFile):
                     1,
                     bcolor,
                     btexture,
-                    1,
+                    i,
                     selectable,
                     visible,
                     gdsLayer,

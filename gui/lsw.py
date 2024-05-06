@@ -32,7 +32,7 @@ from PySide6.QtGui import (
     QPixmap,
     QBitmap,
 )
-from PySide6.QtCore import Signal, Qt, QModelIndex
+from PySide6.QtCore import (Signal, Qt, QModelIndex, QSize,)
 
 
 class layerDataModel(QStandardItemModel):
@@ -50,7 +50,9 @@ class layerDataModel(QStandardItemModel):
 
         for row, layer in enumerate(self._data):
             self.insertRow(row)
-            bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(5, 5).toImage())
+            # bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(5, 5).toImage())
+            bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(QSize(4, 4),
+                                    Qt.KeepAspectRatio, Qt.SmoothTransformation).toImage())
             brush = QBrush(bitmap)
             brush.setColor(QColor(layer.bcolor))
             item = QStandardItem()

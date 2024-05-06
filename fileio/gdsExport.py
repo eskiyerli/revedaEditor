@@ -25,6 +25,7 @@
 
 import gdstk
 import revedaEditor.common.layoutShapes as lshp
+import pdk.pcells as pcell
 import pathlib
 import inspect
 
@@ -46,6 +47,7 @@ class gdsExporter:
         self._topCell = lib.new_cell(self._cellname)  # top Cell
         for item in self._items:
             self.createCells(lib, item, self._topCell)
+
         lib.write_gds(self._outputFileObj)
 
     def createCells(
@@ -136,7 +138,8 @@ class gdsExporter:
                 parentCell.add(viaArray)
             case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
-                    case lshp.layoutPcell:
+                    # case lshp.layoutPcell:
+                    case pcell.baseCell:
                         pcellParamDict = gdsExporter.extractPcellInstanceParameters(
                             item
                         )
