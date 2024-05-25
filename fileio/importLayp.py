@@ -49,7 +49,7 @@ def parseLyp(lypFile):
             for i, layerItem in enumerate(root.iterfind("properties")):
                 pcolor = QColor.fromString(layerItem.find("frame-color").text.upper())
                 bcolor = QColor.fromString(layerItem.find("fill-color").text.upper())
-                btexture = f'{layerItem.find("dither-pattern").text}.png'
+                btexture = f'{layerItem.find("dither-pattern").text}.txt'
                 selectable = bool(layerItem.find("valid").text.capitalize())
                 visible = bool(layerItem.find("visible").text.capitalize())
                 pwidth = int(float(layerItem.find("width").text))

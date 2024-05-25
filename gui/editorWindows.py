@@ -478,6 +478,7 @@ class libraryBrowser(QMainWindow):
                     )
                     layoutWindow.loadLayout()
                     layoutWindow.show()
+                    layoutWindow.centralW.scene.fitItemsInView()
                     self.appMainW.openViews[openCellViewTuple] = layoutWindow
 
                 case "schematic":
@@ -486,6 +487,7 @@ class libraryBrowser(QMainWindow):
                     )
                     schematicWindow.loadSchematic()
                     schematicWindow.show()
+                    schematicWindow.centralW.scene.fitItemsInView()
                     self.appMainW.openViews[openCellViewTuple] = schematicWindow
                 case "symbol":
                     symbolWindow = symbolEditor(
@@ -493,6 +495,7 @@ class libraryBrowser(QMainWindow):
                     )
                     symbolWindow.loadSymbol()
                     symbolWindow.show()
+                    symbolWindow.centralW.scene.fitItemsInView()
                     self.appMainW.openViews[openCellViewTuple] = symbolWindow
                 case "veriloga":
                     with open(viewItem.viewPath) as tempFile:
@@ -585,38 +588,6 @@ class libraryBrowserContainer(QWidget):
         self.designView = lmview.designLibrariesView(self)
         self.layout.addWidget(self.designView)
         self.setLayout(self.layout)
-
-class libraryPathsModel(QStandardItemModel):
-    def __init__(self, libraryDict):
-        super().__init__()
-        self.libraryDict = libraryDict
-        self.setHorizontalHeaderLabels(["Library Name", "Library Path"])
-        for key, value in self.libraryDict.items():
-            libName = QStandardItem(key)
-            libPath = QStandardItem(str(value))
-            self.appendRow(libName, libPath)
-        self.appendRow(QStandardItem("Click here..."), QStandardItem(""))
-
-
-class libraryPathsTableView(QTableView):
-    def __init__(self, model):
-        self.model = model
-        self.setModel(self.model)
-        self.setShowGrid(True)
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-
-    def contextMenuEvent(self, event) -> None:
-        self.menu = QMenu(self)
-        removePathAction = QAction("Remove Library Path...", self.menu)
-        removePathAction.triggered.connect(lambda: self.removeLibraryPath(event))
-        self.menu.addAction(removePathAction)
-        self.menu.popup(QCursor.pos())
-
-    def removeLibraryPath(self, event):
-        print("remove library path")
-
-
-
 
 class editorWindow(QMainWindow):
     """
@@ -1534,6 +1505,7 @@ class layoutEditor(editorWindow):
 
     def loadLayout(self):
         self.centralW.scene.loadLayoutCell(self.file)
+
 
     def createInstClick(self, s):
         # create a designLibrariesView

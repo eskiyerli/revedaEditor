@@ -5,6 +5,7 @@ from PySide6.QtCore import (
     QPoint,
     QRect,
     Qt,
+    Signal,
 )
 from PySide6.QtGui import (
     QColor,
@@ -29,7 +30,7 @@ class editorView(QGraphicsView):
     """
     The qgraphicsview for qgraphicsscene. It is used for both schematic and layout editors.
     """
-
+    zoomFactorChanged = Signal(float)
     def __init__(self, scene, parent):
         super().__init__(scene, parent)
         self.parent = parent
@@ -70,6 +71,7 @@ class editorView(QGraphicsView):
         self.setRenderHint(QPainter.TextAntialiasing, True)
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
 
+
     def wheelEvent(self, event: QWheelEvent) -> None:
         """
         Handle the wheel event for zooming in and out of the view.
@@ -90,6 +92,7 @@ class editorView(QGraphicsView):
         # Calculate the delta and adjust the scene position
         delta = newPos - oldPos
         self.translate(delta.x(), delta.y())
+        self.zoomFactorChanged.emit(self.zoomFactor)
 
     def snapToBase(self, number, base):
         """
@@ -329,36 +332,6 @@ class layoutView(editorView):
         self.parent = parent
         super().__init__(self.scene, self.parent)
 
-    def findCoords(self):
-        """
-        Calculate the coordinates for drawing lines or points on a grid.
-
-        Returns:
-            tuple: A tuple containing the x and y coordinates for drawing the lines or points.
-        """
-        x_coords = range(self._left, self._right, self.majorGrid)
-        y_coords = range(self._top, self._bottom, self.majorGrid)
-
-        if 160 <= len(x_coords) < 320:
-            # Create a range of x and y coordinates for drawing the lines
-            x_coords = range(self._left, self._right, self.majorGrid * 2)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 2)
-        elif 320 <= len(x_coords) < 640:
-            x_coords = range(self._left, self._right, self.majorGrid * 4)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 4)
-        elif 640 <= len(x_coords) < 1280:
-            x_coords = range(self._left, self._right, self.majorGrid * 8)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 8)
-        elif 1280 <= len(x_coords) < 2560:
-            x_coords = range(self._left, self._right, self.majorGrid * 16)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 16)
-        elif len(x_coords) >= 2560:  # grid dots are too small to see
-            x_coords = range(self._left, self._right, self.majorGrid * 32)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 32)
-        elif len(x_coords) >= 5120:  # grid dots are too small to see
-            x_coords = range(self._left, self._right, self.majorGrid * 64)
-            y_coords = range(self._top, self._bottom, self.majorGrid * 64)
-        return x_coords, y_coords
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:

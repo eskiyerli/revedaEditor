@@ -42,6 +42,8 @@ from PySide6.QtGui import (
     QFontDatabase,
     QPainterPath,
     QPolygonF,
+    QImage,
+    QPainter,
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
@@ -50,6 +52,9 @@ from PySide6.QtWidgets import (
 )
 
 import revedaEditor.backend.dataDefinitions as ddef
+from pathlib import Path
+import pdk.layoutLayers as laylyr
+
 
 class layoutShape(QGraphicsItem):
     def __init__(self) -> None:
@@ -70,6 +75,42 @@ class layoutShape(QGraphicsItem):
 
     def itemChange(self, change, value):
         return super().itemChange(change, value)
+
+    def _definePensBrushes(self):
+        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+        # self._bitmap = QBitmap.fromImage(
+        #     QPixmap(self._layer.btexture).scaled(10,
+        #                                          10).toImage()
+        # )
+
+        texturePath = Path(laylyr.__file__).parent.joinpath(self._layer.btexture)
+        _bitmap = QBitmap.fromImage(self.createImage(texturePath, self._layer.bcolor))
+        self._brush = QBrush(self._layer.bcolor, _bitmap)
+        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+        self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
+        self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
+        self._stretchBrush = QBrush(QColor("red"), _bitmap)
+
+    @staticmethod
+    def createImage(filePath:Path, color: QColor):
+        # Read the file and split lines
+        with filePath.open('r') as file:
+            lines = file.readlines()
+
+        height = len(lines)
+        width = len(lines[0].split())
+
+        image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
+        image.fill(QColor(0, 0, 0, 0))
+
+        for y, line in enumerate(lines):
+            for x, value in enumerate(line.split()):
+                if int(value) == 1:
+                    image.setPixelColor(x, y, color)  #
+                else:
+                    image.setPixelColor(x, y, QColor(0, 0, 0, 0))  # Transparent for 0
+
+        return image
 
     @property
     def pen(self):
@@ -184,20 +225,12 @@ class layoutRect(layoutShape):
         self.setZValue(self._layer.z)
 
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10,
-                                                 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
 
     def __repr__(self):
         return f"layoutRect({self._start}, {self._end}, {self._layer})"
 
     def paint(self, painter, option, widget):
+        painter.setRenderHint(QPainter.NonCosmeticBrushPatterns)
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.setBrush(self._selectedBrush)
@@ -435,6 +468,7 @@ class layoutInstance(layoutShape):
         return self.childrenBoundingRect().normalized().adjusted(-2, -2, 2, 2)
 
     def paint(self, painter, option, widget):
+        painter.setRenderHint(QPainter.NonCosmeticBrushPatterns)
         if self.isSelected():
             painter.setPen(self._selectedPen)
             painter.drawRect(self.childrenBoundingRect())
@@ -587,16 +621,16 @@ class layoutPath(layoutShape):
         self._rectCorners(self._draftLine.angle())
         self.setZValue(self._layer.z)
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
-        self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
-        self._stretchBrush = QBrush(QColor("red"), self._bitmap)
+    # def _definePensBrushes(self):
+    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+    #     self._bitmap = QBitmap.fromImage(
+    #         QPixmap(self._layer.btexture).scaled(10, 10).toImage()
+    #     )
+    #     self._brush = QBrush(self._layer.bcolor, self._bitmap)
+    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+    #     self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+    #     self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
+    #     self._stretchBrush = QBrush(QColor("red"), self._bitmap)
 
     def __repr__(self):
         return (
@@ -1034,7 +1068,7 @@ class layoutLabel(layoutShape):
         self._labelAlign = labelAlign
         self._labelOrient = labelOrient
         self._layer = layer
-        self.definePensBrushes()
+        self._definePensBrushes()
         self.fontDefinition(fontFamily, fontStyle)
         self._labelOptions = QTextOption()
         if self._labelAlign == layoutLabel.labelAlignments[0]:
@@ -1063,14 +1097,14 @@ class layoutLabel(layoutShape):
             f"{self._labelOrient}, {self._layer})"
         )
 
-    def definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        _bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(100, 100).toImage(),
-        Qt.ColorOnly)
-        self._brush = QBrush(self._layer.bcolor, _bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
+    # def definePensBrushes(self):
+    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+    #     _bitmap = QBitmap.fromImage(
+    #         QPixmap(self._layer.btexture).scaled(100, 100).toImage(),
+    #     Qt.ColorOnly)
+    #     self._brush = QBrush(self._layer.bcolor, _bitmap)
+    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+    #     self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
 
     def setOrient(self):
         self.setTransformOriginPoint(self.mapFromScene(self._start))
@@ -1258,14 +1292,14 @@ class layoutPin(layoutShape):
         self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
         self.setZValue(self._layer.z)
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+    # def _definePensBrushes(self):
+    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+    #     self._bitmap = QBitmap.fromImage(
+    #         QPixmap(self._layer.btexture).scaled(10, 10).toImage()
+    #     )
+    #     self._brush = QBrush(self._layer.bcolor, self._bitmap)
+    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+    #     self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
 
     def __repr__(self):
         return (
@@ -1448,14 +1482,14 @@ class layoutVia(layoutShape):
         self._definePensBrushes()
         self.setZValue(self._layer.z)
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+    # def _definePensBrushes(self):
+    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+    #     self._bitmap = QBitmap.fromImage(
+    #         QPixmap(self._layer.btexture).scaled(10, 10).toImage()
+    #     )
+    #     self._brush = QBrush(self._layer.bcolor, self._bitmap)
+    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+    #     self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
 
     def __repr__(self):
         return f"layoutVia({self._start}, {self._end}, {self._layer})"
@@ -1745,14 +1779,14 @@ class layoutPolygon(layoutShape):
             painter.setBrush(self._brush)
         painter.drawPolygon(self._polygon)
 
-    def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        self._bitmap = QBitmap.fromImage(
-            QPixmap(self._layer.btexture).scaled(10, 10).toImage()
-        )
-        self._brush = QBrush(self._layer.bcolor, self._bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
+    # def _definePensBrushes(self):
+    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
+    #     self._bitmap = QBitmap.fromImage(
+    #         QPixmap(self._layer.btexture).scaled(10, 10).toImage()
+    #     )
+    #     self._brush = QBrush(self._layer.bcolor, self._bitmap)
+    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
+    #     self._selectedBrush = QBrush(QColor("yellow"), self._bitmap)
 
     def boundingRect(self) -> QRectF:
         return self._polygon.boundingRect()

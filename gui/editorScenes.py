@@ -115,6 +115,7 @@ class editorScene(QGraphicsScene):
         self.messageLine = self.editorWindow.messageLine
         self.statusLine = self.editorWindow.statusLine
         self.installEventFilter(self)
+        self.setMinimumRenderSize(2)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)

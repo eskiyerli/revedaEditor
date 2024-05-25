@@ -31,9 +31,11 @@ from PySide6.QtGui import (
     QColor,
     QPixmap,
     QBitmap,
+    QImage,
 )
 from PySide6.QtCore import (Signal, Qt, QModelIndex, QSize,)
-
+from pathlib import Path
+import pdk.layoutLayers as laylyr
 
 class layerDataModel(QStandardItemModel):
     def __init__(self, data: list):
@@ -51,9 +53,11 @@ class layerDataModel(QStandardItemModel):
         for row, layer in enumerate(self._data):
             self.insertRow(row)
             # bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(5, 5).toImage())
-            bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(QSize(4, 4),
-                                    Qt.KeepAspectRatio, Qt.SmoothTransformation).toImage())
-            brush = QBrush(bitmap)
+            texturePath = Path(laylyr.__file__).parent.joinpath(layer.btexture)
+            _bitmap = QBitmap.fromImage(self.createImage(texturePath, layer.bcolor))
+            # bitmap = QBitmap.fromImage(QPixmap(layer.btexture).scaled(QSize(4, 4),
+            #                         Qt.KeepAspectRatio, Qt.SmoothTransformation).toImage())
+            brush = QBrush(_bitmap)
             brush.setColor(QColor(layer.bcolor))
             item = QStandardItem()
             item.setForeground(QBrush(QColor(255, 255, 255)))
@@ -84,6 +88,26 @@ class layerDataModel(QStandardItemModel):
             for layer in layerlist
         ]
 
+    @staticmethod
+    def createImage(filePath:Path, color: QColor):
+        # Read the file and split lines
+        with filePath.open('r') as file:
+            lines = file.readlines()
+
+        height = len(lines)
+        width = len(lines[0].split())
+
+        image = QImage(width, height, QImage.Format_ARGB32)
+        image.fill(QColor(0, 0, 0, 0))
+
+        for y, line in enumerate(lines):
+            for x, value in enumerate(line.split()):
+                if int(value) == 1:
+                    image.setPixelColor(x, y, color)  #
+                else:
+                    image.setPixelColor(x, y, QColor(0, 0, 0, 0))  # Transparent for 0
+
+        return image
 
 class layerViewTable(QTableView):
     dataSelected = Signal(str, str)
