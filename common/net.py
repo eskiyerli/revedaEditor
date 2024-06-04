@@ -198,8 +198,13 @@ class schematicNet(QGraphicsItem):
     def __repr__(self):
         return f"schematicNet({self.sceneEndPoints})"
 
-    # def itemChange(self, change, value):
-    #     return super().itemChange(change, value)
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            if value:
+                self.scene().selectedNet= self
+            else:
+                self.scene().selectedNet = None
+        return super().itemChange(change, value)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         super().mousePressEvent(event)

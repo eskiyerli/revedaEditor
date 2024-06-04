@@ -23,19 +23,21 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-from PySide6.QtWidgets import QTableView
+from pathlib import Path
+
+from PySide6.QtCore import (Signal, Qt, QModelIndex, )
 from PySide6.QtGui import (
     QStandardItemModel,
     QStandardItem,
     QBrush,
     QColor,
-    QPixmap,
     QBitmap,
     QImage,
 )
-from PySide6.QtCore import (Signal, Qt, QModelIndex, QSize,)
-from pathlib import Path
+from PySide6.QtWidgets import (QTableView, QMenu, QGraphicsItem,)
+
 import pdk.layoutLayers as laylyr
+
 
 class layerDataModel(QStandardItemModel):
     def __init__(self, data: list):
@@ -46,7 +48,7 @@ class layerDataModel(QStandardItemModel):
         # Set the headers for the columns
         self.setHeaderData(0, Qt.Horizontal, "")
         self.setHeaderData(1, Qt.Horizontal, "Layer")
-        self.setHeaderData(2, Qt.Horizontal, "Purpose")
+        self.setHeaderData(2, Qt.Horizontal, "Purp.")
         self.setHeaderData(3, Qt.Horizontal, "V")
         self.setHeaderData(4, Qt.Horizontal, "S")
 
@@ -117,11 +119,15 @@ class layerViewTable(QTableView):
     def __init__(self, parent=None, model: layerDataModel = None):
         super().__init__(parent)
         self._model = model
+        self.parent = parent
+        self.layoutScene = self.parent.scene
         self.setModel(self._model)
+        self.selectedRow: int = -1
         self.resizeColumnsToContents()
         self.setShowGrid(False)
-        self.setMaximumWidth(400)
+        # self.setMaximumWidth(400)
         self.setSelectionBehavior(QTableView.SelectRows)
+        self.setSelectionMode(QTableView.SingleSelection)
         self.verticalHeader().setVisible(False)
         selection_model = self.selectionModel()
         selection_model.selectionChanged.connect(self.onSelectionChanged)
@@ -173,3 +179,33 @@ class layerViewTable(QTableView):
                         self._model.item(row, 2).text(),
                         False,
                     )
+
+    def noLayersVisible(self):
+        for layer in laylyr.pdkAllLayers:
+            layer.visible = False
+        for row in range(self._model.rowCount()):
+            self._model.item(row, 3).setCheckState(Qt.Unchecked)
+
+    def allLayersVisible(self):
+        for layer in laylyr.pdkAllLayers:
+            layer.visible = True
+        for row in range(self._model.rowCount()):
+            self._model.item(row, 3).setCheckState(Qt.Checked)
+
+    def noLayersSelectable(self):
+        for layer in laylyr.pdkAllLayers:
+            layer.selectable = False
+        for row in range(self._model.rowCount()):
+            self._model.item(row, 4).setCheckState(Qt.Unchecked)
+        for item in self.layoutScene.items():
+            if hasattr(item, 'layer') and item.parentItem() is None:
+                item.setEnabled(False)
+
+    def allLayersSelectable(self):
+        for layer in laylyr.pdkAllLayers:
+            layer.selectable = True
+        for row in range(self._model.rowCount()):
+            self._model.item(row, 4).setCheckState(Qt.Checked)
+            for item in self.layoutScene.items():
+                if item.parentItem() is None and hasattr(item, 'layer'):
+                    item.setEnabled(True)

@@ -615,9 +615,6 @@ class editorWindow(QMainWindow):
         self.libraryView = libraryView
         self.parentEditor = None  # type: editorWindow
         self._app = QApplication.instance()  # main application pointer
-        self._createActions()
-        self._createTriggers()
-        self._createShortcuts()
         self.appMainW = self.libraryView.parent.parent.appMainW
         self.logger = self.appMainW.logger
         self.switchViewList = self.appMainW.switchViewList
@@ -629,15 +626,16 @@ class editorWindow(QMainWindow):
         self.snapGrid = 5  # snapping grid size
         self.snapTuple = (self.snapGrid, self.snapGrid)
         self.snapDistance = 2 * self.snapGrid
-        # if self._app.revedasim_path:
-        #     pass
         self.init_UI()
 
     def init_UI(self):
-        """
-        Placeholder for child classes init_UI function.
-        """
-        ...
+        self.resize(1600, 800)
+        self._createActions()
+        self._createMenuBar()
+        self._createToolBars()
+        self._addActions()
+        self._createTriggers()
+        self._createShortcuts()
 
     def _createMenuBar(self):
         """
@@ -832,10 +830,6 @@ class editorWindow(QMainWindow):
         netlistIcon = QIcon(":/icons/script-text.png")
         self.netlistAction = QAction(netlistIcon, "Create Netlist...", self)
         self.netlistAction.setToolTip("Create Netlist")
-
-        simulateIcon = QIcon(":/icons/application-wave.png")
-        self.simulateAction = QAction(simulateIcon, "Run RevEDA Sim GUI", self)
-        self.simulateAction.setToolTip("Run RevEDA Sim GUI")
 
         createLineIcon = QIcon(":/icons/layer-shape-line.png")
         self.createLineAction = QAction(createLineIcon, "Create Line...", self)
@@ -1205,12 +1199,20 @@ class layoutEditor(editorWindow):
         self._layoutContextMenu()
 
     def init_UI(self):
-        self.resize(1600, 800)
-        self._createMenuBar()
-        self._createToolBars()
+        super().init_UI()
         # create container to position all widgets
         self.centralW = layoutContainer(self)
         self.setCentralWidget(self.centralW)
+
+    def _createMenuBar(self):
+        super()._createMenuBar()
+        self.selectMenu = QMenu('Selection', self)
+        self.selectMenu.setIcon(QIcon('icons/node-select.png'))
+        self.menuUtilities.addMenu(self.selectMenu)
+        self.selectMenu.addAction(self.selectDeviceAction)
+        self.selectMenu.addAction(self.selectWireAction)
+        self.selectMenu.addSeparator()
+        self.selectMenu.addAction(self.removeSelectFilterAction)
 
     def _createActions(self):
         super()._createActions()
@@ -1233,11 +1235,6 @@ class layoutEditor(editorWindow):
         self.menuCreate.addAction(self.rulerAction)
         self.menuCreate.addAction(self.delRulerAction)
         self.menuTools.addAction(self.exportGDSAction)
-        self.selectMenu = self.menuUtilities.addMenu("Selection")
-        self.selectMenu.addAction(self.selectDeviceAction)
-        self.selectMenu.addAction(self.selectWireAction)
-        self.selectMenu.addSeparator()
-        self.selectMenu.addAction(self.removeSelectFilterAction)
         # hierarchy submenu
         self.hierMenu = self.menuEdit.addMenu("Hierarchy")
         self.hierMenu.addAction(self.goUpAction)
@@ -1578,12 +1575,12 @@ class schematicEditor(editorWindow):
         self._schematicContextMenu()
 
     def init_UI(self):
+        super().init_UI()
         self.resize(1600, 800)
-        self._createMenuBar()
-        self._createToolBars()
         # create container to position all widgets
         self.centralW = schematicContainer(self)
         self.setCentralWidget(self.centralW)
+
 
     def _createActions(self):
         super()._createActions()
@@ -1595,6 +1592,9 @@ class schematicEditor(editorWindow):
         self.hilightNetAction.setCheckable(True)
         self.renumberInstanceAction = QAction("Renumber Instances", self)
         self.renumberInstanceAction.setToolTip("Renumber Instances")
+        simulationIcon = QIcon("icons/application-run.png")
+        self.simulateAction = QAction(simulationIcon, "Simulaiton GUI...", self)
+
 
     def _createTriggers(self):
         super()._createTriggers()
@@ -1619,11 +1619,6 @@ class schematicEditor(editorWindow):
         self.removeSelectFilterAction.triggered.connect(self.removeSelectFilterClick)
         self.renumberInstanceAction.triggered.connect(self.renumberInstanceClick)
 
-    def _createMenuBar(self):
-        super()._createMenuBar()
-        self.menuSimulation = self.editorMenuBar.addMenu("&Simulation")
-        self.menuHelp = self.editorMenuBar.addMenu("&Help")
-        self._addActions()
 
     def _addActions(self):
         super()._addActions()
@@ -1660,11 +1655,14 @@ class schematicEditor(editorWindow):
         self.selectMenu.addAction(self.selectPinAction)
         self.selectMenu.addSeparator()
         self.selectMenu.addAction(self.removeSelectFilterAction)
-
+        self.simulationMenu = QMenu("&Simulation")
         # help menu
-        self.menuSimulation.addAction(self.netlistAction)
+        self.simulationMenu.addAction(self.netlistAction)
+        self.editorMenuBar.insertMenu(
+            self.menuHelp.menuAction(), self.simulationMenu)
+        # self.menuHelp = self.editorMenuBar.addMenu("&Help")
         if self._app.revedasim_path:
-            self.menuSimulation.addAction(self.simulateAction)
+            self.simulationMenu.addAction(self.simulateAction)
 
     def _createToolBars(self):
         super()._createToolBars()
@@ -1898,8 +1896,8 @@ class schematicEditor(editorWindow):
             self.appMainW.threadPool.start(xyceNetlRunner)
             # netlistObj.writeNetlist()
             endTime = time.perf_counter()
-            print(f"Netlisting time: {endTime - startTime}")
-            self.logger.info("Netlisting finished.")
+            self.logger.info(f"Netlisting time: {endTime - startTime}")
+            print("Netlisting finished.")
 
     def goDownClick(self, s):
         self.centralW.scene.goDownHier()
@@ -2157,8 +2155,7 @@ class symbolEditor(editorWindow):
 
     def init_UI(self):
         self.resize(1600, 800)
-        self._createMenuBar()
-        self._createToolBars()
+
         # create container to position all widgets
         self.centralW = symbolContainer(self)
         self.setCentralWidget(self.centralW)
@@ -2176,7 +2173,7 @@ class symbolEditor(editorWindow):
 
     def _createMenuBar(self):
         super()._createMenuBar()
-        self.menuHelp = self.editorMenuBar.addMenu("&Help")
+        # self.menuHelp = self.editorMenuBar.addMenu("&Help")
         self._addActions()
 
     def _createToolBars(self):  # redefine the toolbar in the editorWindow class
@@ -2366,15 +2363,17 @@ class schematicContainer(QWidget):
 class layoutContainer(QWidget):
     def __init__(self, parent: layoutEditor):
         super().__init__(parent=parent)
-        assert isinstance(parent, layoutEditor)
         self.parent = parent
-        self.lswModel = lsw.layerDataModel(laylyr.pdkAllLayers)
-        self.lswWidget = lsw.layerViewTable(self, self.lswModel)
-        self.lswWidget.dataSelected.connect(self.selectLayer)
-        self.lswWidget.layerSelectable.connect(self.layerSelectableChange)
-        self.lswWidget.layerVisible.connect(self.layerVisibleChange)
         self.scene = escn.layoutScene(self)
         self.view = edv.layoutView(self.scene, self)
+        self.lswModel = lsw.layerDataModel(laylyr.pdkAllLayers)
+        layerViewTable = lsw.layerViewTable(self, self.lswModel)
+        self.lswWidget = lswWindow(layerViewTable)
+        self.lswWidget.setMinimumWidth(300)
+        self.lswWidget.lswTable.dataSelected.connect(self.selectLayer)
+        self.lswWidget.lswTable.layerSelectable.connect(self.layerSelectableChange)
+        self.lswWidget.lswTable.layerVisible.connect(self.layerVisibleChange)
+
         self.init_UI()
 
     def init_UI(self):
@@ -2408,19 +2407,53 @@ class layoutContainer(QWidget):
         if selectedLayer:
             selectedLayer.selectable = layerSelectable
 
+        for item in self.scene.items():
+            if (hasattr(item, 'layer') and item.layer == selectedLayer and item.parentItem()
+                    is None):
+                item.setEnabled(layerSelectable)
+                item.update()
+
     def layerVisibleChange(self, layerName: str, layerPurpose: str, layerVisible: bool):
         selectedLayer = self.findSelectedLayer(layerName, layerPurpose)
         if selectedLayer:
-            if layerVisible:
-                selectedLayer.visible = True
-            else:
-                selectedLayer.visible = False
+            selectedLayer.visible = layerVisible
 
             for item in self.scene.items():
                 if hasattr(item, "layer") and item.layer == selectedLayer:
                     item.setVisible(layerVisible)
                     item.update()
 
+
+class lswWindow(QWidget):
+    def __init__(self, lswTable: lsw.layerViewTable):
+        super().__init__()
+        self.lswTable = lswTable
+        layout = QVBoxLayout()
+        toolBar = QToolBar()
+        avIcon = QIcon('icons/eye.png')
+        nvIcon = QIcon('icons/eye-close.png')
+        avAction = QAction(avIcon, 'All Visible', self)
+        avAction.setToolTip('All layers visible')
+        avAction.triggered.connect(self.lswTable.allLayersVisible)
+        nvAction = QAction(nvIcon, 'None Visible', self)
+        nvAction.setToolTip('No layer visible')
+        nvAction.triggered.connect(self.lswTable.noLayersVisible)
+        asIcon = QIcon('icons/pencil.png')
+        nsIcon = QIcon('icons/pencil-prohibition.png')
+        nsAction = QAction(nsIcon, 'All Selectable', self)
+        nsAction.setToolTip('No layers selectable')
+        nsAction.triggered.connect(self.lswTable.noLayersSelectable)
+        asAction = QAction(asIcon, 'None Selectable', self)
+        asAction.setToolTip('All layers selectable')
+        asAction.triggered.connect(self.lswTable.allLayersSelectable)
+
+        toolBar.addAction(avAction)
+        toolBar.addAction(nvAction)
+        toolBar.addAction(asAction)
+        toolBar.addAction(nsAction)
+        layout.addWidget(toolBar)
+        layout.addWidget(self.lswTable)
+        self.setLayout(layout)
 
 class xyceNetlist:
     def __init__(

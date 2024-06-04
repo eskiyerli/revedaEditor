@@ -1303,41 +1303,46 @@ class schematicSymbol(symbolShape):
 
     def itemChange(self, change, value):
         if self.scene():
-            if change == QGraphicsItem.ItemPositionChange:
-                if self._snapLines is None:
-                    self._snapLines = dict()
-                    self.findPinNetIndexTuples()
-                    for item in self._pinNetIndexTupleSet:
-                        self._snapLines.setdefault(item.pin, set())
-                        snapLine = net.guideLine(
-                            item.pin.mapToScene(item.pin.start),
-                            item.net.sceneEndPoints[item.netEndIndex - 1],
-                        )
-                        snapLine.inherit(item.net)
-                        self.scene().addItem(snapLine)
-                        self._snapLines[item.pin].add(snapLine)
-                        self.scene().removeItem(item.net)
-                else:
-                    for pin, snapLinesSet in self._snapLines.items():
-                        for snapLine in snapLinesSet:
-                            snapLine.setLine(
-                                QLineF(
-                                    snapLine.mapFromScene(pin.mapToScene(pin.start)),
-                                    snapLine.line().p2(),
+            match change:
+                case QGraphicsItem.ItemPositionChange:
+                    if self._snapLines is None:
+                        self._snapLines = dict()
+                        self.findPinNetIndexTuples()
+                        for item in self._pinNetIndexTupleSet:
+                            self._snapLines.setdefault(item.pin, set())
+                            snapLine = net.guideLine(
+                                item.pin.mapToScene(item.pin.start).toPoint(),
+                                item.net.sceneEndPoints[item.netEndIndex - 1],
+                            )
+                            snapLine.inherit(item.net)
+                            self.scene().addItem(snapLine)
+                            self._snapLines[item.pin].add(snapLine)
+                            self.scene().removeItem(item.net)
+                    else:
+                        for pin, snapLinesSet in self._snapLines.items():
+                            for snapLine in snapLinesSet:
+                                snapLine.setLine(
+                                    QLineF(
+                                        snapLine.mapFromScene(pin.mapToScene(pin.start)),
+                                        snapLine.line().p2(),
+                                    )
                                 )
-                            )
-        if (
-            change == QGraphicsItem.ItemPositionHasChanged
-        ):  # adjust the net ends after move is finished.
-            if self._snapLines is not None:
-                for pin, snapLinesSet in self._snapLines.items():
-                    for snapLine in snapLinesSet:
-                        snapLine.setLine(
-                            QLineF(
-                                snapLine.mapFromScene(pin.mapToScene(pin.start)),
-                                snapLine.line().p2(),
-                            )
-                        )
+                case QGraphicsItem.ItemPositionHasChanged:
+                    if self._snapLines is not None:
+                        for pin, snapLinesSet in self._snapLines.items():
+                            for snapLine in snapLinesSet:
+                                snapLine.setLine(
+                                    QLineF(
+                                        snapLine.mapFromScene(pin.mapToScene(pin.start)),
+                                        snapLine.line().p2(),
+                                    )
+                                )
+                case QGraphicsItem.ItemSelectedHasChanged:
+                    if value:
+                        self.scene().selectedSymbol = self
+                    else:
+                        self.scene().selectedSymbol = None
+
         return super().itemChange(change, value)
 
     def paint(self, painter, option, widget):
@@ -1448,7 +1453,7 @@ class schematicSymbol(symbolShape):
         self._instanceName = value
         if self.labels.get("instanceName", None):
             self.labels["instanceName"].labelValue = value
-            self.labels["instanceName"].labelValueSet = True
+            # self.labels["instanceName"].labelValueSet = True
             self.labels["instanceName"].update()
 
     @property
@@ -1591,6 +1596,14 @@ class schematicPin(symbolShape):
                     ]
                 )
         painter.drawText(self._start.x(), self._start.y() - 20, self.pinName)
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            if value:
+                self.scene().selectedPin= self
+            else:
+                self.scene().selectedPin = None
+        return super().itemChange(change, value)
 
     def boundingRect(self):
         return QRect(self._start.x() - 10, self._start.y() - 10, 30, 20).adjusted(

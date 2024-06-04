@@ -141,7 +141,7 @@ class viewItem(QStandardItem):
 
     @property
     def viewName(self):
-        return self.viewPath.stem
+        return str(self.viewPath.stem)
 
 
 def createLibrary(parent, model, libraryDir, libraryName) -> libraryItem:

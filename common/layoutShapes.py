@@ -28,13 +28,14 @@
 # base class for all shapes: rectangle, circle, line
 import itertools
 import math
-from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QPointF, QLineF
+from pathlib import Path
+
+from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QPointF, QLineF, )
 from PySide6.QtGui import (
     QPen,
     QBrush,
     QColor,
     QTransform,
-    QPixmap,
     QBitmap,
     QFontMetrics,
     QFont,
@@ -51,9 +52,8 @@ from PySide6.QtWidgets import (
     QGraphicsSceneHoverEvent,
 )
 
-import revedaEditor.backend.dataDefinitions as ddef
-from pathlib import Path
 import pdk.layoutLayers as laylyr
+import revedaEditor.backend.dataDefinitions as ddef
 
 
 class layoutShape(QGraphicsItem):
@@ -438,6 +438,7 @@ class layoutInstance(layoutShape):
         self._instanceName = ""
         # Pen used for selection
         self._selectedPen = QPen(QColor("yellow"), 1, Qt.DashLine)
+        self._selectedPen.setCosmetic(True)
         # Set the shapes for the symbol
         self.setShapes()
         # Enable child event filtering for filters and handles
@@ -877,7 +878,9 @@ class layoutRuler(layoutShape):
         penColour = QColor(255, 255, 40)
         # penColour.setAlpha(128)
         self._pen = QPen(penColour, self._width, Qt.SolidLine)
+        self._pen.setCosmetic(True)
         self._selectedPen = QPen(Qt.red, self._width + 1, Qt.SolidLine)
+        self._selectedPen.setCosmetic(True)
         # self._pen.setCosmetic(True)
         self._tickTuples = list()
         self._tickFont = tickFont
