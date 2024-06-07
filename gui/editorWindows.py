@@ -962,7 +962,9 @@ class editorWindow(QMainWindow):
         self.menuEdit.addAction(self.moveOriginAction)
         self.menuEdit.addAction(self.stretchAction)
         self.menuEdit.addAction(self.rotateAction)
-        self.selectMenu = self.menuEdit.addMenu("Select")
+        self.selectMenu = QMenu('Selection', self)
+        self.selectMenu.setIcon(QIcon('icons/node-select.png'))
+        self.menuEdit.addMenu(self.selectMenu)
         self.selectMenu.addAction(self.selectAllAction)
         self.selectMenu.addAction(self.deselectAllAction)
         self.menuTools.addAction(self.readOnlyCellAction)
@@ -1195,7 +1197,6 @@ class layoutEditor(editorWindow):
         self.dbu = fabproc.dbu
         self.layoutChooser = None
         self.gdsExportDir = pathlib.Path.cwd()
-        self._addActions()
         self._layoutContextMenu()
 
     def init_UI(self):
@@ -1206,13 +1207,10 @@ class layoutEditor(editorWindow):
 
     def _createMenuBar(self):
         super()._createMenuBar()
-        self.selectMenu = QMenu('Selection', self)
-        self.selectMenu.setIcon(QIcon('icons/node-select.png'))
-        self.menuUtilities.addMenu(self.selectMenu)
-        self.selectMenu.addAction(self.selectDeviceAction)
-        self.selectMenu.addAction(self.selectWireAction)
-        self.selectMenu.addSeparator()
-        self.selectMenu.addAction(self.removeSelectFilterAction)
+        self.alignMenu = QMenu('Align', self)
+        self.alignMenu.setIcon(QIcon('icons/layers-alignment-middle.png'))
+
+        self.propertyMenu = self.menuEdit.addMenu("Properties")
 
     def _createActions(self):
         super()._createActions()
@@ -1221,7 +1219,13 @@ class layoutEditor(editorWindow):
 
     def _addActions(self):
         super()._addActions()
-        self.propertyMenu = self.menuEdit.addMenu("Properties")
+        self.menuEdit.addMenu(self.alignMenu)
+        # self.menuUtilities.addMenu(self.selectMenu)
+        self.selectMenu.addAction(self.selectDeviceAction)
+        self.selectMenu.addAction(self.selectWireAction)
+        self.selectMenu.addSeparator()
+        self.selectMenu.addAction(self.removeSelectFilterAction)
+
         self.propertyMenu.addAction(self.objPropAction)
         self.menuEdit.addAction(self.stretchAction)
         self.menuCreate.addAction(self.createInstAction)
@@ -2151,11 +2155,9 @@ class symbolEditor(editorWindow):
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Symbol Editor - {self.cellName} - {self.viewName}")
         self._symbolContextMenu()
-        # self._createActions()
 
     def init_UI(self):
-        self.resize(1600, 800)
-
+        super().init_UI()
         # create container to position all widgets
         self.centralW = symbolContainer(self)
         self.setCentralWidget(self.centralW)
@@ -2171,10 +2173,6 @@ class symbolEditor(editorWindow):
         self.createLabelAction.setShortcut(Qt.Key_L)
         self.createPinAction.setShortcut(Qt.Key_P)
 
-    def _createMenuBar(self):
-        super()._createMenuBar()
-        # self.menuHelp = self.editorMenuBar.addMenu("&Help")
-        self._addActions()
 
     def _createToolBars(self):  # redefine the toolbar in the editorWindow class
         super()._createToolBars()
@@ -2522,6 +2520,55 @@ class xyceNetlist:
         assert isinstance(value, dict)
         self._configDict = value
 
+
+    # def recursiveNetlisting(self, schematic: schematicEditor, cirFile):
+    #     """
+    #     Recursively traverse all sub-circuits and netlist them.
+    #     """
+    #     try:
+    #         schematicScene = schematic.centralW.scene
+    #         schematicNets = schematicScene.findSceneNetsSet()
+    #         schematicScene.groupAllNets(schematicNets)  # name all nets in the
+    #         # schematic
+    #         sceneSymbolSet = schematicScene.findSceneSymbolSet()
+    #         schematicScene.generatePinNetMap(tuple(sceneSymbolSet))
+    #         for elementSymbol in sceneSymbolSet:
+    #             if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
+    #                 not elementSymbol.netlistIgnore
+    #             ):
+    #                 libItem = libm.getLibItem(
+    #                     schematic.libraryView.libraryModel, elementSymbol.libraryName
+    #                 )
+    #                 cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
+    #                 viewItems = [
+    #                     cellItem.child(row) for row in range(cellItem.rowCount())
+    #                 ]
+    #                 viewNames = [view.viewName for view in viewItems]
+    #
+    #                 netlistView = "symbol"
+    #                 if self._use_config:
+    #                     netlistView = self.configDict.get(elementSymbol.cellName)[1]
+    #                 else:
+    #                     for viewName in self.switchViewList:
+    #                         if viewName in viewNames:
+    #                             netlistView = viewName
+    #                             break
+    #                 # these are qstandarditem in library browser.
+    #                 # viewItem = libm.getViewItem(cellItem, netlistView)
+    #
+    #                 # now create the netlist line for that item.
+    #                 self.createItemLine(cirFile, elementSymbol, cellItem, netlistView)
+    #             elif elementSymbol.netlistIgnore:
+    #                 cirFile.write(
+    #                     f"*{elementSymbol.instanceName} is marked to be ignored\n"
+    #                 )
+    #             elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
+    #                 cirFile.write(
+    #                     f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n"
+    #                 )
+    #
+    #     except Exception as e:
+    #         self.schematic.logger.error(f"Netlisting error: {e}")
     @lru_cache(maxsize=16)
     def recursiveNetlisting(self, schematic: schematicEditor, cirFile):
         """
@@ -2530,47 +2577,43 @@ class xyceNetlist:
         try:
             schematicScene = schematic.centralW.scene
             schematicNets = schematicScene.findSceneNetsSet()
-            schematicScene.groupAllNets(schematicNets)  # name all nets in the
-            # schematic
+            schematicScene.groupAllNets(schematicNets)  # name all nets in the schematic
+
             sceneSymbolSet = schematicScene.findSceneSymbolSet()
             schematicScene.generatePinNetMap(tuple(sceneSymbolSet))
+
             for elementSymbol in sceneSymbolSet:
-                if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
-                    not elementSymbol.netlistIgnore
-                ):
-                    libItem = libm.getLibItem(
-                        schematic.libraryView.libraryModel, elementSymbol.libraryName
-                    )
-                    cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
-                    viewItems = [
-                        cellItem.child(row) for row in range(cellItem.rowCount())
-                    ]
-                    viewNames = [view.viewName for view in viewItems]
-
-                    netlistView = "symbol"
-                    if self._use_config:
-                        netlistView = self.configDict.get(elementSymbol.cellName)[1]
-                    else:
-                        for viewName in self.switchViewList:
-                            if viewName in viewNames:
-                                netlistView = viewName
-                                break
-                    # these are qstandarditem in library browser.
-                    # viewItem = libm.getViewItem(cellItem, netlistView)
-
-                    # now create the netlist line for that item.
-                    self.createItemLine(cirFile, elementSymbol, cellItem, netlistView)
-                elif elementSymbol.netlistIgnore:
-                    cirFile.write(
-                        f"*{elementSymbol.instanceName} is marked to be ignored\n"
-                    )
-                elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
-                    cirFile.write(
-                        f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n"
-                    )
-
+                self.processElementSymbol(elementSymbol, schematic, cirFile)
         except Exception as e:
             self.schematic.logger.error(f"Netlisting error: {e}")
+
+    @lru_cache(maxsize=16)
+    def processElementSymbol(self, elementSymbol, schematic, cirFile):
+        if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
+            not elementSymbol.netlistIgnore):
+            libItem = libm.getLibItem(schematic.libraryView.libraryModel,
+                                      elementSymbol.libraryName)
+            cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
+            netlistView = self.determineNetlistView(elementSymbol, cellItem)
+
+            # Create the netlist line for the item.
+            self.createItemLine(cirFile, elementSymbol, cellItem, netlistView)
+        elif elementSymbol.netlistIgnore:
+            cirFile.write(f"*{elementSymbol.instanceName} is marked to be ignored\n")
+        elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
+            cirFile.write(f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n")
+
+    def determineNetlistView(self, elementSymbol, cellItem):
+        viewItems = [cellItem.child(row) for row in range(cellItem.rowCount())]
+        viewNames = [view.viewName for view in viewItems]
+
+        if self._use_config:
+            return self.configDict.get(elementSymbol.cellName)[1]
+        else:
+            for viewName in self.switchViewList:
+                if viewName in viewNames:
+                    return viewName
+            return "symbol"
 
     def createItemLine(
         self,

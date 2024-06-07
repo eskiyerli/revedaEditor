@@ -27,6 +27,8 @@
 # import pathlib
 
 import json
+
+import pdk.pcells
 import pdk.process as fabproc
 from PySide6.QtCore import QPoint, QLineF
 from PySide6.QtWidgets import QGraphicsScene
@@ -39,6 +41,8 @@ import revedaEditor.fileio.symbolEncoder as se
 import pdk.layoutLayers as laylyr
 import pdk.pcells as pcells
 import pathlib
+from cachetools import LRUCache, cachedmethod
+from cachetools.keys import hashkey
 
 
 class symbolItems:
@@ -52,6 +56,7 @@ class symbolItems:
         """
         self.scene = scene
         self.snapTuple = scene.snapTuple
+
 
     def create(self, item: dict):
         """
@@ -327,41 +332,14 @@ class layoutItems:
         self.rulerWidth = scene.rulerWidth
         self.rulerTickGap = scene.rulerTickGap
 
+
     def create(self, item: dict):
         if isinstance(item, dict):
             match item["type"]:
                 case "Inst":
                     return self.createLayoutInstance(item)
                 case "Pcell":
-                    libraryPath = pathlib.Path(self.libraryDict.get(item["lib"]))
-                    if libraryPath is None:
-                        self.scene.logger.error(f'{item["lib"]} cannot be found.')
-                        return None
-                    cell = item["cell"]
-                    viewName = item["view"]
-                    # open pcell json file with reference to pcell class name
-                    file = libraryPath.joinpath(cell, f"{viewName}.json")
-                    with file.open("r") as temp:  # open pcell view item
-                        try:
-                            pcellDef = json.load(temp)
-                            if pcellDef[0]["cellView"] != "pcell":
-                                self.scene.logger.error("Not a pcell cell")
-                            else:
-                                pcellInstance = eval(
-                                    f'pcells.{pcellDef[1]["reference"]}()'
-                                )
-                                pcellInstance(**item["params"])
-                                pcellInstance.libraryName = item["lib"]
-                                pcellInstance.cellName = item["cell"]
-                                pcellInstance.viewName = item["view"]
-                                pcellInstance.counter = item["ic"]
-                                pcellInstance.instanceName = item["nam"]
-                                pcellInstance.setPos(
-                                    QPoint(item["loc"][0], item["loc"][1])
-                                )
-                                return pcellInstance
-                        except json.decoder.JSONDecodeError:
-                            print("Error: Invalid PCell file")
+                    return self.createPcellInstance(item)
                 case "Rect":
                     return self.createRectShape(item)
                 case "Path":
@@ -379,32 +357,154 @@ class layoutItems:
                 case "Ruler":
                     return self.createRulerShape(item)
 
-    def createLayoutInstance(self, item):
-        libraryPath = pathlib.Path(self.libraryDict.get(item["lib"]))
-        if libraryPath is None:
-            print(f'{item["lib"]} cannot be found.')
+    def createPcellInstance(self, item):
+        libraryPath = pathlib.Path(self.libraryDict.get(item["lib"], None))
+        if not libraryPath:
+            self.scene.logger.error(f'{item["lib"]} cannot be found.')
             return None
+
         cell = item["cell"]
         viewName = item["view"]
-        instCounter = item["ic"]
-        file = libraryPath.joinpath(cell, f"{viewName}.json")
-        itemShapes = list()
-        with open(file, "r") as temp:
+        filePath = libraryPath / cell / f"{viewName}.json"
+
+        if not filePath.is_file():
+            self.scene.logger.error(f'File {filePath} does not exist.')
+            return None
+
+        try:
+            with filePath.open("r") as temp:
+                pcellDef = json.load(temp)
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            self.scene.logger.error(f"Error reading PCell file: {e}")
+            return None
+
+        if not pcellDef or pcellDef[0].get("cellView") != "pcell":
+            self.scene.logger.error("Not a PCell cell")
+            return None
+
+
+        pcellClassName = pcellDef[1].get("reference")
+        pcellClass = pdk.pcells.pcells.get(pcellClassName)
+        if not pcellClass:
+            self.scene.logger.error(f"Unknown PCell class: {pcellClassName}")
+            return None
+
+        try:
+            pcellInstance = pcellClass()
+            pcellInstance(**item.get("params", {}))
+            pcellInstance.libraryName = item["lib"]
+            pcellInstance.cellName = item["cell"]
+            pcellInstance.viewName = item["view"]
+            pcellInstance.counter = item["ic"]
+            pcellInstance.instanceName = item["nam"]
+            pcellInstance.setPos(QPoint(*item["loc"]))
+            return pcellInstance
+        except Exception as e:
+            self.scene.logger.error(f"Error creating PCell instance: {e}")
+            return None
+
+    # def createPcellInstance(self, item):
+    #     libraryPath = pathlib.Path(self.libraryDict.get(item["lib"]))
+    #     if libraryPath is None:
+    #         self.scene.logger.error(f'{item["lib"]} cannot be found.')
+    #         return None
+    #     cell = item["cell"]
+    #     viewName = item["view"]
+    #     # open pcell json file with reference to pcell class name
+    #     file = libraryPath.joinpath(cell, f"{viewName}.json")
+    #     with file.open("r") as temp:  # open pcell view item
+    #         try:
+    #             pcellDef = json.load(temp)
+    #             if pcellDef[0]["cellView"] != "pcell":
+    #                 self.scene.logger.error("Not a pcell cell")
+    #             else:
+    #                 pcellInstance = eval(
+    #                     f'pcells.{pcellDef[1]["reference"]}()'
+    #                 )
+    #
+    #                 pcellInstance(**item["params"])
+    #                 pcellInstance.libraryName = item["lib"]
+    #                 pcellInstance.cellName = item["cell"]
+    #                 pcellInstance.viewName = item["view"]
+    #                 pcellInstance.counter = item["ic"]
+    #                 pcellInstance.instanceName = item["nam"]
+    #                 pcellInstance.setPos(
+    #                     QPoint(item["loc"][0], item["loc"][1])
+    #                 )
+    #                 return pcellInstance
+    #         except json.decoder.JSONDecodeError:
+    #             print("Error: Invalid PCell file")
+
+    def createLayoutInstance(self, item):
+        libraryName = item.get("lib")
+        libraryPath = pathlib.Path(self.libraryDict.get(libraryName))
+
+        if not libraryPath.exists():
+            self.scene.logger.error(f'{libraryName} cannot be found.')
+            return None
+
+        cell = item.get("cell")
+        viewName = item.get("view")
+        # instCounter = item.get("ic")
+        filePath = libraryPath / cell / f"{viewName}.json"
+
+        if not filePath.is_file():
+            self.scene.logger.error(f'File {filePath} does not exist.')
+            return None
+
+        try:
+            with filePath.open("r") as file:
+                shapes = json.load(file)
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            self.scene.logger.error(f"Error reading Layout file: {e}")
+            return None
+
+        itemShapes = []
+        for shape in shapes[2:]:
             try:
-                shapes = json.load(temp)
-                for shape in shapes[2:]:
-                    itemShapes.append(layoutItems(self.scene).create(shape))
-            except json.decoder.JSONDecodeError:
-                print("Error: Invalid Layout file")
+                itemShapes.append(layoutItems(self.scene).create(shape))
+            except Exception as e:
+                self.scene.logger.error(f"Error creating shape: {e}")
+
         layoutInstance = lshp.layoutInstance(itemShapes)
-        layoutInstance.libraryName = item["lib"]
-        layoutInstance.cellName = item["cell"]
-        layoutInstance.counter = instCounter
+        layoutInstance.libraryName = libraryName
+        layoutInstance.cellName = cell
+        layoutInstance.counter = item.get("ic")
         layoutInstance.instanceName = item.get("nam", "")
         layoutInstance.setPos(item["loc"][0], item["loc"][1])
         layoutInstance.angle = item.get("ang", 0)
         layoutInstance.viewName = viewName
+
         return layoutInstance
+
+    #
+    # def createLayoutInstance(self, item):
+    #     libraryPath = pathlib.Path(self.libraryDict.get(item["lib"]))
+    #     if libraryPath is None:
+    #         self.scene.logger.error(f'{item["lib"]} cannot be found.')
+    #         return None
+    #     cell = item["cell"]
+    #     viewName = item["view"]
+    #     instCounter = item["ic"]
+    #     file = libraryPath.joinpath(cell, f"{viewName}.json")
+    #     itemShapes = list()
+    #     with open(file, "r") as temp:
+    #         try:
+    #             shapes = json.load(temp)
+    #             for shape in shapes[2:]:
+    #                 itemShapes.append(layoutItems(self.scene).create(shape))
+    #         except json.decoder.JSONDecodeError:
+    #             print("Error: Invalid Layout file")
+    #     layoutInstance = lshp.layoutInstance(itemShapes)
+    #     layoutInstance.libraryName = item["lib"]
+    #     layoutInstance.cellName = item["cell"]
+    #     layoutInstance.counter = instCounter
+    #     layoutInstance.instanceName = item.get("nam", "")
+    #     layoutInstance.setPos(item["loc"][0], item["loc"][1])
+    #     layoutInstance.angle = item.get("ang", 0)
+    #     layoutInstance.viewName = viewName
+    #     return layoutInstance
+
 
     def createRectShape(self, item):
         start = QPoint(item["tl"][0], item["tl"][1])
@@ -414,6 +514,7 @@ class layoutItems:
         # rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item.get("ang", 0)
         return rect
+
 
     def createPathShape(self, item):
         path = lshp.layoutPath(
