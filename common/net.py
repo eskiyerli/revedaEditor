@@ -256,13 +256,17 @@ class schematicNet(QGraphicsItem):
         super().hoverLeaveEvent(event)
         if self._highlighted:
             self._highlighted = False
-            # [netItem.unhighlight() for netItem in self._connectedNetsSet]
-            # [flightLine.removeFromScene() for flightLine in self._flightLinesSet]
-            # self._flightLinesSet = set()
-            for flightLine in self._flightLinesSet:
-                self.scene().removeItem(flightLine)
-            self._flightLinesSet = set()
-        [netItem.unhighlight() for netItem in self._connectedNetsSet]
+            self._clearFlightLines()
+            self._unhighlightConnectedNets()
+
+    def _clearFlightLines(self) -> None:
+        for flight_line in self._flightLinesSet:
+            self.scene().removeItem(flight_line)
+        self._flightLinesSet.clear()
+
+    def _unhighlightConnectedNets(self) -> None:
+        for net_item in self._connectedNetsSet:
+            net_item.unhighlight()
 
     def isParallel(self, otherNet: "schematicNet") -> bool:
         return abs((self.angle - otherNet.angle) % 180) < 1
@@ -282,11 +286,12 @@ class schematicNet(QGraphicsItem):
         """
         overlapNets = set()
         if self.scene():
-            overlapNets = {
-                netItem
-                for netItem in self.scene().items(self.sceneShapeRect)
-                if isinstance(netItem, schematicNet)
-            }
+            # overlapNets = {
+            #     netItem
+            #     for netItem in self.scene().items(self.sceneShapeRect)
+            #     if isinstance(netItem, schematicNet)
+            # }
+            overlapNets = {netItem for netItem in self.collidingItems() if isinstance(netItem, schematicNet)}
             return overlapNets - {self}
 
     def mergeNets(self) -> tuple["schematicNet", "schematicNet"]:
@@ -395,6 +400,10 @@ class schematicNet(QGraphicsItem):
         assert isinstance(value, bool)
         self._nameConflict = value
 
+    @property
+    def endPoints(self):
+        return [self._draftLine.p1().toPoint(), self._draftLine.p2().toPoint()]
+    
     @property
     def sceneEndPoints(self):
         return [

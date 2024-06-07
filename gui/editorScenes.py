@@ -28,6 +28,7 @@ import inspect
 import itertools as itt
 import json
 import os
+import time
 
 # from hashlib import new
 import pathlib
@@ -200,6 +201,28 @@ class editorScene(QGraphicsScene):
 
     def copySelectedItems(self):
         pass
+
+    # def selectSceneItems(self, modifiers):
+    #     """
+    #     Selects scene items based on the given modifiers.
+    #     A selection rectangle is drawn if ShiftModifier is pressed,
+    #     else a single item is selected. The function does not return anything.
+
+    #     :param modifiers: The keyboard modifiers that determine the selection type.
+    #     :type modifiers: Qt.KeyboardModifiers
+    #     """
+    #     if modifiers == Qt.ShiftModifier:
+    #         self.editorWindow.messageLine.setText("Draw Selection Rectangle")
+    #         self.selectionRectItem = QGraphicsRectItem(
+    #             QRectF(self.mousePressLoc, self.mousePressLoc)
+    #         )
+    #         self.selectionRectItem.setPen(schlyr.draftPen)
+
+    #         self.undoStack.push(us.addShapeUndo(self, self.selectionRectItem))
+    #         # self.addItem(self.selectionRectItem)
+    #     self.editorWindow.messageLine.setText(
+    #         "Item selected" if self.selectedItems() else "Nothing selected"
+    #     )
 
     def selectSceneItems(self, modifiers):
         """
@@ -862,7 +885,6 @@ class symbolScene(editorScene):
         self.undoStack.push(undoCommand)
 
     def updatePolygonShape(self, item):
-
         tempPoints = []
         for i in range(self.queryDlg.tableWidget.rowCount()):
             xcoor = self.queryDlg.tableWidget.item(i, 1).text()
@@ -1246,55 +1268,53 @@ class schematicScene(editorScene):
     def mergeSplitNets(self, inputNet: net.schematicNet):
         self.mergeNets(inputNet)  # output is self._totalNet
         overlapNets = self._totalNet.findOverlapNets()
-        # # inputNet splits overlapping nets
+        splitPoints = set()
+        # inputNet splits overlapping nets
         for netItem in overlapNets:
-            splitPoints = self.findSplitPoints(netItem)
-            netItem.inherit(self._totalNet)
-            if len(splitPoints) > 2:
-                self.splitNets(netItem, splitPoints)
-        # splitPoints = self.findSplitPoints(self._totalNet)
-        # if len(splitPoints)>2:
-        #     self.splitNets(self._totalNet, splitPoints)
-        # else:
-        #     self.addUndoStack(self._totalNet)
+            for end in netItem.endPoints:
+                endPoint = self._totalNet.mapFromItem(netItem, end).toPoint() # map to totalNet (mergedNet) coordinates
+                if self._totalNet.contains(endPoint) and endPoint not in self._totalNet.endPoints:
+                    splitPoints.add(endPoint)
+        if splitPoints:
+            splitPointsList = list(splitPoints)
+            splitPointsList.insert(0,self._totalNet.endPoints[0])
+            splitPointsList.append(self._totalNet.endPoints[1])
+            orderedPointsObj = map(self._totalNet.mapToScene,list(Counter(self.orderPoints(splitPointsList)).keys()))
+            orderedPoints = [opoint.toPoint() for opoint in orderedPointsObj]
+            # print(f'ordered points: {orderedPoints}')
+            splitNetList = []
+            for i in range(len(orderedPoints) - 1):
+                splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
+                splitNet.inherit(inputNet)
+                splitNetList.append(splitNet)
+                if inputNet.isSelected():
+                    splitNet.setSelected(True)
+            self.addListUndoStack(splitNetList)
+            self.deleteUndoStack(self._totalNet)
 
-    def splitNets(self, inputNet: net.schematicNet, splitPoints: list[QPoint]):
-        """
-        After merging, splitNets splits the total merged net (_totalNet) back
-        into individual nets. It:
-        1. Finds split points using findSplitPoints
-        2. Inserts the start/end points of _totalNet
-        3. Orders the points
-        4. Loops through points and creates a new schematicNet between each pair
-        5. Sets properties like name from _totalNet
-        6. Adds the new net to the scene
-        7. Removes _totalNet
-        """
-
-        splitPoints.insert(0, inputNet.sceneEndPoints[0])
-        splitPoints.append(inputNet.sceneEndPoints[1])
-        orderedPoints = list(Counter(schematicScene.orderPoints(splitPoints)).keys())
-        splitNetList = []
-        for i in range(len(orderedPoints) - 1):
-            splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
-            splitNet.inherit(inputNet)
-            splitNetList.append(splitNet)
-            if inputNet.isSelected():
-                splitNet.setSelected(True)
-        self.addListUndoStack(splitNetList)
-        self.removeItem(inputNet)
 
     def mergeNets(self, inputNet: net.schematicNet) -> net.schematicNet:
+        """
+        Recursively merge nets until no changes are made.
+
+        :param inputNet: The net to merge
+        :return: The merged net
+        """
         (origNet, mergedNet) = inputNet.mergeNets()
         if origNet.isSelected():
             mergedNet.setSelected(True)
+        
         if origNet.sceneShapeRect == mergedNet.sceneShapeRect:
-            # we came to standstill, exit recursion.
+            # No changes, exit recursion
             self._totalNet = origNet
-        else:
-            self.removeItem(origNet)
-            self.addItem(mergedNet)
-            self.mergeNets(mergedNet)
+            return origNet
+        
+        # Remove original net and add merged net
+        self.removeItem(origNet)
+        self.addItem(mergedNet)
+    
+        # Recursively merge the new net
+        return self.mergeNets(mergedNet)
 
     def removeSnapRect(self):
         if self._snapPointRect:
@@ -1390,26 +1410,43 @@ class schematicScene(editorScene):
         splitPoints: set[QPoint | Any] = set()
 
         # Find split points for nets that are orthogonally aligned with the target net.
-        sceneRect = targetNet.sceneShapeRect
-        rectItems = set(self.items(sceneRect))
+        # sceneRect = targetNet.sceneShapeRect
+        collidingItems = set(self.collidingItems())
 
-        for item in rectItems:
+        for item in collidingItems:
             if (
                 isinstance(item, net.schematicNet)
-                and any(list(map(sceneRect.contains, item.sceneEndPoints)))
-                and targetNet.isOrthogonal(item)
+                and any(list(map(self.collidesWithItem, item.endPoints)))
+                # and targetNet.isOrthogonal(item)
             ):
-                splitPoints.add(
-                    item.sceneEndPoints[
-                        list(map(sceneRect.contains, item.sceneEndPoints)).index(True)
-                    ]
-                )
-            elif (
-                isinstance(item, shp.symbolPin) or isinstance(item, shp.schematicPin)
-            ) and sceneRect.contains(item.mapToScene(item.start).toPoint()):
-                splitPoints.add(item.mapToScene(item.start).toPoint())
+                print(item.sceneEndPoints)
+        #         splitPoints.add(
+        #             item.sceneEndPoints[
+        #                 list(map(self.contains, item.sceneEndPoints)).index(True)
+        #             ]
+        #         )
+        #     elif (
+        #         isinstance(item, shp.symbolPin) or isinstance(item, shp.schematicPin)
+        #     ) and self.contains(item.mapToScene(item.start).toPoint()):
+        #         splitPoints.add(item.mapToScene(item.start).toPoint())
 
-        return list(splitPoints)
+        # return list(splitPoints)
+    
+    
+    @staticmethod
+    def orderPoints(points: list[QPoint]) -> list[QPoint]:
+        currentPoint = points.pop(0)
+        orderedPoints = [currentPoint]
+
+        while points:
+            distances = [(point - currentPoint).manhattanLength() for point in points]
+            nearest_point_index = distances.index(min(distances))
+            nearestPoint = points[nearest_point_index]
+            orderedPoints.append(nearestPoint)
+            currentPoint = points.pop(nearest_point_index)
+
+        return orderedPoints
+
 
     def stretchNet(self, netItem: net.schematicNet, stretchEnd: str):
         match stretchEnd:
@@ -1427,20 +1464,6 @@ class schematicScene(editorScene):
             self, self._stretchNet, netItem
         )
         self.undoStack.push(addDeleteStretchNetCommand)
-
-    @staticmethod
-    def orderPoints(points: list[QPoint]) -> list[QPoint]:
-        currentPoint = points.pop(0)
-        orderedPoints = [currentPoint]
-
-        while points:
-            distances = [(point - currentPoint).manhattanLength() for point in points]
-            nearest_point_index = distances.index(min(distances))
-            nearestPoint = points[nearest_point_index]
-            orderedPoints.append(nearestPoint)
-            currentPoint = points.pop(nearest_point_index)
-
-        return orderedPoints
 
     @staticmethod
     def clearNetStatus(netsSet: set[net.schematicNet]):
@@ -2179,27 +2202,6 @@ class schematicScene(editorScene):
                 )
                 self.editModes.setMode("selectItem")
 
-    def selectSceneItems(self, modifiers):
-        """
-        Selects scene items based on the given modifiers.
-        A selection rectangle is drawn if ShiftModifier is pressed,
-        else a single item is selected. The function does not return anything.
-
-        :param modifiers: The keyboard modifiers that determine the selection type.
-        :type modifiers: Qt.KeyboardModifiers
-        """
-        if modifiers == Qt.ShiftModifier:
-            self.editorWindow.messageLine.setText("Draw Selection Rectangle")
-            self.selectionRectItem = QGraphicsRectItem(
-                QRectF(self.mousePressLoc, self.mousePressLoc)
-            )
-            self.selectionRectItem.setPen(schlyr.draftPen)
-            self.undoStack.push(us.addShapeUndo(self, self.selectionRectItem))
-            # self.addItem(self.selectionRectItem)
-        self.editorWindow.messageLine.setText(
-            "Item selected" if self.selectedItems() else "Nothing selected"
-        )
-
     def selectInRectItems(self, selectionRect: QRect, partialSelection=False):
         """
         Select items in the scene.
@@ -2425,6 +2427,7 @@ class layoutScene(editorScene):
                             tickFont=self.rulerFont,
                         )
                         self.addUndoStack(self._newRuler)
+                        self.rulersSet.add(self._newRuler)
                     else:
                         self._newRuler = None
 
@@ -2643,6 +2646,7 @@ class layoutScene(editorScene):
         except Exception as e:
             self.logger.error(f"mouse release error: {e}")
 
+
     def instLayout(self):
         """
         Read a layout file and create layoutShape objects from it.
@@ -2754,7 +2758,10 @@ class layoutScene(editorScene):
             self.snapGrid = snapGrid[1]  # snapping grid size
             self.snapTuple = (self.snapGrid, self.snapGrid)
             self.snapDistance = 2 * self.snapGrid
+            starttime = time.time()
             self.createLayoutItems(decodedData[2:])
+            endtime = time.time()
+            print(f"load time: {endtime-starttime}")
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
@@ -2831,7 +2838,6 @@ class layoutScene(editorScene):
         )
 
         if dlg.exec() == QDialog.Accepted:
-
             item.layer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
             tempPoints = []
             for i in range(dlg.tableWidget.rowCount()):
@@ -3109,9 +3115,9 @@ class layoutScene(editorScene):
                 labelText = (
                     dlg.instanceParamsLayout.itemAt(row, QFormLayout.LabelRole)
                     .widget()
-                    .text().replace("&","")
-                ) # why & is added?
-                print(labelText)
+                    .text()
+                    .replace("&", "")
+                ) 
                 paramValue = (
                     dlg.instanceParamsLayout.itemAt(row, QFormLayout.FieldRole)
                     .widget()
@@ -3250,9 +3256,9 @@ class layoutScene(editorScene):
             vector (layp.layoutPath): The vector to rotate.
             transform (QTransform): The transform to apply to the vector.
         """
-        start = vector.start
-        xmove = mouseLoc.x() - start.x()
-        ymove = mouseLoc.y() - start.y()
+        # start = vector.start
+        # xmove = mouseLoc.x() - start.x()
+        # ymove = mouseLoc.y() - start.y()
 
     #     # Determine the new end point of the vector based on the mouse movement
     #     if xmove >= 0 and ymove >= 0:

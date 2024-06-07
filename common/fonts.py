@@ -24,23 +24,23 @@
 #
 
 
-from PySide6.QtGui import QFont, QFontMetrics, QFontDatabase
+from PySide6.QtGui import QFont, QFontDatabase
 
 
 class font(QFont):
     def __init__(
-        self, fontFamily: str, fontStyle: str, fontSize: int, kerning: bool, logger
-    ):
+        self, fontFamily: str, fontSize: int = 12, kerning: bool = False):
+        super().__init__(fontFamily)
         self._fontFamily = fontFamily
-        self._fontStyle = fontStyle
+
         self._fontSize = fontSize
         self._kerning = kerning
-        self._logger = logger
+
         self.setFamily(self._fontFamily)
-        self.setStyle(self._fontStyle)
         self.setPointSize(self._fontSize)
         self.setKerning(self._kerning)
-        self.setStyleHint(QFont.TypeWriter)
+        # self.setStyleHint(QFont.Monospace)
+
 
     @property
     def fontFamily(self):
@@ -53,10 +53,9 @@ class font(QFont):
             family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
         ]
         if value not in fixedFamilies:
-            self._logger.warning(
+            print(
                 "No such font family present in the system. Another "
-                "font "
-                "will be substituted."
+                "font will be substituted."
             )
         self._fontFamily = value
         self.setFamily(self._fontFamily)
