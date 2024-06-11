@@ -1376,10 +1376,7 @@ class schematicSymbol(symbolShape):
             for netItem in self.scene().items(pinItem.sceneBoundingRect()):
                 if isinstance(netItem, net.schematicNet):
                     connectList = list(
-                        map(
-                            pinItem.sceneBoundingRect().contains, netItem.sceneEndPoints
-                        )
-                    )
+                        map(pinItem.sceneBoundingRect().contains, netItem.sceneEndPoints))
                     endIndex = connectList.index(True)
                     if any(connectList):
                         self._pinNetIndexTupleSet.add(

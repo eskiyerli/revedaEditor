@@ -133,6 +133,8 @@ class editorScene(QGraphicsScene):
         self.cellName = self.editorWindow.file.parent.stem
         self.partialSelection = True
         self.selectionRectItem = None
+        self._items = []
+        self._itemsOffset = []
         self.libraryDict = self.editorWindow.libraryDict
         self.editModes.rotateItem = False
         self.itemContextMenu = QMenu()
@@ -146,9 +148,25 @@ class editorScene(QGraphicsScene):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton:
+            self._itemsOffset = []
             self.mousePressLoc = event.scenePos().toPoint()
+            self._items = [item for item in self.items(self.mousePressLoc) if
+                           item.parentItem() is None]
+            for item in self._items:
+                self._itemsOffset.append(item.pos().toPoint() - self.mousePressLoc)
+
             if self.editModes.panView:
                 self.centerViewOnPoint(self.mousePressLoc)
+                self.messageLine.setText('Pan View at mouse press position')
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton:
+            self.mouseReleaseLoc = event.scenePos().toPoint()
+            if self._items:
+                if self.mouseReleaseLoc != self.mousePressLoc:
+                    self.moveShapesUndoStack(self._items, self._itemsOffset, self.mousePressLoc,
+                                            self.mouseReleaseLoc)
 
     def snapToBase(self, number, base):
         """
@@ -355,6 +373,17 @@ class editorScene(QGraphicsScene):
     def addListUndoStack(self, itemList: list):
         undoCommand = us.addShapesUndo(self, itemList)
         self.undoStack.push(undoCommand)
+
+    def moveShapesUndoStack(self, items: list[QGraphicsItem], itemsOffsetList: list[int],
+                            start: QPoint, end: QPoint):
+        undoCommand = us.undoMoveShapesCommand(items, itemsOffsetList, start, end)
+        self.undoStack.push(undoCommand)
+
+    def addUndoMacroStack(self, undoCommands: list, macroName: str = "Macro"):
+        self.undoStack.beginMacro(macroName)
+        for command in undoCommands:
+            self.undoStack.push(command)
+        self.undoStack.endMacro()
 
 
 # noinspection PyUnresolvedReferences
@@ -2736,7 +2765,7 @@ class layoutScene(editorScene):
             topLevelItems.insert(1, {"snapGrid": self.snapTuple})
             with filePathObj.open("w") as file:
                 # Serialize items to JSON using layoutEncoder class
-                json.dump(topLevelItems, file, cls=layenc.layoutEncoder, indent=4)
+                json.dump(topLevelItems, file, cls=layenc.layoutEncoder)
         except Exception as e:
             self.logger.error(f"Cannot save layout: {e}")
 

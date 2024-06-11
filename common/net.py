@@ -199,11 +199,12 @@ class schematicNet(QGraphicsItem):
         return f"schematicNet({self.sceneEndPoints})"
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedHasChanged:
-            if value:
-                self.scene().selectedNet= self
-            else:
-                self.scene().selectedNet = None
+        if self.scene():
+            if change == QGraphicsItem.ItemSelectedHasChanged:
+                if value:
+                    self.scene().selectedNet= self
+                else:
+                    self.scene().selectedNet = None
         return super().itemChange(change, value)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
@@ -503,6 +504,7 @@ class guideLine(QGraphicsLineItem):
         self._end = end
         super().__init__(QLineF(self._start, self._end))
         self.setPen(schlyr.guideLinePen)
+        self.pen().setCosmetic(True)
         self._name: str = ""
         self._nameStrength: netNameStrengthEnum = netNameStrengthEnum.NONAME
 

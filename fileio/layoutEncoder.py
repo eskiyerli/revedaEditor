@@ -27,7 +27,6 @@ import json
 import inspect
 import pdk.layoutLayers as laylyr
 import revedaEditor.common.layoutShapes as lshp
-from pdk.pcells import baseCell
 
 
 class layoutEncoder(json.JSONEncoder):

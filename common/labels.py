@@ -26,7 +26,6 @@
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QBrush, QFont, QColor
 from PySide6.QtWidgets import QGraphicsSimpleTextItem, QGraphicsItem
-import revedaEditor.common.fonts as fnt
 import pdk.symLayers as symlyr
 import pdk.callbacks as cb
 import itertools as itt
@@ -80,10 +79,9 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._labelOrient = labelOrient
         self._labelUse = labelUse
         self._labelType = labelType
-        self._labelFont = fnt.font('Arial', int(float(self._labelHeight)))
-        # self._labelFont = QFont("Arial")
-        # self._labelFont.setPointSize(int(float(self._labelHeight)))
-        # self._labelFont.setKerning(False)
+        self._labelFont = QFont("Arial")
+        self._labelFont.setPointSize(int(float(self._labelHeight)))
+        self._labelFont.setKerning(False)
         self._labelVisible: bool = False
 
         self._angle = 0.0  # rotation angle
@@ -376,4 +374,4 @@ class symbolLabel(QGraphicsSimpleTextItem):
         except Exception as e:
             # Log the error if scene exists
             if self.scene():
-                self.scene().logger.error(f"PyLabel Error:{e}")
+                self.scene().logger.error(f"PyLabel Error: {e}")

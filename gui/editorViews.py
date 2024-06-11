@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 # import pdk.symLayers as symlyr
 import pdk.schLayers as schlyr
 import revedaEditor.common.net as net
+import revedaEditor.backend.undoStack as us
 
 
 # import os
@@ -207,16 +208,27 @@ class editorView(QGraphicsView):
     def printView(self, printer):
         """
         Print view using selected Printer.
+
+        Args:
+            printer (QPrinter): The printer object to use for printing.
+
+        This method prints the current view using the provided printer. It first creates a QPainter object
+        using the printer. Then, it toggles the gridbackg and linebackg attributes. After that, it calls
+        the revedaPrint method to render the view onto the painter. Finally, it toggles the gridbackg
+        and linebackg attributes back to their original state.
         """
         painter = QPainter(printer)
 
+        # Toggle gridbackg attribute
         if self.gridbackg:
             self.gridbackg = False
         else:
             self.linebackg = False
 
+        # Render the view onto the painter
         self.revedaPrint(painter)
 
+        # Toggle gridbackg and linebackg attributes back to their original state
         self.gridbackg = not self.gridbackg
         self.linebackg = not self.linebackg
 
@@ -262,15 +274,11 @@ class schematicView(editorView):
             for guideLineItem in self.scene.items(self.viewRect)
             if isinstance(guideLineItem, net.guideLine)
         }
-        for snapLine in viewSnapLinesSet:
-            lines: list[net.schematicNet] = self.scene.addStretchWires(
-                snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
-            )
-            if lines:
-                for line in lines:
-                    line.inheritGuideLine(snapLine)
-                self.scene.addListUndoStack(lines)
-            self.scene.removeItem(snapLine)
+        self.removeSnapLines(viewSnapLinesSet)
+
+        self.mergeSplitViewNets()
+
+    def mergeSplitViewNets(self):
         netsInView = [
             netItem
             for netItem in self.scene.items(self.viewRect)
@@ -279,6 +287,22 @@ class schematicView(editorView):
         for netItem in netsInView:
             if netItem.scene():
                 self.scene.mergeSplitNets(netItem)
+
+    def removeSnapLines(self, viewSnapLinesSet):
+
+        undoCommandList = []
+        for snapLine in viewSnapLinesSet:
+            lines: list[net.schematicNet] = self.scene.addStretchWires(
+                snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
+            )
+
+            if lines:
+                for line in lines:
+                    line.inheritGuideLine(snapLine)
+                undoCommandList.append(us.addShapesUndo(self.scene, lines))
+
+        undoCommandList.append(us.deleteShapesUndo(self.scene, list(viewSnapLinesSet)))
+        self.scene.addUndoMacroStack(undoCommandList, 'Stretch Wires')
 
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)
