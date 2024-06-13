@@ -435,7 +435,7 @@ class createLayoutViaDialog(QDialog):
         self.setWindowTitle("Create Via(s)")
         self.setMinimumWidth(300)
 
-        viaLayerNames = [item.name for item in fabproc.processVias]
+        
         mainLayout = QVBoxLayout()
         self.viaTypeGroup = QGroupBox("Via Type")
         self.viaTypeLayout = QHBoxLayout()
@@ -452,15 +452,15 @@ class createLayoutViaDialog(QDialog):
         singleViaPropsLayout = QFormLayout()
         self.singleViaPropsGroup.setLayout(singleViaPropsLayout)
         self.singleViaNamesCB = QComboBox()
-        self.singleViaNamesCB.addItems(viaLayerNames)
+        
         self.singleViaNamesCB.currentTextChanged.connect(self.singleViaNameChanged)
         singleViaPropsLayout.addRow(edf.boldLabel("Via Name"), self.singleViaNamesCB)
         self.singleViaWidthEdit = edf.shortLineEdit()
-        self.singleViaWidthEdit.setText(fabproc.processVias[0].minWidth)
+        
         self.singleViaWidthEdit.editingFinished.connect(self.singleViaWidthChanged)
         singleViaPropsLayout.addRow(edf.boldLabel("Via Width"), self.singleViaWidthEdit)
         self.singleViaHeightEdit = edf.shortLineEdit()
-        self.singleViaHeightEdit.setText(fabproc.processVias[0].minHeight)
+        
         self.singleViaHeightEdit.editingFinished.connect(self.singleViaHeightChanged)
         singleViaPropsLayout.addRow(
             edf.boldLabel("Via Height"), self.singleViaHeightEdit
@@ -470,19 +470,19 @@ class createLayoutViaDialog(QDialog):
         arrayViaPropsLayout = QFormLayout()
         self.arrayViaPropsGroup.setLayout(arrayViaPropsLayout)
         self.arrayViaNamesCB = QComboBox()
-        self.arrayViaNamesCB.addItems(viaLayerNames)
+        
         self.arrayViaNamesCB.currentTextChanged.connect(self.arrayViaNameChanged)
         arrayViaPropsLayout.addRow(edf.boldLabel("Via Name"), self.arrayViaNamesCB)
         self.arrayViaWidthEdit = edf.shortLineEdit()
-        self.arrayViaWidthEdit.setText(fabproc.processVias[0].minWidth)
+        
         self.arrayViaWidthEdit.editingFinished.connect(self.arrayViaWidthChanged)
         arrayViaPropsLayout.addRow(edf.boldLabel("Via Width"), self.arrayViaWidthEdit)
         self.arrayViaHeightEdit = edf.shortLineEdit()
-        self.arrayViaHeightEdit.setText(fabproc.processVias[0].minHeight)
+        
         self.singleViaHeightEdit.editingFinished.connect(self.arrayViaHeightChanged)
         arrayViaPropsLayout.addRow(edf.boldLabel("Via Height"), self.arrayViaHeightEdit)
         self.arrayViaSpacingEdit = edf.shortLineEdit()
-        self.arrayViaSpacingEdit.setText(fabproc.processVias[0].minSpacing)
+        
         self.arrayViaSpacingEdit.editingFinished.connect(self.arrayViaSpacingChanged)
         arrayViaPropsLayout.addRow(edf.boldLabel("Spacing"), self.arrayViaSpacingEdit)
         self.arrayXNumEdit = edf.shortLineEdit()
