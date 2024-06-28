@@ -23,13 +23,22 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-from PySide6.QtCore import QPoint, Qt
-from PySide6.QtGui import QBrush, QFont, QColor
-from PySide6.QtWidgets import QGraphicsSimpleTextItem, QGraphicsItem
-import pdk.symLayers as symlyr
-import pdk.callbacks as cb
+import os
 
+from PySide6.QtCore import (QPoint, )
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QGraphicsSimpleTextItem, QGraphicsItem
+from dotenv import load_dotenv
 from quantiphy import Quantity
+
+load_dotenv()
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.symLayers as symlyr
+    import pdk.callbacks as cb
+else:
+    import defaultPDK.symLayers as symlyr
+    import defaultPDK.callbacks as cb
 
 
 class symbolLabel(QGraphicsSimpleTextItem):
@@ -335,39 +344,73 @@ class symbolLabel(QGraphicsSimpleTextItem):
                 f"Error parsing label definition: {self._labelDefinition}, {e}"
             )
 
-
-
+    #
+    #
+    # def createPyLabel(self):
+    #     """
+    #     Create a PyLabel using the label definition and parent item information.
+    #     """
+    #     try:
+    #         # Split the label definition into name and function
+    #         labelName, labelFunction = map(str.strip, self._labelDefinition.split("="))
+    #
+    #         # Check if parent item exists and has 'cellName' attribute
+    #         if self.parentItem() and hasattr(self.parentItem(), "cellName"):
+    #             # Construct the expression to evaluate
+    #             parentItem = self.parentItem()
+    #             parentCellName = parentItem.cellName
+    #             parentLabelsDict = parentItem.labels
+    #             if hasattr(cb, parentCellName):
+    #                 callbackClass = getattr(cb, parentCellName)
+    #                 callbackClassObj = callbackClass(parentLabelsDict)
+    #                 if hasattr(callbackClassObj, labelFunction):
+    #                     labelMethod = getattr(callbackClassObj, labelFunction)
+    #                     if labelMethod:
+    #                         print(labelMethod)
+    #                         self._labelValue = Quantity(labelMethod()).render(prec=3)
+    #                     else:
+    #                         self._labelValue = '?'
+    #
+    #             # Set the label text with the name and value
+    #                     self._labelText = f"{labelName}={self._labelValue}"
+    #         else:
+    #             # Set the label text with the name and function
+    #             self._labelText = f"{labelName} = {labelFunction}"
+    #         self._labelName = f"@{labelName}"
+    #     except Exception as e:
+    #         # Log the error if scene exists
+    #         if self.scene():
+    #             self.scene().logger.error(f"PyLabel Error: {e}")
     def createPyLabel(self):
         """
         Create a PyLabel using the label definition and parent item information.
         """
         try:
-            # Split the label definition into name and function
             labelName, labelFunction = map(str.strip, self._labelDefinition.split("="))
-
-            # Check if parent item exists and has 'cellName' attribute
-            if self.parentItem() and hasattr(self.parentItem(), "cellName"):
-                # Construct the expression to evaluate
-                parentItem = self.parentItem()
-                parentCellName = parentItem.cellName
-                parentLabelsDict = parentItem.labels
-                if hasattr(cb, parentCellName):
-                    callbackClass = getattr(cb, parentCellName)
-                    callbackClassObj = callbackClass(parentLabelsDict)
-                    if hasattr(callbackClassObj, labelFunction):
-                        labelMethod = getattr(callbackClassObj, labelFunction)
-                        if labelMethod:
-                            self._labelValue = Quantity(labelMethod()).render(prec=3)
-                        else:
-                            self._labelValue = '?'
-
-                # Set the label text with the name and value
-                        self._labelText = f"{labelName}={self._labelValue}"
-            else:
-                # Set the label text with the name and function
-                self._labelText = f"{labelName} = {labelFunction}"
             self._labelName = f"@{labelName}"
+
+            parentItem = self.parentItem()
+            if not parentItem or not hasattr(parentItem, "cellName"):
+                self._labelText = f"{labelName} = {labelFunction}"
+                return
+
+            parentCellName = parentItem.cellName
+            callbackClass = getattr(cb, parentCellName, None)
+
+            if not callbackClass:
+                self._labelText = f"{labelName} = {labelFunction}"
+                return
+
+            callbackObj = callbackClass(parentItem.labels)
+            labelMethod = getattr(callbackObj, labelFunction, None)
+
+            if labelMethod:
+                self._labelValue = Quantity(labelMethod()).render(prec=3)
+                self._labelText = f"{labelName}={self._labelValue}"
+            else:
+                self._labelText = f"{labelName}=?"
+
         except Exception as e:
-            # Log the error if scene exists
             if self.scene():
                 self.scene().logger.error(f"PyLabel Error: {e}")
+            self._labelText = f"{self._labelName}=Error"

@@ -39,10 +39,10 @@ from PySide6.QtWidgets import (
 
 import revedaEditor.backend.libraryModelView as lmview
 import revedaEditor.backend.schBackEnd as scb
-import revedaEditor.gui.editorScenes as escn
+from revedaEditor.gui.symbolScene import symbolScene
 import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.propertyDialogues as pdlg
-import revedaEditor.gui.editorWindows as edw
+import revedaEditor.gui.editorWindow as edw
 
 
 # from hashlib import new
@@ -225,7 +225,7 @@ class symbolContainer(QWidget):
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.parent = parent
-        self.scene = escn.symbolScene(self)
+        self.scene = symbolScene(self)
         self.view = edv.symbolView(self.scene, self)
         self.init_UI()
 

@@ -44,7 +44,12 @@ class boldLabel(QLabel):
     def __init__(self, text: str, parent: QWidget = None):
         super().__init__(text, parent)
         self.setTextFormat(Qt.RichText)
-        self.setText("<b>" + text + "</b>")
+        # self.setText("<b>" + text + "</b>")
+        self.setText(f'<b>{text}</b>')
+
+    def setBoldText(self, text: str):
+        self.setTextFormat(Qt.RichText)
+        self.setText(f'<b>{text}</b>')
 
 
 class longLineEdit(QLineEdit):

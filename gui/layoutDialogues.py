@@ -59,8 +59,17 @@ from PySide6.QtWidgets import (
 
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.gui.editFunctions as edf
-import pdk.process as fabproc
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
+if os.environ.get("REVEDA_PDK_PATH"):
+
+    import pdk.layoutLayers as laylyr
+    import pdk.process as fabproc
+else:
+    import defaultPDK.layoutLayers as laylyr
+    import defaultPDK.process as fabproc
 
 class pcellInstanceDialog(QDialog):
     def __init__(self, parent):

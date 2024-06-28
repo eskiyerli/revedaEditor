@@ -199,40 +199,43 @@ def createCellView(parent, viewName, cellItem: cellItem):
     if viewName.strip() == "":
         QMessageBox.warning(parent, "Error", "Please enter a view name")
         return None
-    viewPath = cellItem.data(Qt.UserRole + 2).joinpath(f"{viewName}.json")
-    if viewPath.exists():
-        parent.logger.warning("Replacing the cell view.")
-        oldView = [
-            cellItem.child(row)
-            for row in range(cellItem.rowCount())
-            if cellItem.child(row).viewName == viewName
-        ][0]
-        oldView.delete()
-    newViewItem = viewItem(viewPath)
-    viewPath.touch()  # create empty cell view path
-    items = list()
-    if "schematic" in viewName:
-        items.insert(0, {"viewName": "schematic"})
-        items.insert(1, {"snapGrid": (10, 5)})
-    elif "symbol" in viewName:
-        items.insert(0, {"viewName": "symbol"})
-        items.insert(1, {"snapGrid": (10, 5)})
-    elif "layout" in viewName:
-        items.insert(0, {"viewName": "layout"})
-        items.insert(1, {"snapGrid": (10, 5)})
-    elif "pcell" in viewName:
-        items.insert(0, {"viewName": "pcell"})
-    elif "spice" in viewName:
-        items.insert(0, {"viewName": "spice"})
-    elif "veriloga" in viewName:
-        items.insert(0, {"viewName": "veriloga"})
-    elif "config" in viewName:
-        items.insert(0, {"viewName": "config"})
-    with viewPath.open(mode="w") as f:
-        json.dump(items, f, indent=4)
-    parent.logger.warning(f"Created {viewName} at {str(viewPath)}")
-    cellItem.appendRow(newViewItem)
-    return newViewItem
+    try:
+        viewPath = cellItem.data(Qt.UserRole + 2).joinpath(f"{viewName}.json")
+        if viewPath.exists():
+            parent.logger.warning("Replacing the cell view.")
+            oldView = [
+                cellItem.child(row)
+                for row in range(cellItem.rowCount())
+                if cellItem.child(row).viewName == viewName
+            ][0]
+            oldView.delete()
+        newViewItem = viewItem(viewPath)
+        viewPath.touch()  # create empty cell view path
+        items = list()
+        if "schematic" in viewName:
+            items.insert(0, {"viewName": "schematic"})
+            items.insert(1, {"snapGrid": (10, 5)})
+        elif "symbol" in viewName:
+            items.insert(0, {"viewName": "symbol"})
+            items.insert(1, {"snapGrid": (10, 5)})
+        elif "layout" in viewName:
+            items.insert(0, {"viewName": "layout"})
+            items.insert(1, {"snapGrid": (10, 5)})
+        elif "pcell" in viewName:
+            items.insert(0, {"viewName": "pcell"})
+        elif "spice" in viewName:
+            items.insert(0, {"viewName": "spice"})
+        elif "veriloga" in viewName:
+            items.insert(0, {"viewName": "veriloga"})
+        elif "config" in viewName:
+            items.insert(0, {"viewName": "config"})
+        with viewPath.open(mode="w") as f:
+            json.dump(items, f, indent=4)
+        parent.logger.warning(f"Created {viewName} at {str(viewPath)}")
+        cellItem.appendRow(newViewItem)
+        return newViewItem
+    except Exception as e:
+        parent.logger.warning(f"Error creating cell view: {e}")
 
 # function for copying a cell
 def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -> bool:

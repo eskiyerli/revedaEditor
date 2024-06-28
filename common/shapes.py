@@ -136,6 +136,16 @@ class symbolShape(QGraphicsItem):
             super().sceneEvent(event)
             return True
 
+    def itemChange(self, change, value):
+        if self.scene():
+            match change:
+                case QGraphicsItem.ItemSelectedHasChanged:
+                    if value:
+                        self.setZValue(self.zValue() + 10)
+                    else:
+                        self.setZValue(self.zValue() - 10)
+        return super().itemChange(change, value)
+
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(event)
 
@@ -962,6 +972,7 @@ class symbolPin(symbolShape):
         self._pinDir = pinDir
         self._pinType = pinType
         self._connected = False  # True if the pin is connected to a net.
+        self._highlighted = False
         self._rect = QRect(self._start.x() - 5, self._start.y() - 5, 10, 10)
 
     def __str__(self):
@@ -974,15 +985,19 @@ class symbolPin(symbolShape):
         if self.isSelected():
             painter.setPen(symlyr.selectedSymbolPinPen)
             painter.setBrush(symlyr.selectedSymbolPinBrush)
+        elif self._highlighted:
+            painter.setPen(symlyr.highlightedSymbolPinPen)
+            painter.setBrush(symlyr.highlightedSymbolPinBrush)
         else:
             painter.setPen(symlyr.symbolPinPen)
             painter.setBrush(symlyr.symbolPinBrush)
         painter.setFont(QFont("Arial", 12))
         painter.drawRect(self._rect)
-        if (
-            str(type(self.scene()))
-            == "<class 'revedaEditor.gui.editorScenes.symbolScene'>"
-        ):
+        # if (
+        #     str(type(self.scene()))
+        #     == "<class 'revedaEditor.gui.editorScenes.symbolScene'>"
+        # ):
+        if self.scene().__class__.__name__ == 'symbolScene':
             painter.drawText(
                 QPoint(self._start.x() - 5, self._start.y() - 10), self._pinName
             )
@@ -1045,6 +1060,16 @@ class symbolPin(symbolShape):
     def connected(self, value: bool):
         if isinstance(value, bool):
             self._connected = value
+
+    @property
+    def highlighted(self):
+        return self._highlighted
+
+    @highlighted.setter
+    def highlighted(self, value: bool):
+        if isinstance(value, bool):
+            self._highlighted = value
+
 
     def toSchematicPin(self, start: QPoint):
         return schematicPin(start, self.pinName, self.pinDir, self.pinType)
@@ -1383,33 +1408,19 @@ class schematicSymbol(symbolShape):
                             pinNetIndexTuple(pinItem, netItem, endIndex)
                         )
 
-            # netsConnected = [
-            #     netItem
-            #     for netItem in self.scene().items(pinItem.sceneBoundingRect())
-            #     if isinstance(netItem, net.schematicNet)
-            #     and any(list(map(pinItem.sceneBoundingRect().contains,
-            #                      netItem.sceneEndPoints)))
-            #
-            #     # and
-            #     # pinItem.mapToScene(pinItem.start).toPoint()
-            #     # in netItem.sceneEndPoints
-            # ]
-            # # Iterate over each connected net item
-            # for netItem in netsConnected:
-            #     # Find the index of the pin in the net item's scene end points
-            #     endIndex = netItem.sceneEndPoints.index(
-            #         pinItem.mapToScene(pinItem.start).toPoint()
-            #     )
-            #
-            #     # Create a pin-net-index tuple and add it to the set
-            #     self._pinNetIndexTupleSet.add(
-            #         pinNetIndexTuple(pinItem, netItem, endIndex)
-            #     )
-
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-
-        super().mousePressEvent(event)
+        # Check if the click is on any of the pins
+        for pin in self._pins.values():
+            if pin.contains(self.mapToItem(pin, event.pos())):
+                self.scene().selectedSymbolPin = pin
+                pin.highlighted = True
+                # You can handle the pin click here, or pass the event to the pin
+                pin.mousePressEvent(event)
+                return  # Stop processing after handling pin click
         self._snapLines = None
+        # If not on a pin, handle as normal
+        super().mousePressEvent(event)
+
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(event)

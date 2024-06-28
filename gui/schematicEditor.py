@@ -56,9 +56,9 @@ import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.fileio.symbolEncoder as symenc
-import revedaEditor.gui.editorScenes as escn
+from revedaEditor.gui.schematicScene import schematicScene
 import revedaEditor.gui.editorViews as edv
-import revedaEditor.gui.editorWindows as edw
+import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.resources.resources
@@ -97,7 +97,7 @@ class schematicEditor(edw.editorWindow):
         self.renumberInstanceAction = QAction("Renumber Instances", self)
         self.renumberInstanceAction.setToolTip("Renumber Instances")
         simulationIcon = QIcon("icons/application-run.png")
-        self.simulateAction = QAction(simulationIcon, "Simulaiton GUI...", self)
+        self.simulateAction = QAction(simulationIcon, "Analogue DE...", self)
 
 
     def _createTriggers(self):
@@ -652,7 +652,7 @@ class schematicContainer(QWidget):
         super().__init__(parent=parent)
         assert isinstance(parent, schematicEditor)
         self.parent = parent
-        self.scene = escn.schematicScene(self)
+        self.scene = schematicScene(self)
         self.view = edv.schematicView(self.scene, self)
 
         self.init_UI()

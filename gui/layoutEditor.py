@@ -23,7 +23,10 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
+from revedaEditor.gui.layoutScene import layoutScene
+from revedaEditor.gui.startThread import startThread
 import json
+
 # from hashlib import new
 import pathlib
 
@@ -45,18 +48,6 @@ from PySide6.QtWidgets import (
 )
 from quantiphy import Quantity
 
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-if os.environ.get("REVEDA_PDK_PATH"):
-
-    import pdk.layoutLayers as laylyr
-    import pdk.process as fabproc
-else:
-    import defaultPDK.layoutLayers as laylyr
-    import defaultPDK.process as fabproc
-
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
@@ -65,15 +56,24 @@ import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.fileio.gdsExport as gdse
 import revedaEditor.fileio.layoutEncoder as layenc
 import revedaEditor.fileio.loadJSON as lj
-import revedaEditor.gui.editorScenes as escn
+
 import revedaEditor.gui.editorViews as edv
-import revedaEditor.gui.editorWindows as edw
+import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.lsw as lsw
-from revedaEditor.gui.startThread import startThread
-import revedaEditor.resources.resources
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.layoutLayers as laylyr
+    import pdk.process as fabproc
+else:
+    import defaultPDK.layoutLayers as laylyr
+    import defaultPDK.process as fabproc
 
 class layoutEditor(edw.editorWindow):
     def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView) -> None:
@@ -465,7 +465,7 @@ class layoutContainer(QWidget):
     def __init__(self, parent: layoutEditor):
         super().__init__(parent=parent)
         self.parent = parent
-        self.scene = escn.layoutScene(self)
+        self.scene = layoutScene(self)
         self.view = edv.layoutView(self.scene, self)
         self.lswModel = lsw.layerDataModel(laylyr.pdkAllLayers)
         layerViewTable = lsw.layerViewTable(self, self.lswModel)
