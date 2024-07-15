@@ -61,13 +61,13 @@ class layoutEncoder(json.JSONEncoder):
                     "se": item.startExtend,
                     "ee": item.endExtend,
                     "md": item.mode,
-                    "nam": item.name,
+                    "nam": item.netName,
                     "ang": item.angle,
                 }
             case lshp.layoutViaArray:
                 viaDict = {
                     "st": item.via.mapToScene(item.via.start).toTuple(),
-                    "vdt": item.via.viaDefTuple.name,
+                    "vdt": item.via.viaDefTuple.netName,
                     "w": item.via.width,
                     "h": item.via.height,
                     "ang": item.angle,

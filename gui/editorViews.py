@@ -1,28 +1,3 @@
-#    “Commons Clause” License Condition v1.0
-#   #
-#    The Software is provided to you by the Licensor under the License, as defined
-#    below, subject to the following condition.
-#
-#    Without limiting other conditions in the License, the grant of rights under the
-#    License will not include, and the License does not grant to you, the right to
-#    Sell the Software.
-#
-#    For purposes of the foregoing, “Sell” means practicing any or all of the rights
-#    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
-#    derives, entirely or substantially, from the functionality of the Software. Any
-#    license notice or attribution required by the License must also include this
-#    Commons Clause License Condition notice.
-#
-#   Add-ons and extensions developed for this software may be distributed
-#   under their own separate licenses.
-#
-#    Software: Revolution EDA
-#    License: Mozilla Public License 2.0
-#    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-#
-
 from collections import Counter
 
 # import numpy as np
@@ -39,10 +14,9 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
-    QGraphicsView, QGraphicsScene, QMainWindow,
+    QGraphicsView,
 )
-import revedaEditor.common.net as net
-import revedaEditor.backend.undoStack as us
+
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -52,6 +26,8 @@ if os.environ.get("REVEDA_PDK_PATH"):
 else:
     import defaultPDK.schLayers as schlyr
 
+import revedaEditor.common.net as net
+import revedaEditor.backend.undoStack as us
 
 
 # import os
@@ -63,7 +39,7 @@ class editorView(QGraphicsView):
     The qgraphicsview for qgraphicsscene. It is used for both schematic and layout editors.
     """
     zoomFactorChanged = Signal(float)
-    def __init__(self, scene: QGraphicsScene, parent: QMainWindow):
+    def __init__(self, scene, parent):
         super().__init__(scene, parent)
         self.parent = parent
         self.editor = self.parent.parent
@@ -92,9 +68,8 @@ class editorView(QGraphicsView):
         Returns:
             None
         """
-
-        # self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        self.setCacheMode(QGraphicsView.CacheBackground)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # self.setCacheMode(QGraphicsView.CacheBackground)
         self.setMouseTracking(True)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
@@ -102,8 +77,8 @@ class editorView(QGraphicsView):
         self.setCursor(Qt.CrossCursor)
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.TextAntialiasing, True)
-        self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
+
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         """

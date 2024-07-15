@@ -34,16 +34,16 @@ from PySide6.QtCore import QPointF
 class schematicEncoder(json.JSONEncoder):
     def default(self, item: Any) -> Dict[str, Any]:
         if isinstance(item, shp.schematicSymbol):
-            return self._encode_schematic_symbol(item)
+            return self._encodeSchematicSymbol(item)
         elif isinstance(item, net.schematicNet):
-            return self._encode_schematic_net(item)
+            return self._encodeSchematicNet(item)
         elif isinstance(item, shp.schematicPin):
-            return self._encode_schematic_pin(item)
+            return self._encodeSchematicPin(item)
         elif isinstance(item, shp.text):
-            return self._encode_text(item)
+            return self._encodeText(item)
         return super().default(item)
 
-    def _encode_schematic_symbol(self, item: shp.schematicSymbol) -> Dict[str, Any]:
+    def _encodeSchematicSymbol(self, item: shp.schematicSymbol) -> Dict[str, Any]:
         item_label_dict = (
             item.labelDict if item.draft
             else {label.labelName: [label.labelValue, label.labelVisible]
@@ -64,7 +64,7 @@ class schematicEncoder(json.JSONEncoder):
             "br": item.boundingRect().getCoords(),
         }
 
-    def _encode_schematic_net(self, item: net.schematicNet) -> Dict[str, Any]:
+    def _encodeSchematicNet(self, item: net.schematicNet) -> Dict[str, Any]:
         scene_origin = item.scene().origin
         return {
             "type": "scn",
@@ -74,7 +74,7 @@ class schematicEncoder(json.JSONEncoder):
             "ns": item.nameStrength.value
         }
 
-    def _encode_schematic_pin(self, item: shp.schematicPin) -> Dict[str, Any]:
+    def _encodeSchematicPin(self, item: shp.schematicPin) -> Dict[str, Any]:
         return {
             "type": "scp",
             "st": self._subtract_point(item.mapToScene(item.start), item.scene().origin),
@@ -84,7 +84,7 @@ class schematicEncoder(json.JSONEncoder):
             "ang": item.angle,
         }
 
-    def _encode_text(self, item: shp.text) -> Dict[str, Any]:
+    def _encodeText(self, item: shp.text) -> Dict[str, Any]:
         return {
             "type": "txt",
             "st": self._subtract_point(item.mapToScene(item.start), item.scene().origin),

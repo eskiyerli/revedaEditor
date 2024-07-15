@@ -23,7 +23,6 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 import pathlib
-from typing import Dict
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -36,11 +35,19 @@ from PySide6.QtCore import (
 import revedaEditor.backend.libraryModelView as lmview
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.schBackEnd as scb
-import revedaEditor.gui.symbolEditor as edw
+import revedaEditor.gui.editorWindow as edw
 import revedaEditor.common.shapes as shp
 import revedaEditor.common.labels as lbl
 import revedaEditor.fileio.symbolEncoder as symenc
-import pdk.callbacks as clb
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.callbacks as cb
+
+else:
+    import defaultPDK.callbacks as cb
 
 import re
 
@@ -88,15 +95,60 @@ class importXschemSym:
             for line in file.readlines():
                 lineTokens = line.split()
                 if line[0] == "L" and len(lineTokens) > 4:
-                    self.drawLines(lineTokens)
+                    self.symbolScene.lineDraw(
+                        QPoint(
+                            self._scaleFactor * float(lineTokens[2]),
+                            self._scaleFactor * float(lineTokens[3]),
+                        ),
+                        QPoint(
+                            self._scaleFactor * float(lineTokens[4]),
+                            self._scaleFactor * float(lineTokens[5]),
+                        ),
+                    )
                 elif line[0] == "B" and len(lineTokens) > 4:
                     properties = self.findProperties(line)
                     if "name" in properties.keys():
-                        self.drawPin(lineTokens, properties)
+                        pin = shp.symbolPin(
+                            QPoint(0, 0),
+                            properties.get("name", ""),
+                            properties.get("dir", "input").capitalize(),
+                            shp.symbolPin.pinTypes[0],
+                        )
+                        pin.rect = QRect(
+                            QPoint(
+                                self._scaleFactor * float(lineTokens[2]),
+                                self._scaleFactor * float(lineTokens[3]),
+                            ),
+                            QPoint(
+                                self._scaleFactor * float(lineTokens[4]),
+                                self._scaleFactor * float(lineTokens[5]),
+                            ),
+                        )
+                        self.symbolScene.addItem(pin)
+                        self._pins.append(pin)
                     else:
-                        self.drawRectangle(lineTokens)
+                        self.symbolScene.rectDraw(
+                            QPoint(
+                                self._scaleFactor * float(lineTokens[2]),
+                                self._scaleFactor * float(lineTokens[3]),
+                            ),
+                            QPoint(
+                                self._scaleFactor * float(lineTokens[4]),
+                                self._scaleFactor * float(lineTokens[5]),
+                            ),
+                        )
                 elif line[0] == "P" and len(lineTokens) > 4:
-                    self.drawPolygons(lineTokens)
+                    numberPoints = int(float(lineTokens[2]))
+                    points = []
+                    for i in range(numberPoints):
+                        points.append(
+                            QPoint(
+                                self._scaleFactor * float(lineTokens[2 * i + 3]),
+                                self._scaleFactor * float(lineTokens[2 * i + 4]),
+                            )
+                        )
+                    polygon = shp.symbolPolygon(points)
+                    self.symbolScene.addItem(polygon)
                 elif line[0] == "T" and len(lineTokens) > 4:
                     if "tcleval" in line:
                     # self._functions.append(line)  # just a reminder
@@ -177,63 +229,6 @@ class importXschemSym:
             )
         self.processTclEval(self._tclExpressLines)
         self.symbolWindow.checkSaveCell()
-
-    def drawPin(self, lineTokens, properties):
-        pin = shp.symbolPin(
-                            QPoint(0, 0),
-                            properties.get("name", ""),
-                            properties.get("dir", "input").capitalize(),
-                            shp.symbolPin.pinTypes[0],
-                        )
-        pin.rect = QRect(
-                            QPoint(
-                                self._scaleFactor * float(lineTokens[2]),
-                                self._scaleFactor * float(lineTokens[3]),
-                            ),
-                            QPoint(
-                                self._scaleFactor * float(lineTokens[4]),
-                                self._scaleFactor * float(lineTokens[5]),
-                            ),
-                        )
-        self.symbolScene.addItem(pin)
-        self._pins.append(pin)
-
-    def drawRectangle(self, lineTokens):
-        self.symbolScene.rectDraw(
-                            QPoint(
-                                self._scaleFactor * float(lineTokens[2]),
-                                self._scaleFactor * float(lineTokens[3]),
-                            ),
-                            QPoint(
-                                self._scaleFactor * float(lineTokens[4]),
-                                self._scaleFactor * float(lineTokens[5]),
-                            ),
-                        )
-
-    def drawPolygons(self, lineTokens):
-        numberPoints = int(float(lineTokens[2]))
-        points = []
-        for i in range(numberPoints):
-            points.append(
-                            QPoint(
-                                self._scaleFactor * float(lineTokens[2 * i + 3]),
-                                self._scaleFactor * float(lineTokens[2 * i + 4]),
-                            )
-                        )
-        polygon = shp.symbolPolygon(points)
-        self.symbolScene.addItem(polygon)
-
-    def drawLines(self, lineTokens):
-        self.symbolScene.lineDraw(
-                        QPoint(
-                            self._scaleFactor * float(lineTokens[2]),
-                            self._scaleFactor * float(lineTokens[3]),
-                        ),
-                        QPoint(
-                            self._scaleFactor * float(lineTokens[4]),
-                            self._scaleFactor * float(lineTokens[5]),
-                        ),
-                    )
         
 
 
@@ -242,7 +237,7 @@ class importXschemSym:
         return self._scaleFactor
 
     @scaleFactor.setter
-    def scaleFactor(self, value: float) -> None:
+    def scaleFactor(self, value: float):
         self._scaleFactor = value
 
     @staticmethod
@@ -279,7 +274,7 @@ class importXschemSym:
         return text, textProperties, textLocation, rotationAngle
 
     @staticmethod
-    def processFormatString(formatString: str) -> Dict:
+    def processFormatString(formatString: str):
         lines = " ".join([line.strip() for line in formatString.strip().split("\n")])
         # print(lines)
         joinedLines = lines.split("{")[1].split("}")[0]
@@ -292,6 +287,7 @@ class importXschemSym:
             startIndex += 2
             indexes.append(startIndex)
         startIndex = 0
+        # print(f'Keys: {keys}')
         values = []
         for index in indexes:
             endIndex = joinedLines.find('"', index)
@@ -321,7 +317,7 @@ class importXschemSym:
         for (key, value) in zip(parameterMatches, tclEvalMatches):
             self._expressionDict[key] = value
 
-        clbPathObj = pathlib.Path(clb.__file__)
+        clbPathObj = pathlib.Path(cb.__file__)
         with clbPathObj.open("a") as clbFile:
             clbFile.write("\n\n")
             clbFile.write(f"class {self.cellName}(baseInst):\n")
@@ -340,7 +336,7 @@ class importXschemSym:
                 clbFile.write(f"       return returnValue\n")
                 label = lbl.symbolLabel(
                     QPoint(0, 0),
-                    f"{key} = {key}parm",
+                    f"{key} = {key}parm()",
                     lbl.symbolLabel.labelTypes[2],
                     self._labelHeight,
                     lbl.symbolLabel.labelAlignments[0],

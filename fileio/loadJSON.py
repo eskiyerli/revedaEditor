@@ -27,27 +27,39 @@
 # import pathlib
 
 import json
-from typing import Dict, Any, Optional, List
-import pdk.pcells
-import pdk.process as fabproc
-from PySide6.QtCore import QPoint, QLineF
-from PySide6.QtWidgets import QGraphicsScene
-
-import revedaEditor.common.net as net
-import revedaEditor.common.shapes as shp
-import revedaEditor.common.labels as lbl
-import revedaEditor.common.layoutShapes as lshp
-import revedaEditor.fileio.symbolEncoder as se
 import os
 import pathlib
-from methodtools import lru_cache
+from typing import Dict, Any, List
+
+from PySide6.QtCore import QPoint, QLineF, QRect
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+)
+from PySide6.QtWidgets import (
+    QGraphicsScene,
+    QGraphicsItem,
+    QGraphicsRectItem,
+    QGraphicsTextItem,
+)
 from dotenv import load_dotenv
+from methodtools import lru_cache
+
+import pdk.pcells
+import pdk.process as fabproc
+import revedaEditor.common.labels as lbl
+import revedaEditor.common.layoutShapes as lshp
+import revedaEditor.common.net as net
+import revedaEditor.common.shapes as shp
+import revedaEditor.fileio.symbolEncoder as se
+
 load_dotenv()
 
 if os.environ.get("REVEDA_PDK_PATH"):
     import pdk.layoutLayers as laylyr
 else:
     import defaultPDK.layoutLayers as laylyr
+
 
 class symbolItems:
     def __init__(self, scene: QGraphicsScene):
@@ -61,13 +73,12 @@ class symbolItems:
         self.scene = scene
         self.snapTuple = scene.snapTuple
 
-
     def create(self, item: dict):
         """
         Create symbol items from json file.
         """
         if isinstance(item, dict):
-            match item["type"]:
+            match item.get("type"):
                 case "rect":
                     return self.createRectItem(item)
                 case "circle":
@@ -84,6 +95,9 @@ class symbolItems:
                     return self.createTextItem(item)
                 case "polygon":
                     return self.createPolygonItem(item)
+                case _:
+                    return self.unknownItem()
+
     @staticmethod
     def createRectItem(item: dict):
         """
@@ -111,7 +125,8 @@ class symbolItems:
         circle.angle = item["ang"]
         return circle
 
-    def createArcItem(self, item: dict):
+    @staticmethod
+    def createArcItem(item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
 
@@ -121,7 +136,8 @@ class symbolItems:
         arc.angle = item["ang"]
         return arc
 
-    def createLineItem(self, item: dict):
+    @staticmethod
+    def createLineItem(item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
 
@@ -130,14 +146,16 @@ class symbolItems:
         line.angle = item["ang"]
         return line
 
-    def createPinItem(self, item: dict):
+    @staticmethod
+    def createPinItem(item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         pin = shp.symbolPin(start, item["nam"], item["pd"], item["pt"])
         pin.setPos(QPoint(item["loc"][0], item["loc"][1]))
         pin.angle = item["ang"]
         return pin
 
-    def createLabelItem(self, item: dict):
+    @staticmethod
+    def createLabelItem(item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         label = lbl.symbolLabel(
             start,
@@ -155,7 +173,8 @@ class symbolItems:
         label.labelValue = item["val"]
         return label
 
-    def createTextItem(self, item: dict):
+    @staticmethod
+    def createTextItem(item: dict):
         start = QPoint(item["st"][0], item["st"][1])
         text = shp.text(
             start,
@@ -169,13 +188,24 @@ class symbolItems:
         text.setPos(QPoint(item["loc"][0], item["loc"][1]))
         return text
 
-    def createPolygonItem(self, item: dict):
+    @staticmethod
+    def createPolygonItem(item: dict):
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
         return shp.symbolPolygon(pointsList)
 
     @staticmethod
     def createSymbolAttribute(item: dict):
         return se.symbolAttribute(item["nam"], item["def"])
+
+    def unknownItem(self):
+        rectItem = QGraphicsRectItem(QRect(0, 0, *self.snapTuple))
+        rectItem.setPen(QColor("red"))
+        textItem = QGraphicsTextItem("Unknown item type")
+        textItem.setFont(QFont("Arial", 10))
+        textItem.setDefaultTextColor(QColor("red"))
+        textItem.setParentItem(rectItem)
+        textItem.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        return rectItem
 
 
 class schematicItems:
@@ -188,98 +218,10 @@ class schematicItems:
         if isinstance(item, dict):
             match item["type"]:
                 case "sys":
-                    itemShapes = list()
-                    symbolAttributes = dict()
-                    symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes)
-                    symbolInstance.libraryName = item["lib"]
-                    symbolInstance.cellName = item["cell"]
-                    symbolInstance.viewName = item["view"]
-                    symbolInstance.counter = item["ic"]
-                    symbolInstance.instanceName = item["nam"]
-                    symbolInstance.netlistIgnore = bool(item.get("ign", 0))
-                    symbolInstance.labelDict = item["ld"]
-                    symbolInstance.setPos(*item["loc"])
-                    [
-                        labelItem.labelDefs()
-                        for labelItem in symbolInstance.labels.values()
-                    ]
-                    libraryPath = self.libraryDict.get(item["lib"])
-
-                    if libraryPath is None:
-                        self.createDraftSymbol(item, symbolInstance)
-                        self.scene.logger.warning(f"{item['lib']} cannot be found.")
-                        return symbolInstance
-                    else:
-                        # find the symbol file
-                        file = libraryPath.joinpath(
-                            item["cell"], f'{item["view"]}.json'
-                        )
-                        if not file.exists():
-                            self.createDraftSymbol(item, symbolInstance)
-                            self.scene.logger.warning(f"{item['lib']} cannot be found.")
-                            return symbolInstance
-                        else:
-                            # load json file and create shapes
-                            with file.open(mode="r", encoding="utf-8") as temp:
-                                try:
-                                    jsonItems = json.load(temp)
-                                    assert jsonItems[0]["cellView"] == "symbol"
-                                    symbolSnapTuple = jsonItems[1]["snapGrid"]
-                                    # we snap to scene grid values. Need to test further.
-                                    symbolShape = symbolItems(self.scene)
-                                    symbolShape.snapTuple = symbolSnapTuple
-                                    for jsonItem in jsonItems[
-                                        2:
-                                    ]:  # skip first two entries.
-                                        if jsonItem["type"] == "attr":
-                                            symbolAttributes[jsonItem["nam"]] = (
-                                                jsonItem["def"]
-                                            )
-                                        else:
-                                            itemShapes.append(
-                                                symbolShape.create(jsonItem)
-                                            )
-                                    symbolInstance.shapes = itemShapes
-                                    for labelItem in symbolInstance.labels.values():
-                                        if (
-                                            labelItem.labelName
-                                            in symbolInstance.labelDict.keys()
-                                        ):
-                                            labelItem.labelValue = (
-                                                symbolInstance.labelDict[
-                                                    labelItem.labelName
-                                                ][0]
-                                            )
-                                            labelItem.labelVisible = (
-                                                symbolInstance.labelDict[
-                                                    labelItem.labelName
-                                                ][1]
-                                            )
-                                    symbolInstance.symattrs = symbolAttributes
-                                    [
-                                        labelItem.labelDefs()
-                                        for labelItem in symbolInstance.labels.values()
-                                    ]
-                                    symbolInstance.angle = item.get("ang", 0)
-                                    return symbolInstance
-                                except json.decoder.JSONDecodeError:
-                                    self.scene.logger.error(
-                                        "Error: Invalid Symbol file"
-                                    )
+                    return self._createSymbolShape(item)
 
                 case "scn":
-                    start = QPoint(item["st"][0], item["st"][1])
-                    end = QPoint(item["end"][0], item["end"][1])
-                    netItem = net.schematicNet(start, end)
-                    netItem.name = item["nam"]
-                    match item["ns"]:
-                        case 3:
-                            netItem.nameStrength = net.netNameStrengthEnum.SET
-                        case 2:
-                            netItem.nameStrength = net.netNameStrengthEnum.INHERIT
-                        case _:
-                            netItem.nameStrength = net.netNameStrengthEnum.NONAME
-                    return netItem
+                    return self._createNet(item)
                 case "scp":
                     start = QPoint(item["st"][0], item["st"][1])
                     pinName = item["pn"]
@@ -306,6 +248,102 @@ class schematicItems:
                     )
                     return text
 
+    def _createNet(self, item):
+        start = QPoint(item["st"][0], item["st"][1])
+        end = QPoint(item["end"][0], item["end"][1])
+        netItem = net.schematicNet(start, end)
+        match item["ns"]:
+            case 3:
+                netItem.nameStrength = net.netNameStrengthEnum.SET
+            case 2:
+                netItem.nameStrength = net.netNameStrengthEnum.INHERIT
+            case 1:
+                netItem.nameStrength = net.netNameStrengthEnum.WEAK
+            case _:
+                netItem.nameStrength = net.netNameStrengthEnum.NONAME
+        netItem.netName = item["nam"]
+        return netItem
+
+    def _createSymbolShape(self, item):
+        itemShapes = list()
+        symbolAttributes = dict()
+        symbolInstance = shp.schematicSymbol(itemShapes, symbolAttributes)
+        symbolInstance.libraryName = item["lib"]
+        symbolInstance.cellName = item["cell"]
+        symbolInstance.viewName = item["view"]
+        symbolInstance.counter = item["ic"]
+        symbolInstance.instanceName = item["nam"]
+        symbolInstance.netlistIgnore = bool(item.get("ign", 0))
+        symbolInstance.labelDict = item["ld"]
+        symbolInstance.setPos(*item["loc"])
+        [
+            labelItem.labelDefs()
+            for labelItem in symbolInstance.labels.values()
+        ]
+        libraryPath = self.libraryDict.get(item["lib"])
+        if libraryPath is None:
+            self.createDraftSymbol(item, symbolInstance)
+            self.scene.logger.warning(f"{item['lib']} cannot be found.")
+            return symbolInstance
+        else:
+            # find the symbol file
+            file = libraryPath.joinpath(
+                item["cell"], f'{item["view"]}.json'
+            )
+            if not file.exists():
+                self.createDraftSymbol(item, symbolInstance)
+                self.scene.logger.warning(f"{item['lib']} cannot be found.")
+                return symbolInstance
+            else:
+                # load json file and create shapes
+                with file.open(mode="r", encoding="utf-8") as temp:
+                    try:
+                        jsonItems = json.load(temp)
+                        assert jsonItems[0]["cellView"] == "symbol"
+                        symbolSnapTuple = jsonItems[1]["snapGrid"]
+                        # we snap to scene grid values. Need to test further.
+                        symbolShape = symbolItems(self.scene)
+                        symbolShape.snapTuple = symbolSnapTuple
+                        for jsonItem in jsonItems[
+                                        2:
+                                        ]:  # skip first two entries.
+                            if jsonItem["type"] == "attr":
+                                symbolAttributes[jsonItem["nam"]] = (
+                                    jsonItem["def"]
+                                )
+                            else:
+                                itemShapes.append(
+                                    symbolShape.create(jsonItem)
+                                )
+                        symbolInstance.shapes = itemShapes
+                        for labelItem in symbolInstance.labels.values():
+                            if (
+                                    labelItem.labelName
+                                    in symbolInstance.labelDict.keys()
+                            ):
+                                labelItem.labelValue = (
+                                    symbolInstance.labelDict[
+                                        labelItem.labelName
+                                    ][0]
+                                )
+                                labelItem.labelVisible = (
+                                    symbolInstance.labelDict[
+                                        labelItem.labelName
+                                    ][1]
+                                )
+                        symbolInstance.symattrs = symbolAttributes
+                        [
+                            labelItem.labelDefs()
+                            for labelItem in symbolInstance.labels.values()
+                        ]
+                        symbolInstance.angle = item.get("ang", 0)
+                        return symbolInstance
+                    except json.decoder.JSONDecodeError:
+                        self.scene.logger.error(
+                            "Error: Invalid Symbol file"
+                        )
+                        return None
+
     def createDraftSymbol(self, item: dict, symbolInstance: shp.schematicSymbol):
         rectItem = shp.symbolRectangle(
             QPoint(item["br"][0], item["br"][1]), QPoint(item["br"][2], item["br"][3])
@@ -313,7 +351,7 @@ class schematicItems:
         fixedFont = self.scene.fixedFont
         textItem = shp.text(
             rectItem.start,
-            f'{item["lib"]}' f'/{item["cell"]}/' f'{item["view"]}',
+            f'{item["lib"]}/{item["cell"]}/{item["view"]}',
             fixedFont.family(),
             fixedFont.styleName(),
             fixedFont.pointSize(),
@@ -324,6 +362,35 @@ class schematicItems:
         symbolInstance.draft = True
 
 
+#
+# class PCellCache:
+#     _instance = None
+#
+#     def __new__(cls):
+#         if cls._instance is None:
+#             cls._instance = super(PCellCache, cls).__new__(cls)
+#         return cls._instance
+#
+#     @classmethod
+#     @lru_cache(maxsize=100)
+#     def get_pcell_def(cls, file_path: str) -> Dict:
+#         try:
+#             with open(file_path, "r") as temp:
+#                 return json.load(temp)
+#         except (json.JSONDecodeError, FileNotFoundError) as e:
+#             return None
+#
+#     @classmethod
+#     @lru_cache(maxsize=100)
+#     def get_pcell_class(cls, pcell_class_name: str) -> Any:
+#         return pdk.pcells.pcells.get(pcell_class_name)
+#
+#     @classmethod
+#     def clear_caches(cls):
+#         cls.get_pcell_def.cache_clear()
+#         cls.get_pcell_class.cache_clear()
+#
+
 
 class PCellCache:
     _instance = None
@@ -331,26 +398,36 @@ class PCellCache:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(PCellCache, cls).__new__(cls)
+            cls._instance.layout_file_cache = {}
         return cls._instance
 
     @classmethod
     @lru_cache(maxsize=100)
-    def get_pcell_def(cls, file_path: str) -> Dict:
+    def getPCellDef(cls, file_path: str) -> dict:
         try:
             with open(file_path, "r") as temp:
                 return json.load(temp)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            return None
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
 
     @classmethod
     @lru_cache(maxsize=100)
-    def get_pcell_class(cls, pcell_class_name: str) -> Any:
+    def getPCellClass(cls, pcell_class_name: str) -> Any:
         return pdk.pcells.pcells.get(pcell_class_name)
 
     @classmethod
+    def getLayoutFileContents(cls, file_path: str) -> List:
+        return cls._instance.layout_file_cache.get(file_path)
+
+    @classmethod
+    def setLayoutFileContents(cls, file_path: str, contents: List):
+        cls._instance.layout_file_cache[file_path] = contents
+
+    @classmethod
     def clear_caches(cls):
-        cls.get_pcell_def.cache_clear()
-        cls.get_pcell_class.cache_clear()
+        cls.getPCellDef.cache_clear()
+        cls.getPCellClass.cache_clear()
+        cls._instance.layout_file_cache.clear()
 
 
 class layoutItems:
@@ -366,7 +443,6 @@ class layoutItems:
         self.rulerWidth = scene.rulerWidth
         self.rulerTickGap = scene.rulerTickGap
         self.cache = PCellCache()
-
 
     def create(self, item: dict):
         if isinstance(item, dict):
@@ -391,45 +467,6 @@ class layoutItems:
                     return self.createViaArrayShape(item)
                 case "Ruler":
                     return self.createRulerShape(item)
-    #
-    # def createPcellInstance(self, item):
-    #     library_path = pathlib.Path(self.libraryDict.get(item["lib"], None))
-    #     if not library_path:
-    #         self.scene.logger.error(f'{item["lib"]} cannot be found.')
-    #         return None
-    #
-    #     file_path = str(library_path / item["cell"] / f"{item['view']}.json")
-    #
-    #     pcell_def = self.cache.get_pcell_def(file_path)
-    #     if not pcell_def:
-    #         self.scene.logger.error(f'Error reading PCell file: {file_path}')
-    #         return None
-    #
-    #     if not pcell_def or pcell_def[0].get("cellView") != "pcell":
-    #         self.scene.logger.error("Not a PCell cell")
-    #         return None
-    #
-    #     pcell_class_name = pcell_def[1].get("reference")
-    #     pcell_class = self.cache.get_pcell_class(pcell_class_name)
-    #     if not pcell_class:
-    #         self.scene.logger.error(f"Unknown PCell class: {pcell_class_name}")
-    #         return None
-    #
-    #     try:
-    #         pcell_instance = pcell_class()
-    #         pcell_instance(**item.get("params", {}))
-    #
-    #         # Set instance-specific properties
-    #         pcell_instance.libraryName = item["lib"]
-    #         pcell_instance.cellName = item["cell"]
-    #         pcell_instance.viewName = item["view"]
-    #         pcell_instance.counter = item["ic"]
-    #         pcell_instance.instanceName = item["nam"]
-    #         pcell_instance.setPos(QPoint(*item["loc"]))
-    #         return pcell_instance
-    #     except Exception as e:
-    #         self.scene.logger.error(f"Error creating PCell instance: {e}")
-    #         return None
 
     def createPcellInstance(self, item):
         libraryPath = pathlib.Path(self.libraryDict.get(item["lib"], None))
@@ -442,7 +479,7 @@ class layoutItems:
         filePath = libraryPath / cell / f"{viewName}.json"
 
         if not filePath.is_file():
-            self.scene.logger.error(f'File {filePath} does not exist.')
+            self.scene.logger.error(f"File {filePath} does not exist.")
             return None
 
         try:
@@ -455,7 +492,6 @@ class layoutItems:
         if not pcellDef or pcellDef[0].get("cellView") != "pcell":
             self.scene.logger.error("Not a PCell cell")
             return None
-
 
         pcellClassName = pcellDef[1].get("reference")
         pcellClass = pdk.pcells.pcells.get(pcellClassName)
@@ -482,27 +518,31 @@ class layoutItems:
         libraryPath = pathlib.Path(self.libraryDict.get(libraryName))
 
         if not libraryPath.exists():
-            self.scene.logger.error(f'{libraryName} cannot be found.')
+            self.scene.logger.error(f"{libraryName} cannot be found.")
             return None
 
         cell = item.get("cell")
         viewName = item.get("view")
-        # instCounter = item.get("ic")
         filePath = libraryPath / cell / f"{viewName}.json"
 
         if not filePath.is_file():
-            self.scene.logger.error(f'File {filePath} does not exist.')
+            self.scene.logger.error(f"File {filePath} does not exist.")
             return None
 
-        try:
-            with filePath.open("r") as file:
-                shapes = json.load(file)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            self.scene.logger.error(f"Error reading Layout file: {e}")
-            return None
+        # Try to get the cached file contents
+        file_contents = self.cache.getLayoutFileContents(str(filePath))
+        if file_contents is None:
+            try:
+                with filePath.open("r") as file:
+                    file_contents = json.load(file)
+                # Cache the file contents
+                self.cache.setLayoutFileContents(str(filePath), file_contents)
+            except (json.JSONDecodeError, FileNotFoundError) as e:
+                self.scene.logger.error(f"Error reading Layout file: {e}")
+                return None
 
         itemShapes = []
-        for shape in shapes[2:]:
+        for shape in file_contents[2:]:
             try:
                 itemShapes.append(layoutItems(self.scene).create(shape))
             except Exception as e:
@@ -519,7 +559,6 @@ class layoutItems:
 
         return layoutInstance
 
-
     def createRectShape(self, item):
         start = QPoint(item["tl"][0], item["tl"][1])
         end = QPoint(item["br"][0], item["br"][1])
@@ -528,7 +567,6 @@ class layoutItems:
         # rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item.get("ang", 0)
         return rect
-
 
     def createPathShape(self, item):
         path = lshp.layoutPath(
