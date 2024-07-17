@@ -23,7 +23,10 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
+from revedaEditor.gui.layoutScene import layoutScene
+from revedaEditor.gui.startThread import startThread
 import json
+
 # from hashlib import new
 import pathlib
 
@@ -45,18 +48,6 @@ from PySide6.QtWidgets import (
 )
 from quantiphy import Quantity
 
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-if os.environ.get("REVEDA_PDK_PATH"):
-
-    import pdk.layoutLayers as laylyr
-    import pdk.process as fabproc
-else:
-    import defaultPDK.layoutLayers as laylyr
-    import defaultPDK.process as fabproc
-
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
@@ -65,15 +56,24 @@ import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.fileio.gdsExport as gdse
 import revedaEditor.fileio.layoutEncoder as layenc
 import revedaEditor.fileio.loadJSON as lj
-import revedaEditor.gui.editorScenes as escn
+
 import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.lsw as lsw
-from revedaEditor.gui.startThread import startThread
-import revedaEditor.resources.resources
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.layoutLayers as laylyr
+    import pdk.process as fabproc
+else:
+    import defaultPDK.layoutLayers as laylyr
+    import defaultPDK.process as fabproc
 
 class layoutEditor(edw.editorWindow):
     def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView) -> None:
@@ -96,7 +96,7 @@ class layoutEditor(edw.editorWindow):
         super()._createMenuBar()
         self.alignMenu = QMenu("Align", self)
         self.alignMenu.setIcon(QIcon("icons/layers-alignment-middle.png"))
-        
+
         self.propertyMenu = self.menuEdit.addMenu("Properties")
 
     def _createActions(self):
@@ -203,7 +203,7 @@ class layoutEditor(edw.editorWindow):
         dlg = ldlg.createPathDialogue(self)
         # paths are created on drawing layers
         dlg.pathLayerCB.addItems(
-            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
+            [f"{item.netName} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
         )
         dlg.pathWidth.setText("1.0")
         dlg.startExtendEdit.setText("0.5")
@@ -230,7 +230,7 @@ class layoutEditor(edw.editorWindow):
             pathName = dlg.pathNameEdit.text()
             pathLayerName = dlg.pathLayerCB.currentText().split()[0]
             pathLayer = [
-                item for item in laylyr.pdkDrawingLayers if item.name == pathLayerName
+                item for item in laylyr.pdkDrawingLayers if item.netName == pathLayerName
             ][0]
             startExtend = float(dlg.startExtendEdit.text().strip()) * fabproc.dbu
             endExtend = float(dlg.endExtendEdit.text().strip()) * fabproc.dbu
@@ -241,22 +241,22 @@ class layoutEditor(edw.editorWindow):
     def createPinClick(self):
         dlg = ldlg.createLayoutPinDialog(self)
         pinLayersNames = [
-            f"{item.name} [{item.purpose}]" for item in laylyr.pdkPinLayers
+            f"{item.netName} [{item.purpose}]" for item in laylyr.pdkPinLayers
         ]
         textLayersNames = [
-            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+            f"{item.netName} [{item.purpose}]" for item in laylyr.pdkTextLayers
         ]
         dlg.pinLayerCB.addItems(pinLayersNames)
         dlg.labelLayerCB.addItems(textLayersNames)
 
         if self.centralW.scene.newPinTuple is not None:
             dlg.pinLayerCB.setCurrentText(
-                f"{self.centralW.scene.newPinTuple.pinLayer.name} "
+                f"{self.centralW.scene.newPinTuple.pinLayer.netName} "
                 f"[{self.centralW.scene.newPinTuple.pinLayer.purpose}]"
             )
         if self.centralW.scene.newLabelTuple is not None:
             dlg.labelLayerCB.setCurrentText(
-                f"{self.centralW.scene.newLabelTuple.labelLayer.name} ["
+                f"{self.centralW.scene.newLabelTuple.labelLayer.netName} ["
                 f"{self.centralW.scene.newLabelTuple.labelLayer.purpose}]"
             )
             dlg.familyCB.setCurrentText(self.centralW.scene.newLabelTuple.fontFamily)
@@ -277,11 +277,11 @@ class layoutEditor(edw.editorWindow):
             pinType = dlg.pinType.currentText()
             pinLayerName = dlg.pinLayerCB.currentText().split()[0]
             pinLayer = [
-                item for item in laylyr.pdkPinLayers if item.name == pinLayerName
+                item for item in laylyr.pdkPinLayers if item.netName == pinLayerName
             ][0]
             labelLayerName = dlg.labelLayerCB.currentText().split()[0]
             labelLayer = [
-                item for item in laylyr.pdkTextLayers if item.name == labelLayerName
+                item for item in laylyr.pdkTextLayers if item.netName == labelLayerName
             ][0]
             fontFamily = dlg.familyCB.currentText()
             fontStyle = dlg.fontStyleCB.currentText()
@@ -304,7 +304,7 @@ class layoutEditor(edw.editorWindow):
     def createLabelClick(self):
         dlg = ldlg.createLayoutLabelDialog(self)
         textLayersNames = [
-            f"{item.name} [{item.purpose}]" for item in laylyr.pdkTextLayers
+            f"{item.netName} [{item.purpose}]" for item in laylyr.pdkTextLayers
         ]
         dlg.labelLayerCB.addItems(textLayersNames)
         if dlg.exec() == QDialog.Accepted:
@@ -312,7 +312,7 @@ class layoutEditor(edw.editorWindow):
             labelName = dlg.labelName.text()
             labelLayerName = dlg.labelLayerCB.currentText().split()[0]
             labelLayer = [
-                item for item in laylyr.pdkTextLayers if item.name == labelLayerName
+                item for item in laylyr.pdkTextLayers if item.netName == labelLayerName
             ][0]
             fontFamily = dlg.familyCB.currentText()
             fontStyle = dlg.fontStyleCB.currentText()
@@ -331,7 +331,7 @@ class layoutEditor(edw.editorWindow):
 
     def createViaClick(self):
         dlg = ldlg.createLayoutViaDialog(self)
-        viaLayerNames = [item.name for item in fabproc.processVias]
+        viaLayerNames = [item.netName for item in fabproc.processVias]
         dlg.singleViaNamesCB.addItems(viaLayerNames)
         dlg.arrayViaNamesCB.addItems(viaLayerNames)
         dlg.singleViaWidthEdit.setText(fabproc.processVias[0].minWidth)
@@ -368,7 +368,7 @@ class layoutEditor(edw.editorWindow):
                 selViaDefTuple = [
                     viaDefTuple
                     for viaDefTuple in fabproc.processVias
-                    if viaDefTuple.name == dlg.arrayViaNamesCB.currentText()
+                    if viaDefTuple.netName == dlg.arrayViaNamesCB.currentText()
                 ][0]
 
                 singleViaTuple = ddef.singleViaTuple(
@@ -465,7 +465,7 @@ class layoutContainer(QWidget):
     def __init__(self, parent: layoutEditor):
         super().__init__(parent=parent)
         self.parent = parent
-        self.scene = escn.layoutScene(self)
+        self.scene = layoutScene(self)
         self.view = edv.layoutView(self.scene, self)
         self.lswModel = lsw.layerDataModel(laylyr.pdkAllLayers)
         layerViewTable = lsw.layerViewTable(self, self.lswModel)
@@ -497,7 +497,7 @@ class layoutContainer(QWidget):
 
     def findSelectedLayer(self, layerName: str, layerPurpose: str):
         for layer in laylyr.pdkAllLayers:
-            if layer.name == layerName and layer.purpose == layerPurpose:
+            if layer.netName == layerName and layer.purpose == layerPurpose:
                 return layer
         return laylyr.pdkAllLayers[0]
 

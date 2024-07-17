@@ -61,7 +61,7 @@ class layoutEncoder(json.JSONEncoder):
                     "se": item.startExtend,
                     "ee": item.endExtend,
                     "md": item.mode,
-                    "nam": item.netName,
+                    "nam": item.name,
                     "ang": item.angle,
                 }
             case lshp.layoutViaArray:
