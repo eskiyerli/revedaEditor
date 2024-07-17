@@ -93,7 +93,6 @@ class editorWindow(QMainWindow):
         self.majorGrid = 10  # dot/line grid spacing
         self.snapGrid = 5  # snapping grid size
         self.snapTuple = (self.snapGrid, self.snapGrid)
-        self.snapDistance = 2 * self.snapGrid
         self.init_UI()
 
     def init_UI(self):
@@ -551,10 +550,10 @@ class editorWindow(QMainWindow):
             scd.partialSelection.setChecked(True)
         else:
             scd.fullSelection.setChecked(True)
-        scd.snapDistanceEntry.setText(str(self.snapDistance))
+        scd.snapDistanceEntry.setText(str(self.centralW.scene._snapDistance))
         if scd.exec() == QDialog.Accepted:
             self.centralW.scene.partialSelection = scd.partialSelection.isChecked()
-            self.snapDistance = int(float(scd.snapDistanceEntry.text()))
+            self.centralW.scene._snapDistance = int(float(scd.snapDistanceEntry.text()))
 
     def checkSaveCell(self):
         pass

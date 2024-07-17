@@ -56,7 +56,7 @@ import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.fileio.symbolEncoder as symenc
-import revedaEditor.gui.editorScenes as escn
+import revedaEditor.gui.schematicScene as schscn
 import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
@@ -652,7 +652,7 @@ class schematicContainer(QWidget):
         super().__init__(parent=parent)
         assert isinstance(parent, schematicEditor)
         self.parent = parent
-        self.scene = escn.schematicScene(self)
+        self.scene = schscn.schematicScene(self)
         self.view = edv.schematicView(self.scene, self)
 
         self.init_UI()

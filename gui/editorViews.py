@@ -209,6 +209,10 @@ class editorView(QGraphicsView):
             case Qt.Key_Escape:
                 self.scene.editModes.setMode("selectItem")
                 self.editor.messageLine.setText("Select Item")
+                self.scene._items = None
+                if self.scene._selectionRectItem:
+                    self.scene.removeItem(self.scene._selectionRectItem)
+                    self.scene._selectionRectItem = None
             case _:
                 super().keyPressEvent(event)
 

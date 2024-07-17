@@ -219,7 +219,6 @@ class schematicItems:
             match item["type"]:
                 case "sys":
                     return self._createSymbolShape(item)
-
                 case "scn":
                     return self._createNet(item)
                 case "scp":
@@ -247,7 +246,8 @@ class schematicItems:
                         item["to"],
                     )
                     return text
-
+                case _:
+                    return self.unknownItem()
     def _createNet(self, item):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
@@ -361,6 +361,15 @@ class schematicItems:
         symbolInstance.shapes = [rectItem, textItem]
         symbolInstance.draft = True
 
+    def unknownItem(self):
+        rectItem = QGraphicsRectItem(QRect(0, 0, *self.snapTuple))
+        rectItem.setPen(QColor("red"))
+        textItem = QGraphicsTextItem("Unknown item type")
+        textItem.setFont(QFont("Arial", 10))
+        textItem.setDefaultTextColor(QColor("red"))
+        textItem.setParentItem(rectItem)
+        textItem.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        return rectItem
 
 #
 # class PCellCache:
@@ -467,6 +476,8 @@ class layoutItems:
                     return self.createViaArrayShape(item)
                 case "Ruler":
                     return self.createRulerShape(item)
+                case _:
+                    return self.unknownItem()
 
     def createPcellInstance(self, item):
         libraryPath = pathlib.Path(self.libraryDict.get(item["lib"], None))
@@ -654,3 +665,13 @@ class layoutItems:
         )
         viaArray.angle = item.get("ang", 0)
         return viaArray
+
+    def unknownItem(self):
+        rectItem = QGraphicsRectItem(QRect(0, 0, *self.snapTuple))
+        rectItem.setPen(QColor("red"))
+        textItem = QGraphicsTextItem("Unknown item type")
+        textItem.setFont(QFont("Arial", 10))
+        textItem.setDefaultTextColor(QColor("red"))
+        textItem.setParentItem(rectItem)
+        textItem.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
+        return rectItem

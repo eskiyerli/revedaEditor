@@ -50,7 +50,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QGraphicsItem,
     QGraphicsPolygonItem,
-    QGraphicsTextItem,
+    QGraphicsSimpleTextItem,
     QGraphicsRectItem,
     QGraphicsSceneMouseEvent,
     QGraphicsSceneHoverEvent,
@@ -990,15 +990,20 @@ class symbolPin(symbolShape):
         self._highlighted = False
         self._pinRectItem = QGraphicsRectItem(QRect(self._start.x() - self.PIN_WIDTH / 2,
                                                     self._start.y() - self.PIN_HEIGHT / 2,
-                                                    self.PIN_WIDTH, self.PIN_HEIGHT), self)
-        self._pinRect = self._pinRectItem.rect()
-        self._pinNameItem = QGraphicsTextItem(self._pinName, self)
+                                                    self.PIN_WIDTH, self.PIN_HEIGHT))
+        self._pinRectItem.setPen(symlyr.symbolPinPen)
+        self._pinRectItem.setBrush(symlyr.symbolPinBrush)
+        self._pinRectItem.setParentItem(self)
+        self._pinRect = self._pinRectItem.rect().adjusted(-2,-2,2,2)
+        self._pinNameItem = QGraphicsSimpleTextItem(self._pinName)
         self._font = QFont("Arial", 14)
-        textBoundingRectHeight = self._pinNameItem.boundingRect().height()
+        # textBoundingRectHeight = self._pinNameItem.boundingRect().height()
         self._pinNameItem.setFont(self._font)
         self._pinNameItem.setPos(self._start.x() - self.PIN_WIDTH / 2, self._start.y() -
-                                 self.PIN_HEIGHT / 2 - self.TEXT_MARGIN - textBoundingRectHeight)
-        self._pinNameItem.setDefaultTextColor(pdk.symLayers.symbolPinLayer.bcolor)
+                                 self.PIN_HEIGHT / 2 + self.TEXT_MARGIN)
+        self._pinNameItem.setBrush(symlyr.symbolPinBrush)
+        # self._pinNameItem.setDefaultTextColor(pdk.symLayers.symbolPinLayer.bcolor)
+        self._pinNameItem.setParentItem(self)
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
@@ -1010,17 +1015,7 @@ class symbolPin(symbolShape):
         return self.childrenBoundingRect()
 
     def paint(self, painter, option, widget):
-        if self.isSelected():
-            painter.setPen(symlyr.selectedSymbolPinPen)
-            painter.setBrush(symlyr.selectedSymbolPinBrush)
-        elif self._highlighted:
-            painter.setPen(symlyr.highlightedSymbolPinPen)
-            painter.setBrush(symlyr.highlightedSymbolPinBrush)
-        else:
-            painter.setPen(symlyr.symbolPinPen)
-            painter.setBrush(symlyr.symbolPinBrush)
-
-        painter.drawRect(self._pinRect)
+        pass
 
     def __repr__(self):
         return f"pin({self._start},{self._pinName}, {self._pinDir}, {self._pinType})"
@@ -1030,6 +1025,13 @@ class symbolPin(symbolShape):
             # The scene change is complete
             if self.scene().__class__.__name__ == 'schematicScene':
                 self._pinNameItem.setVisible(False)
+        elif change == QGraphicsItem.ItemSelectedHasChanged:
+            if value:
+                self._pinRectItem.setPen(symlyr.selectedSymbolPinPen)
+                self._pinRectItem.setBrush(symlyr.selectedSymbolPinBrush)
+            else:
+                self._pinRectItem.setPen(symlyr.symbolPinPen)
+                self._pinRectItem.setBrush(symlyr.symbolPinBrush)
         return super().itemChange(change, value)
 
     def shape(self):
@@ -1340,7 +1342,7 @@ class schematicSymbol(symbolShape):
                 self._labels[item.labelName] = item
 
     def __repr__(self):
-        return f"schematicSymbol({self._shapes})"
+        return f"schematicSymbol({self._instanceName})"
 
     def itemChange(self, change, value):
         if self.scene():
@@ -1568,11 +1570,11 @@ class schematicPin(symbolShape):
         self._font = QFont("Arial", 12)
         self._updateTextMetrics()
         self._pinItem = QGraphicsPolygonItem(self.pinPolygon, self)
-        self._textItem = QGraphicsTextItem(self._pinName, self)
+        self._textItem = QGraphicsSimpleTextItem(self._pinName, self)
         self._textItem.setFont(self._font)
         self._textItem.setPos(self._start.x() - self.PIN_WIDTH / 2, self._start.y() -
                               self.PIN_HEIGHT - self.TEXT_MARGIN)
-        self._textItem.setDefaultTextColor(pdk.schLayers.schematicPinNameLayer.bcolor)
+        self._textItem.setBrush(QBrush(pdk.schLayers.schematicPinNameLayer.bcolor))
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
