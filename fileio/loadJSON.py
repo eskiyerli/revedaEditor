@@ -261,7 +261,7 @@ class schematicItems:
                 netItem.nameStrength = net.netNameStrengthEnum.WEAK
             case _:
                 netItem.nameStrength = net.netNameStrengthEnum.NONAME
-        netItem.netName = item["nam"]
+        netItem.name = item["nam"]
         return netItem
 
     def _createSymbolShape(self, item):
@@ -371,34 +371,6 @@ class schematicItems:
         textItem.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
         return rectItem
 
-#
-# class PCellCache:
-#     _instance = None
-#
-#     def __new__(cls):
-#         if cls._instance is None:
-#             cls._instance = super(PCellCache, cls).__new__(cls)
-#         return cls._instance
-#
-#     @classmethod
-#     @lru_cache(maxsize=100)
-#     def get_pcell_def(cls, file_path: str) -> Dict:
-#         try:
-#             with open(file_path, "r") as temp:
-#                 return json.load(temp)
-#         except (json.JSONDecodeError, FileNotFoundError) as e:
-#             return None
-#
-#     @classmethod
-#     @lru_cache(maxsize=100)
-#     def get_pcell_class(cls, pcell_class_name: str) -> Any:
-#         return pdk.pcells.pcells.get(pcell_class_name)
-#
-#     @classmethod
-#     def clear_caches(cls):
-#         cls.get_pcell_def.cache_clear()
-#         cls.get_pcell_class.cache_clear()
-#
 
 
 class PCellCache:

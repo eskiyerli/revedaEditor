@@ -29,7 +29,8 @@
 import itertools
 import math
 from pathlib import Path
-
+import numpy as np
+from typing import List, Set, Tuple, Union
 from PySide6.QtCore import (QPoint, QRect, QRectF, Qt, QPointF, QLineF, )
 from PySide6.QtGui import (
     QPen,
@@ -48,22 +49,67 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
+    QGraphicsSimpleTextItem,
     QGraphicsSceneMouseEvent,
     QGraphicsSceneHoverEvent,
 )
-import os
-from dotenv import load_dotenv
-load_dotenv()
 
-if os.environ.get("REVEDA_PDK_PATH"):
-    import pdk.layoutLayers as laylyr
-
-else:
-    import defaultPDK.layoutLayers as laylyr
-
-
+import pdk.layoutLayers as laylyr
 import revedaEditor.backend.dataDefinitions as ddef
 
+class textureCache:
+    _file_content_cache = {}
+    _bitmap_cache = {}
+
+    @classmethod
+    def getCachedBitmap(cls, texturePath, color):
+        cache_key = (str(texturePath), color.name())
+        if cache_key not in cls._bitmap_cache:
+            image = cls.createImage(texturePath, color)
+            cls._bitmap_cache[cache_key] = QBitmap.fromImage(image)
+        return cls._bitmap_cache[cache_key]
+
+    @classmethod
+    def readFileContent(cls, filePath):
+        if filePath not in cls._file_content_cache:
+            with open(filePath, 'r') as file:
+                cls._file_content_cache[filePath] = file.read()
+        return cls._file_content_cache[filePath]
+
+    @classmethod
+    def createImage(cls, filePath: Path, color: QColor):
+        content = cls.readFileContent(str(filePath))
+        data = np.array([[int(val) for val in line.split()] for line in content.strip().split('\n')])
+
+        height, width = data.shape
+        # image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
+
+        color_array = np.array([color.red(), color.green(), color.blue(), 255], dtype=np.uint8)
+        transparent = np.array([0, 0, 0, 0], dtype=np.uint8)
+
+        image_array = np.where(data[:, :, None] == 1, color_array, transparent)
+        buffer = image_array.tobytes()
+
+        image = QImage(buffer, width, height, width * 4, QImage.Format.Format_ARGB32_Premultiplied)
+        return image
+
+    @classmethod
+    def clearCaches(cls):
+        cls._file_content_cache.clear()
+        cls._bitmap_cache.clear()
+
+def definePensBrushes(layer):
+    pen = QPen(layer.pcolor, layer.pwidth, layer.pstyle)
+
+    texturePath = Path(laylyr.__file__).parent.joinpath(layer.btexture)
+    _bitmap = textureCache.getCachedBitmap(texturePath, layer.bcolor)
+    brush = QBrush(layer.bcolor, _bitmap)
+    selectedPen = QPen(QColor("yellow"), layer.pwidth, Qt.DashLine)
+    selectedBrush = QBrush(QColor("yellow"), _bitmap)
+    stretchPen = QPen(QColor("red"), layer.pwidth, Qt.SolidLine)
+    stretchBrush = QBrush(QColor("red"), _bitmap)
+
+    return pen, brush, selectedPen, selectedBrush, stretchPen, stretchBrush
 
 class layoutShape(QGraphicsItem):
     def __init__(self) -> None:
@@ -78,48 +124,27 @@ class layoutShape(QGraphicsItem):
         self._angle = 0  # rotation angle
         self._stretch: bool = False
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
+        self.setFlag(QGraphicsItem.ItemUsesExtendedStyleOption)
+        self._offset = QPoint(0,0)
 
     def __repr__(self):
         return "layoutShape()"
 
     def itemChange(self, change, value):
+        if self.scene():
+            match change:
+                case QGraphicsItem.ItemSelectedHasChanged:
+                    if value:
+                        self.setZValue(self.zValue() + 10)
+                    else:
+                        self.setZValue(self.zValue() - 10)
         return super().itemChange(change, value)
 
     def _definePensBrushes(self):
-        self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-        # self._bitmap = QBitmap.fromImage(
-        #     QPixmap(self._layer.btexture).scaled(10,
-        #                                          10).toImage()
-        # )
+        # Assuming 'layer' is your layer object
+        (self._pen, self._brush, self._selectedPen, self._selectedBrush, self._stretchPen,
+         self._stretchBrush) = definePensBrushes(self._layer)
 
-        texturePath = Path(laylyr.__file__).parent.joinpath(self._layer.btexture)
-        _bitmap = QBitmap.fromImage(self.createImage(texturePath, self._layer.bcolor))
-        self._brush = QBrush(self._layer.bcolor, _bitmap)
-        self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-        self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
-        self._stretchPen = QPen(QColor("red"), self._layer.pwidth, Qt.SolidLine)
-        self._stretchBrush = QBrush(QColor("red"), _bitmap)
-
-    @staticmethod
-    def createImage(filePath:Path, color: QColor):
-        # Read the file and split lines
-        with filePath.open('r') as file:
-            lines = file.readlines()
-
-        height = len(lines)
-        width = len(lines[0].split())
-
-        image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
-        image.fill(QColor(0, 0, 0, 0))
-
-        for y, line in enumerate(lines):
-            for x, value in enumerate(line.split()):
-                if int(value) == 1:
-                    image.setPixelColor(x, y, color)  #
-                else:
-                    image.setPixelColor(x, y, QColor(0, 0, 0, 0))  # Transparent for 0
-
-        return image
 
     @property
     def pen(self):
@@ -163,6 +188,14 @@ class layoutShape(QGraphicsItem):
             return self.scene().views()[0]
         else:
             return None
+
+    @property
+    def offset(self):
+        return self._offset
+
+    @offset.setter
+    def offset(self, value: Union[QPoint | QPointF]):
+        self._offset = value
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -895,6 +928,8 @@ class layoutRuler(layoutShape):
         self._tickFont = tickFont
         self._determineAngle(self._draftLine.angle())
         self._fm = QFontMetrics(self._tickFont)
+        self._fontHeight = self._fm.boundingRect('0').height()
+        self._fontWidth = self._fm.boundingRect('0.000').width()
         # Enable child event filtering for filters and handles
         self.setFiltersChildEvents(True)
         self.setHandlesChildEvents(True)
@@ -902,8 +937,9 @@ class layoutRuler(layoutShape):
         self.setFlag(QGraphicsItem.ItemContainsChildrenInShape, True)
         self._createRulerTicks()
         # self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
-        self.update(self.boundingRect())
+        # self.update(self.boundingRect())
         self.setZValue(999)
+
 
     def __repr__(self):
         return (
@@ -978,7 +1014,7 @@ class layoutRuler(layoutShape):
                                 + i * self._tickGap * direction
                                 + perpendicular * self._tickLength,
                             ),
-                            str(float(i)),
+                            str(float(i*self._tickGap)),
                         )
                     )
         self._tickTuples.append(
@@ -991,16 +1027,13 @@ class layoutRuler(layoutShape):
                 str(round(self._draftLine.length() / self._tickGap, 3)),
             )
         )
-        point1 = self._draftLine.p1().toPoint()
-        point2 = (
-            self._draftLine.p2()
-            + perpendicular
-            * (self._tickLength + len(self._tickTuples[-1].text) * self._fm.maxWidth())
-        ).toPoint()
-        self._rect = QRectF(point1, point2).normalized()
+        self._rect = QRectF(self._draftLine.p1().toPoint(), self._draftLine.p2(
+        ).toPoint()).normalized()
+
 
     def boundingRect(self) -> QRectF:
-        return self._rect.adjusted(-30, -10, 30, 10)
+        return self._rect.normalized().adjusted(-self._fontWidth, -self._fontHeight,
+                                                self._fontWidth, self._fontHeight)
 
     def paint(self, painter, option, widget):
         if self.isSelected():
@@ -1030,6 +1063,7 @@ class layoutRuler(layoutShape):
         angle = self._draftLine.angle()
         self._determineAngle(angle)
         self._createRulerTicks()
+
 
     @property
     def width(self):
@@ -1108,15 +1142,6 @@ class layoutLabel(layoutShape):
             f"{self._fontStyle}, {self._fontHeight}, {self._labelAlign}, "
             f"{self._labelOrient}, {self._layer})"
         )
-
-    # def definePensBrushes(self):
-    #     self._pen = QPen(self._layer.pcolor, self._layer.pwidth, self._layer.pstyle)
-    #     _bitmap = QBitmap.fromImage(
-    #         QPixmap(self._layer.btexture).scaled(100, 100).toImage(),
-    #     Qt.ColorOnly)
-    #     self._brush = QBrush(self._layer.bcolor, _bitmap)
-    #     self._selectedPen = QPen(QColor("yellow"), self._layer.pwidth, Qt.DashLine)
-    #     self._selectedBrush = QBrush(QColor("yellow"), _bitmap)
 
     def setOrient(self):
         self.setTransformOriginPoint(self.mapFromScene(self._start))

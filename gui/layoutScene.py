@@ -308,7 +308,7 @@ class layoutScene(editorScene):
                         self.newPathTuple.endExtend,
                         self.newPathTuple.mode,
                     )
-                    self._newPath.name = self.newPathTuple.netName
+                    self._newPath.name = self.newPathTuple.name
                     self.addUndoStack(self._newPath)
                 elif self.editModes.drawRect:
                     self.editorWindow.messageLine.setText("Rectangle mode.")
@@ -598,43 +598,6 @@ class layoutScene(editorScene):
             undoCommand = us.loadShapesUndo(self, loadedLayoutItems)
             self.undoStack.push(undoCommand)
 
-    #
-    # def loadLayoutCell(self, filePathObj: pathlib.Path) -> None:
-    #     """
-    #     Load the layout cell from the given file path.
-    #
-    #     Args:
-    #         filePathObj (pathlib.Path): The file path object.
-    #
-    #     Returns:
-    #         None
-    #     """
-    #     try:
-    #         with filePathObj.open("r") as file:
-    #             decodedData = json.load(file)
-    #         snapGrid = decodedData[1].get("snapGrid")
-    #         self.majorGrid = snapGrid[0]  # dot/line grid spacing
-    #         self.snapGrid = snapGrid[1]  # snapping grid size
-    #         self.snapTuple = (self.snapGrid, self.snapGrid)
-    #         self.snapDistance = 2 * self.snapGrid
-    #         starttime = time.time()
-    #         self.createLayoutItems(decodedData[2:])
-    #         endtime = time.time()
-    #         print(f"load time: {endtime-starttime}")
-    #     except Exception as e:
-    #         self.logger.error(f"Cannot load layout: {e}")
-    #
-    # def createLayoutItems(self, decodedData):
-    #     if decodedData:
-    #         loadedLayoutItems = [
-    #             lj.layoutItems(self).create(item)
-    #             for item in decodedData
-    #             if item.get("type") in self.layoutShapes
-    #         ]
-    #         # A hack to get loading working. Otherwise, when it is saved the top-level items
-    #         # get destroyed.
-    #         undoCommand = us.loadShapesUndo(self, loadedLayoutItems)
-    #         self.undoStack.push(undoCommand)
 
     def reloadScene(self):
         # Get the top level items from the scene
@@ -690,10 +653,10 @@ class layoutScene(editorScene):
         pointsTupleList = [self.toLayoutCoord(point) for point in item.points]
         dlg = ldlg.layoutPolygonProperties(self.editorWindow, pointsTupleList)
         dlg.polygonLayerCB.addItems(
-            [f"{item.netName} [{item.purpose}]" for item in laylyr.pdkAllLayers]
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
         )
         dlg.polygonLayerCB.setCurrentText(
-            f"{item.layer.netName} [" f"{item.layer.purpose}]"
+            f"{item.layer.name} [" f"{item.layer.purpose}]"
         )
 
         if dlg.exec() == QDialog.Accepted:
@@ -711,9 +674,9 @@ class layoutScene(editorScene):
     def layoutRectProperties(self, item):
         dlg = ldlg.layoutRectProperties(self.editorWindow)
         dlg.rectLayerCB.addItems(
-            [f"{item.netName} [{item.purpose}]" for item in laylyr.pdkAllLayers]
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers]
         )
-        dlg.rectLayerCB.setCurrentText(f"{item.layer.netName} [{item.layer.purpose}]")
+        dlg.rectLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.rectWidthEdit.setText(str(item.width / fabproc.dbu))
         dlg.rectHeightEdit.setText(str(item.height / fabproc.dbu))
         dlg.topLeftEditX.setText(str(item.rect.topLeft().x() / fabproc.dbu))
@@ -735,13 +698,13 @@ class layoutScene(editorScene):
         if item.xnum == 1 and item.ynum == 1:
             dlg.singleViaRB.setChecked(True)
             dlg.singleViaClicked()
-            dlg.singleViaNamesCB.setCurrentText(item.via.viaDefTuple.netName)
+            dlg.singleViaNamesCB.setCurrentText(item.via.viaDefTuple.name)
             dlg.singleViaWidthEdit.setText(str(item.width / fabproc.dbu))
             dlg.singleViaHeightEdit.setText(str(item.via.height / fabproc.dbu))
         else:
             dlg.arrayViaRB.setChecked(True)
             dlg.arrayViaClicked()
-            dlg.arrayViaNamesCB.setCurrentText(item.via.viaDefTuple.netName)
+            dlg.arrayViaNamesCB.setCurrentText(item.via.viaDefTuple.name)
             dlg.arrayViaWidthEdit.setText(str(item.via.width / fabproc.dbu))
             dlg.arrayViaHeightEdit.setText(str(item.via.height / fabproc.dbu))
             dlg.arrayViaSpacingEdit.setText(str(item.spacing / fabproc.dbu))
@@ -754,7 +717,7 @@ class layoutScene(editorScene):
                 item.viaDefTuple = [
                     viaDefT
                     for viaDefT in fabproc.processVias
-                    if viaDefT.netName == dlg.singleViaNamesCB.currentText()
+                    if viaDefT.name == dlg.singleViaNamesCB.currentText()
                 ][0]
                 item.width = float(dlg.singleViaWidthEdit.text()) * fabproc.dbu
                 item.height = float(dlg.singleViaHeightEdit.text()) * fabproc.dbu
@@ -772,7 +735,7 @@ class layoutScene(editorScene):
                 item.viaDefTuple = [
                     viaDefT
                     for viaDefT in fabproc.processVias
-                    if viaDefT.netName == dlg.arrayViaNamesCB.currentText()
+                    if viaDefT.name == dlg.arrayViaNamesCB.currentText()
                 ][0]
                 item.width = float(dlg.arrayViaWidthEdit.text()) * fabproc.dbu
                 item.height = float(dlg.arrayViaHeightEdit.text()) * fabproc.dbu
@@ -801,11 +764,11 @@ class layoutScene(editorScene):
             case 4:
                 dlg.verticalButton.setChecked(True)
         dlg.pathLayerCB.addItems(
-            [f"{item.netName} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
+            [f"{item.name} [{item.purpose}]" for item in laylyr.pdkDrawingLayers]
         )
-        dlg.pathLayerCB.setCurrentText(f"{item.layer.netName} [{item.layer.purpose}]")
+        dlg.pathLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.pathWidth.setText(str(item.width / fabproc.dbu))
-        dlg.pathNameEdit.setText(item.netName)
+        dlg.pathNameEdit.setText(item.name)
         roundingFactor = len(str(fabproc.dbu)) - 1
         dlg.startExtendEdit.setText(
             str(round(item.startExtend / fabproc.dbu, roundingFactor))
@@ -827,7 +790,7 @@ class layoutScene(editorScene):
         )
         angle = item.angle
         if dlg.exec() == QDialog.Accepted:
-            item.netName = dlg.pathNameEdit.text()
+            item.name = dlg.pathNameEdit.text()
             item.layer = laylyr.pdkDrawingLayers[dlg.pathLayerCB.currentIndex()]
             item.width = fabproc.dbu * float(dlg.pathWidth.text())
             item.startExtend = fabproc.dbu * float(dlg.startExtendEdit.text())
@@ -851,9 +814,9 @@ class layoutScene(editorScene):
         dlg = ldlg.layoutLabelProperties(self.editorWindow)
         dlg.labelName.setText(item.labelText)
         dlg.labelLayerCB.addItems(
-            [f"{layer.netName} [{layer.purpose}]" for layer in laylyr.pdkTextLayers]
+            [f"{layer.name} [{layer.purpose}]" for layer in laylyr.pdkTextLayers]
         )
-        dlg.labelLayerCB.setCurrentText(f"{item.layer.netName} [{item.layer.purpose}]")
+        dlg.labelLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.familyCB.setCurrentText(item.fontFamily)
         dlg.fontStyleCB.setCurrentText(item.fontStyle)
         dlg.labelHeightCB.setCurrentText(str(int(item.fontHeight)))
@@ -889,11 +852,11 @@ class layoutScene(editorScene):
 
         dlg.pinLayerCB.addItems(
             [
-                f"{pinLayer.netName} [{pinLayer.purpose}]"
+                f"{pinLayer.name} [{pinLayer.purpose}]"
                 for pinLayer in laylyr.pdkPinLayers
             ]
         )
-        dlg.pinLayerCB.setCurrentText(f"{item.layer.netName} [{item.layer.purpose}]")
+        dlg.pinLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.pinBottomLeftX.setText(str(item.mapToScene(item.start).x() / fabproc.dbu))
         dlg.pinBottomLeftY.setText(str(item.mapToScene(item.start).y() / fabproc.dbu))
         dlg.pinTopRightX.setText(str(item.mapToScene(item.end).x() / fabproc.dbu))
@@ -926,7 +889,7 @@ class layoutScene(editorScene):
                 ),
                 self.snapTuple,
             )
-            item.layer.netName = dlg.pinLayerCB.currentText()
+            item.layer.name = dlg.pinLayerCB.currentText()
 
     def layoutInstanceProperties(self, item):
         dlg = ldlg.layoutInstancePropertiesDialog(self.editorWindow)
