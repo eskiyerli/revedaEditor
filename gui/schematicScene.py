@@ -282,6 +282,12 @@ class schematicScene(editorScene):
                     and endPoint not in self._totalNet.endPoints
                 ):
                     splitPoints.add(endPoint)
+        overlapSymbols = {item for item in self._totalNet.collidingItems() if isinstance(
+            item, shp.schematicSymbol)}
+        for schemSymbol in overlapSymbols:
+            for pin in schemSymbol.pins.values():
+                if self._totalNet in pin.collidingItems():
+                    splitPoints.add(self._totalNet.mapFromItem(pin, pin.start).toPoint())
         if splitPoints:
             splitPointsList = list(splitPoints)
             splitPointsList.insert(0, self._totalNet.endPoints[0])
@@ -295,10 +301,14 @@ class schematicScene(editorScene):
             splitNetList = []
             for i in range(len(orderedPoints) - 1):
                 splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
-                splitNet.inherit(inputNet)
                 splitNetList.append(splitNet)
                 if inputNet.isSelected():
                     splitNet.setSelected(True)
+            for netItem in splitNetList:
+                netItem.name = self._totalNet.name
+                netItem.nameStrength = self._totalNet.nameStrength.decrement()
+            splitNetList[0].nameStrength = self._totalNet.nameStrength
+
             self.addListUndoStack(splitNetList)
             self.deleteUndoStack(self._totalNet)
 
@@ -432,6 +442,8 @@ class schematicScene(editorScene):
         )
         self.undoStack.push(addDeleteStretchNetCommand)
 
+
+        # Utility methods
     @staticmethod
     def clearNetStatus(netsSet: set[net.schematicNet]):
         """
@@ -442,42 +454,31 @@ class schematicScene(editorScene):
             if netItem.nameStrength.value < 3:
                 netItem.nameStrength = net.netNameStrengthEnum.NONAME
 
-    # netlisting related methods.
-    def groupAllNets(self, sceneNetsSet: set[net.schematicNet]) -> None:
+    @staticmethod
+    def checkPinNetConnect(pinItem: shp.schematicPin, netItem: net.schematicNet):
         """
-        This method starting from nets connected to pins, then named nets and unnamed
-        nets, groups all the nets in the schematic.
+        Determine if a pin is connected to a net.
         """
-        try:
-            # all the nets in the schematic in a set to remove duplicates
-            # sceneNetsSet = self.findSceneNetsSet()
-            self.clearNetStatus(sceneNetsSet)
-            # first find nets connected to pins designating global nets.
-            schematicSymbolSet = self.findSceneSymbolSet()
-            globalNetsSet = self.findGlobalNets(schematicSymbolSet)
-            sceneNetsSet -= globalNetsSet  # remove these nets from all nets set.
-            # now remove nets connected to global nets from this set.
-            sceneNetsSet = self.groupNamedNets(globalNetsSet, sceneNetsSet)
-            # now find nets connected to schematic pins
-            schemPinConNetsSet = self.findSchPinNets()
-            sceneNetsSet -= schemPinConNetsSet
-            # use these nets as starting nets to find other nets connected to them
-            sceneNetsSet = self.groupNamedNets(schemPinConNetsSet, sceneNetsSet)
-            # now find the set of nets whose name is set by the user
-            namedNetsSet = set(
-                [netItem for netItem in sceneNetsSet if netItem.nameStrength.value > 1]
-            )
-            # remove named nets from this remanining net set
-            sceneNetsSet -= namedNetsSet
-            # now remove already named net set from firstNetSet
-            unnamedNets = self.groupNamedNets(namedNetsSet, sceneNetsSet)
-            # now start netlisting from the unnamed nets
-            self.groupUnnamedNets(unnamedNets, self.netCounter)
-        except Exception as e:
-            self.logger.error(e)
+        return bool(pinItem.sceneBoundingRect().intersects(netItem.sceneBoundingRect()))
 
+    @staticmethod
+    def checkNetConnect(netItem, otherNetItem):
+        """
+        Determine if a net is connected to another one. One net should end on the other net.
+        """
+        if otherNetItem is not netItem:
+            for netItemEnd, otherEnd in itt.product(
+                    netItem.sceneEndPoints, otherNetItem.sceneEndPoints
+            ):
+                # not a very elegant solution to mistakes in net end points.
+                if (netItemEnd - otherEnd).manhattanLength() <= 1:
+                    return True
+        else:
+            return False
+
+    # Net finding methods
     def findGlobalNets(
-        self, symbolSet: set[shp.schematicSymbol]
+            self, symbolSet: set[shp.schematicSymbol]
     ) -> set[net.schematicNet]:
         """
         This method finds all nets connected to global pins.
@@ -489,7 +490,6 @@ class schematicScene(editorScene):
                 for pinName, pinItem in symbolItem.pins.items():
                     if pinName[-1] == "!":
                         globalPinsSet.add(pinItem)
-            # self.logger.warning(f'global pins:{globalPinsSet}')
             for pinItem in globalPinsSet:
                 pinNetSet = {
                     netItem
@@ -498,7 +498,6 @@ class schematicScene(editorScene):
                 }
                 for netItem in pinNetSet:
                     if netItem.nameStrength.value == 3:
-                        # check if net is already named explicitly
                         if netItem.name != pinItem.pinName:
                             netItem.nameConflict = True
                             self.logger.error(
@@ -510,15 +509,14 @@ class schematicScene(editorScene):
                     else:
                         globalNetsSet.add(netItem)
                         netItem.name = pinItem.pinName
-                        netItem.nameStrength = net.netNameStrengthEnum.INHERIT
+                        netItem.nameStrength = net.netNameStrengthEnum.SET
             return globalNetsSet
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(f'Error in global nets:{e}')
 
     def findSchPinNets(self) -> set[net.schematicNet]:
         # nets connected to schematic pins.
         schemPinConNetsSet = set()
-        # first start from schematic pins
         sceneSchemPinsSet = self.findSceneSchemPinsSet()
         for sceneSchemPin in sceneSchemPinsSet:
             pinNetSet = {
@@ -527,9 +525,7 @@ class schematicScene(editorScene):
                 if isinstance(netItem, net.schematicNet)
             }
             for netItem in pinNetSet:
-                if (
-                    netItem.nameStrength.value == 3
-                ):  # check if net name is not set explicitly
+                if netItem.nameStrength.value == 3:
                     if netItem.name == sceneSchemPin.pinName:
                         schemPinConNetsSet.add(netItem)
                     else:
@@ -541,13 +537,26 @@ class schematicScene(editorScene):
                 else:
                     schemPinConNetsSet.add(netItem)
                     netItem.name = sceneSchemPin.pinName
-                    netItem.nameStrength = net.netNameStrengthEnum.INHERIT
+                    netItem.nameStrength = net.netNameStrengthEnum.SET
                 netItem.update()
             schemPinConNetsSet.update(pinNetSet)
         return schemPinConNetsSet
 
+    def findConnectedNetSet(self, startNet: net.schematicNet) -> set[net.schematicNet]:
+        """
+        find all the nets connected to a net including nets connected by name.
+        """
+        sceneNetSet = self.findSceneNetsSet()
+        connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
+        # now check if any other name is connected due to a common name:
+        for netItem in otherNetsSet:
+            if netItem.name == startNet.name and (netItem.nameStrength.value > 1):
+                connectedSet.add(netItem)
+        return connectedSet - {startNet}
+
+    # Net grouping methods
     def groupNamedNets(
-        self, namedNetsSet: set[net.schematicNet], unnamedNetsSet: set[net.schematicNet]
+            self, namedNetsSet: set[net.schematicNet], unnamedNetsSet: set[net.schematicNet]
     ) -> set[net.schematicNet]:
         """
         Groups nets with the same name using namedNetsSet members as seeds and going
@@ -562,7 +571,6 @@ class schematicScene(editorScene):
                 unnamedNetsSet,
             )
             self.schematicNets[netItem.name] |= connectedNets
-        # These are the nets not connected to any named net
         return unnamedNetsSet
 
     def groupUnnamedNets(self, unnamedNetsSet: set[net.schematicNet], nameCounter: int):
@@ -570,18 +578,12 @@ class schematicScene(editorScene):
         Groups nets together if they are connected and assign them default names
         if they don't have a name assigned.
         """
-        # select a net from the set and remove it from the set
         try:
-            initialNet = (
-                unnamedNetsSet.pop()
-            )  # assign it a name, net0, net1, net2, etc.
+            initialNet = unnamedNetsSet.pop()
         except KeyError:  # initialNet set is empty
             pass
         else:
             initialNet.name = "net" + str(nameCounter)
-            # now go through the set and see if any of the
-            # nets are connected to the initial net
-            # remove them from the set and add them to the initial net's set
             self.schematicNets[initialNet.name], unnamedNetsSet = self.traverseNets(
                 {
                     initialNet,
@@ -597,7 +599,7 @@ class schematicScene(editorScene):
                 self.schematicNets[lastNet.name] = {lastNet}
 
     def traverseNets(
-        self, connectedSet: set[net.schematicNet], otherNetsSet: set[net.schematicNet]
+            self, connectedSet: set[net.schematicNet], otherNetsSet: set[net.schematicNet]
     ) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
         """
         Start from a net and traverse the schematic to find all connected nets.
@@ -611,51 +613,40 @@ class schematicScene(editorScene):
             for netItem2 in otherNetsSet:
                 if self.checkNetConnect(netItem, netItem2):
                     netItem2.inherit(netItem)
-                    if not netItem2.nameConflict:
+                    if netItem2.nameConflict:
+                        continue
+                    else:
                         newFoundConnectedSet.add(netItem2)
-        # keep searching if you already found a net connected to the initial net
         if len(newFoundConnectedSet) > 0:
             connectedSet.update(newFoundConnectedSet)
             otherNetsSet -= newFoundConnectedSet
             self.traverseNets(connectedSet, otherNetsSet)
         return connectedSet, otherNetsSet
 
-    def findConnectedNetSet(self, startNet: net.schematicNet) -> set[net.schematicNet]:
+    # Main method
+    def groupAllNets(self, sceneNetsSet: set[net.schematicNet]) -> None:
         """
-        find all the nets connected to a net including nets connected by name.
+        This method starting from nets connected to pins, then named nets and unnamed
+        nets, groups all the nets in the schematic.
         """
-
-        sceneNetSet = self.findSceneNetsSet()
-        connectedSet, otherNetsSet = self.traverseNets({startNet}, sceneNetSet)
-        # now check if any other name is connected due to a common name:
-        for netItem in otherNetsSet:
-            if netItem.name == startNet.name and (netItem.nameStrength.value > 1):
-                connectedSet.add(netItem)
-        return connectedSet - {startNet}
-
-    @staticmethod
-    def checkPinNetConnect(pinItem: shp.schematicPin, netItem: net.schematicNet):
-        """
-        Determine if a pin is connected to a net.
-        """
-        return bool(pinItem.sceneBoundingRect().intersects(netItem.sceneBoundingRect()))
-
-    @staticmethod
-    def checkNetConnect(netItem, otherNetItem):
-        """
-        Determine if a net is connected to another one. One net should end on the other net.
-        """
-
-        if otherNetItem is not netItem:
-            for netItemEnd, otherEnd in itt.product(
-                netItem.sceneEndPoints, otherNetItem.sceneEndPoints
-            ):
-                # not a very elegant solution to mistakes in net end points.
-                if (netItemEnd - otherEnd).manhattanLength() <= 1:
-                    return True
-        else:
-            return False
-
+        try:
+            self.clearNetStatus(sceneNetsSet)
+            schematicSymbolSet = self.findSceneSymbolSet()
+            globalNetsSet = self.findGlobalNets(schematicSymbolSet)
+            sceneNetsSet -= globalNetsSet
+            sceneNetsSet = self.groupNamedNets(globalNetsSet, sceneNetsSet)
+            schemPinConNetsSet = self.findSchPinNets()
+            sceneNetsSet -= schemPinConNetsSet
+            sceneNetsSet = self.groupNamedNets(schemPinConNetsSet, sceneNetsSet)
+            namedNetsSet = set(
+                [netItem for netItem in sceneNetsSet if netItem.nameStrength.value > 1]
+            )
+            sceneNetsSet -= namedNetsSet
+            unnamedNets = self.groupNamedNets(namedNetsSet, sceneNetsSet)
+            self.groupUnnamedNets(unnamedNets, self.netCounter)
+        except Exception as e:
+            self.logger.error(e)
+            
     def generatePinNetMap(self, sceneSymbolSet: tuple[set[shp.schematicSymbol]]):
         """
         For symbols in sceneSymbolSet, find which pin is connected to which net. If a

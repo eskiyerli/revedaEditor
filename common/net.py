@@ -67,7 +67,27 @@ class NetMode(IntEnum):
     FREE = 2
 
 
-class netNameStrengthEnum(IntEnum):
+class customIntEnum(IntEnum):
+    @classmethod
+    def _missing_(cls, value):
+        # Handle out-of-range values
+        return cls(max(min(value, max(cls)), min(cls)))
+
+    def increment(self):
+        """Increment the enum value, wrapping around if necessary."""
+        try:
+            return self.__class__(self.value + 1)
+        except ValueError:
+            return self.__class__(min(self.__class__))
+
+    def decrement(self):
+        """Decrement the enum value, wrapping around if necessary."""
+        try:
+            return self.__class__(self.value - 1)
+        except ValueError:
+            return self.__class__(max(self.__class__))
+
+class netNameStrengthEnum(customIntEnum):
     NONAME = 0
     WEAK = 1
     INHERIT = 2
@@ -339,7 +359,7 @@ class schematicNet(QGraphicsItem):
             if otherNet.nameStrength.value == 3 and self.name != otherNet.name:
                 self.nameConflict = True
                 otherNet.nameConflict = True
-        elif otherNet.nameStrength.value > 1:  # INHERIT or SET
+        else:
             self.name = otherNet.name
             self.nameStrength = netNameStrengthEnum.INHERIT
 
@@ -364,7 +384,6 @@ class schematicNet(QGraphicsItem):
 
     @nameStrength.setter
     def nameStrength(self, value: netNameStrengthEnum):
-        assert isinstance(value, netNameStrengthEnum)
         self._nameItem.nameStrength = value
 
     @property
@@ -479,7 +498,6 @@ class netName(QGraphicsSimpleTextItem):
 
     @nameStrength.setter
     def nameStrength(self, value: netNameStrengthEnum):
-        assert isinstance(value, netNameStrengthEnum)
         self._nameStrength = value
         if self._nameStrength == netNameStrengthEnum.SET:
             self.setVisible(True)
