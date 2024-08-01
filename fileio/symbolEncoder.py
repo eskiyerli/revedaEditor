@@ -67,6 +67,7 @@ class symbolEncoder(json.JSONEncoder):
                 "rect": item.rect.getCoords(),
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.symbolLine):
             return {
@@ -75,6 +76,7 @@ class symbolEncoder(json.JSONEncoder):
                 "end": item.end.toTuple(),
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.symbolCircle):
             return {
@@ -83,12 +85,14 @@ class symbolEncoder(json.JSONEncoder):
                 "end": item.end.toTuple(),
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.symbolPolygon):
             pointsList = [item.mapToScene(point).toTuple() for point in item.points]
             return {
                 "type": "polygon",
                 "ps": pointsList,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.symbolArc):
             return {
@@ -97,6 +101,7 @@ class symbolEncoder(json.JSONEncoder):
                 "end": item.end.toTuple(),
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.symbolPin):
             return {
@@ -107,6 +112,7 @@ class symbolEncoder(json.JSONEncoder):
                 "pt": item.pinType,
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, shp.text):
             return {
@@ -120,6 +126,7 @@ class symbolEncoder(json.JSONEncoder):
                 "to": item.textOrient,
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
                 "ang": item.angle,
+                "fl": item.flipTuple,
             }
         elif isinstance(item, lbl.symbolLabel):
             return {
@@ -136,6 +143,7 @@ class symbolEncoder(json.JSONEncoder):
                 "or": item.labelOrient,
                 "use": item.labelUse,
                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
+                "fl": item.flipTuple,
             }
         elif isinstance(item, symbolAttribute):
             return {

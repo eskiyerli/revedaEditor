@@ -22,6 +22,8 @@
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
+import os
+
 # net class definition.
 from PySide6.QtCore import (
     QPoint,
@@ -32,10 +34,8 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QPen,
-    QStaticText,
     QPainterPath,
     QPainter,
-    QFont,
 )
 from PySide6.QtWidgets import (
     QGraphicsLineItem,
@@ -45,8 +45,8 @@ from PySide6.QtWidgets import (
     QGraphicsSceneMouseEvent,
     QGraphicsSceneHoverEvent,
 )
-import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 if os.environ.get("REVEDA_PDK_PATH"):
@@ -56,7 +56,7 @@ else:
     import defaultPDK.schLayers as schLayers
 
 import math
-from typing import Union, NamedTuple, Type, Set
+from typing import Union, Type, Set, Tuple
 from enum import IntEnum
 
 
@@ -116,6 +116,7 @@ class schematicNet(QGraphicsItem):
         self._draftLine = QLineF(start, end)
         self._transformOriginPoint = self._draftLine.p1()
         self._angle = None
+        self._flip = (1,1)
         match self._mode:
             case 0:
                 self._angle = 90 * math.floor(
@@ -251,6 +252,9 @@ class schematicNet(QGraphicsItem):
                 )
                 self._flightLinesSet.add(flightLine)
                 self.scene().addItem(flightLine)
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        self.setSelected(True)
+        super().mouseReleaseEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         super().hoverLeaveEvent(event)
@@ -361,7 +365,7 @@ class schematicNet(QGraphicsItem):
                 otherNet.nameConflict = True
         else:
             self.name = otherNet.name
-            self.nameStrength = netNameStrengthEnum.INHERIT
+            self.nameStrength = otherNet.nameStrength.decrement()
 
     def inheritGuideLine(self, otherNet: Type["guideLine"]):
         self.name = otherNet.name
@@ -462,6 +466,9 @@ class schematicNet(QGraphicsItem):
     def stretch(self, value: bool):
         self._stretch = value
 
+    @property
+    def mode(self) -> int:
+        return self._mode
 
 class netName(QGraphicsSimpleTextItem):
     def __init__(self, name: str, parent: schematicNet):
@@ -517,6 +524,7 @@ class netName(QGraphicsSimpleTextItem):
             self.setVisible(True)
         else:
             self.setVisible(False)
+
 
 
 class netFlightLine(QGraphicsPathItem):

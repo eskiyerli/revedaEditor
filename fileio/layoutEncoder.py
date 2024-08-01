@@ -42,6 +42,7 @@ class layoutEncoder(json.JSONEncoder):
                     "ic": item.counter,
                     "loc": (item.scenePos() - item.scene().origin).toTuple(),
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutRect:
                 itemDict = {
@@ -50,6 +51,7 @@ class layoutEncoder(json.JSONEncoder):
                     "br": item.mapToScene(item.rect.bottomRight()).toTuple(),
                     "ang": item.angle,
                     "ln": laylyr.pdkAllLayers.index(item.layer),
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutPath:
                 itemDict = {
@@ -63,6 +65,7 @@ class layoutEncoder(json.JSONEncoder):
                     "md": item.mode,
                     "nam": item.name,
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutViaArray:
                 viaDict = {
@@ -71,6 +74,7 @@ class layoutEncoder(json.JSONEncoder):
                     "w": item.via.width,
                     "h": item.via.height,
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
                 itemDict = {
                     "type": "Via",
@@ -91,6 +95,7 @@ class layoutEncoder(json.JSONEncoder):
                     "pt": item.pinType,
                     "ln": laylyr.pdkPinLayers.index(item.layer),
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutLabel:
                 itemDict = {
@@ -104,6 +109,7 @@ class layoutEncoder(json.JSONEncoder):
                     "lo": item.labelOrient,
                     "ln": laylyr.pdkTextLayers.index(item.layer),
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutPolygon:
                 pointsList = [item.mapToScene(point).toTuple() for point in item.points]
@@ -112,6 +118,7 @@ class layoutEncoder(json.JSONEncoder):
                     "ps": pointsList,
                     "ln": laylyr.pdkAllLayers.index(item.layer),
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case lshp.layoutRuler:
                 itemDict = {
@@ -120,6 +127,7 @@ class layoutEncoder(json.JSONEncoder):
                     "dfl2": item.mapToScene(item.draftLine.p2()).toTuple(),
                     "md": item.mode,
                     "ang": item.angle,
+                    "fl": item.flipTuple,
                 }
             case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
@@ -139,6 +147,7 @@ class layoutEncoder(json.JSONEncoder):
                             "ic": item.counter,
                             "loc": (item.scenePos() - item.scene().origin).toTuple(),
                             "ang": item.angle,
+                            "fl": item.flipTuple,
                             "params": argDict,
                         }
         return itemDict

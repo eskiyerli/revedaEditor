@@ -63,6 +63,7 @@ class schematicEncoder(json.JSONEncoder):
             "ang": item.angle,
             "ign": int(item.netlistIgnore),
             "br": item.boundingRect().getCoords(),
+            "fl": item.flipTuple,
         }
 
     def _encodeSchematicNet(self, item: net.schematicNet) -> Dict[str, Any]:
@@ -72,7 +73,7 @@ class schematicEncoder(json.JSONEncoder):
             "st": self._subtract_point(item.mapToScene(item.draftLine.p1()), scene_origin),
             "end": self._subtract_point(item.mapToScene(item.draftLine.p2()), scene_origin),
             "nam": item.name,
-            "ns": item.nameStrength.value
+            "ns": item.nameStrength.value,
         }
 
     def _encodeSchematicPin(self, item: shp.schematicPin) -> Dict[str, Any]:
@@ -83,6 +84,7 @@ class schematicEncoder(json.JSONEncoder):
             "pd": item.pinDir,
             "pt": item.pinType,
             "ang": item.angle,
+            "fl": item.flipTuple,
         }
 
     def _encodeText(self, item: shp.text) -> Dict[str, Any]:
@@ -96,76 +98,9 @@ class schematicEncoder(json.JSONEncoder):
             "ta": item.textAlignment,
             "to": item.textOrient,
             "ang": item.angle,
+            "fl": item.flipTuple,
         }
 
     @staticmethod
     def _subtract_point(point: QPointF, origin: QPointF) -> tuple:
         return (point - origin).toTuple()
-
-# class schematicEncoder(json.JSONEncoder):
-#     def default(self, item):
-#         if isinstance(item, shp.schematicSymbol):
-#             # if item was drawn as a draft, then just carry the labels
-#             if item.draft:
-#                 itemLabelDict = item.labelDict
-#             else:
-#                 itemLabelDict = {
-#                     label.labelName: [label.labelValue, label.labelVisible]
-#                     for label in item.labels.values()
-#                 }
-#             itemDict = {
-#                 "type": "sys",
-#                 "lib": item.libraryName,
-#                 "cell": item.cellName,
-#                 "view": item.viewName,
-#                 "nam": item.instanceName,
-#                 "ic": item.counter,
-#                 "ld": itemLabelDict,
-#                 "loc": (item.scenePos() - item.scene().origin).toTuple(),
-#                 "ang": item.angle,
-#                 "ign": int(item.netlistIgnore),
-#                 "br": item.boundingRect().getCoords(),
-#             }
-#             return itemDict
-#         elif isinstance(item, net.schematicNet):
-#             itemDict = {
-#                 "type": "scn",
-#                 "st": (item.mapToScene(item.draftLine.p1()) - item.scene().origin)
-#                 .toPoint()
-#                 .toTuple(),
-#                 "end": (item.mapToScene(item.draftLine.p2()) - item.scene().origin)
-#                 .toPoint()
-#                 .toTuple(),
-#                 "nam": item.name,
-#                 "ns": item.nameStrength.value
-#             }
-#             return itemDict
-#         elif isinstance(item, shp.schematicPin):
-#             itemDict = {
-#                 "type": "scp",
-#                 "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
-#                 "pn": item.pinName,
-#                 "pd": item.pinDir,
-#                 "pt": item.pinType,
-#                 "ang": item.angle,
-#             }
-#             return itemDict
-#         elif isinstance(item, shp.text):
-#             itemDict = {
-#                 "type": "txt",
-#                 "st": (item.mapToScene(item.start) - item.scene().origin).toTuple(),
-#                 "tc": item.textContent,
-#                 "ff": item.fontFamily,
-#                 "fs": item.fontStyle,
-#                 "th": item.textHeight,
-#                 "ta": item.textAlignment,
-#                 "to": item.textOrient,
-#                 "ang": item.angle,
-#             }
-#             return itemDict
-#         # elif isinstance(item, net.crossingDot):
-#         #     itemDict = {
-#         #         "type": "dot",
-#         #         "pt": (item.mapToScene(item.point) - item.scene().origin).toTuple(),
-#         #     }
-#         #     return itemDict

@@ -46,6 +46,8 @@ import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.schBackEnd as scb
 import revedaEditor.gui.fileDialogues as fd
 
+from typing import List
+
 
 class designLibrariesView(QTreeView):
     def __init__(self, parent):
@@ -290,6 +292,34 @@ class designLibrariesModel(QStandardItemModel):
     def addViewToModel(self, viewPath, parentItem):
         viewEntry = scb.viewItem(viewPath)
         parentItem.appendRow(viewEntry)
+
+    def listLibraries(self) -> List[str]:
+        librariesList = []
+        for row in range(self.rowCount()):
+            itemText = self.item(row,0).text()
+            if itemText:
+                librariesList.append(itemText)
+        return  librariesList
+
+    def listLibraryCells(self, libraryName: str) -> List[str]:
+        cellsList = []
+        libraryItem = libm.getLibItem(self, libraryName)
+        if libraryItem:
+            for row in range(libraryItem.rowCount()):
+                itemText = libraryItem.child(row, 0).text()
+                if itemText:
+                    cellsList.append(itemText)
+        return cellsList
+
+    def listCellViews(self, libraryName: str, cellName: str, viewTypes: List[str]) -> List[str]:
+        viewsList = []
+        libraryItem = libm.getLibItem(self, libraryName)
+        cellItem = libm.getCellItem(libraryItem, cellName)
+        if cellItem:
+            for row in range(cellItem.rowCount()):
+                if cellItem.child(row,0).viewType in viewTypes:
+                    viewsList.append(cellItem.child(row,0).text())
+        return viewsList
 
 class symbolViewsModel(designLibrariesModel):
     """

@@ -109,7 +109,8 @@ class symbolItems:
         rect.setPos(
             QPoint(item["loc"][0], item["loc"][1]),
         )
-        rect.angle = item["ang"]
+        rect.angle = item.get(["ang"],0)
+        rect.flipTuple = item.get('fl',(1,1))
         return rect
 
     @staticmethod
@@ -122,7 +123,8 @@ class symbolItems:
         circle.setPos(
             QPoint(item["loc"][0], item["loc"][1]),
         )
-        circle.angle = item["ang"]
+        circle.angle = item.get("ang",0)
+        circle.flipTuple = item.get('fl',(1,1))
         return circle
 
     @staticmethod
@@ -133,7 +135,8 @@ class symbolItems:
         arc = shp.symbolArc(start, end)  # note that we are using grid values
         # for scene
         arc.setPos(QPoint(item["loc"][0], item["loc"][1]))
-        arc.angle = item["ang"]
+        arc.angle = item.get("ang", 0)
+        arc.flipTuple = item.get('fl',(1,1))
         return arc
 
     @staticmethod
@@ -143,7 +146,8 @@ class symbolItems:
 
         line = shp.symbolLine(start, end)
         line.setPos(QPoint(item["loc"][0], item["loc"][1]))
-        line.angle = item["ang"]
+        line.angle = item.get("ang",0)
+        line.flipTuple = item.get('fl',(1,1))
         return line
 
     @staticmethod
@@ -152,6 +156,7 @@ class symbolItems:
         pin = shp.symbolPin(start, item["nam"], item["pd"], item["pt"])
         pin.setPos(QPoint(item["loc"][0], item["loc"][1]))
         pin.angle = item["ang"]
+        pin.flipTuple = item.get('fl',(1,1))
         return pin
 
     @staticmethod
@@ -191,7 +196,9 @@ class symbolItems:
     @staticmethod
     def createPolygonItem(item: dict):
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
-        return shp.symbolPolygon(pointsList)
+        polygon = shp.symbolPolygon(pointsList)
+        polygon.flipTuple = item.get('fl',(1,1))
+        return polygon
 
     @staticmethod
     def createSymbolAttribute(item: dict):
@@ -222,21 +229,15 @@ class schematicItems:
                 case "scn":
                     return self._createNet(item)
                 case "scp":
-                    start = QPoint(item["st"][0], item["st"][1])
-                    pinName = item["pn"]
-                    pinDir = item["pd"]
-                    pinType = item["pt"]
-                    pinItem = shp.schematicPin(
-                        start,
-                        pinName,
-                        pinDir,
-                        pinType,
-                    )
-                    pinItem.angle = item["ang"]
-                    return pinItem
+                    return self._createPin(item)
                 case "txt":
-                    start = QPoint(item["st"][0], item["st"][1])
-                    text = shp.text(
+                    return self._createText(item)
+                case _:
+                    return self.unknownItem()
+
+    def _createText(self, item):
+        start = QPoint(item["st"][0], item["st"][1])
+        text = shp.text(
                         start,
                         item["tc"],
                         item["ff"],
@@ -245,9 +246,25 @@ class schematicItems:
                         item["ta"],
                         item["to"],
                     )
-                    return text
-                case _:
-                    return self.unknownItem()
+        text.flipTuple = item.get('fl', (1,1))
+        
+        return text
+
+    def _createPin(self, item):
+        start = QPoint(item["st"][0], item["st"][1])
+        pinName = item["pn"]
+        pinDir = item["pd"]
+        pinType = item["pt"]
+        pinItem = shp.schematicPin(
+                        start,
+                        pinName,
+                        pinDir,
+                        pinType,
+                    )
+        pinItem.angle = item.get('ang', 0)
+        pinItem.flipTuple = item.get('fl', (1,1))
+        return pinItem
+    
     def _createNet(self, item):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])
@@ -304,9 +321,7 @@ class schematicItems:
                         # we snap to scene grid values. Need to test further.
                         symbolShape = symbolItems(self.scene)
                         symbolShape.snapTuple = symbolSnapTuple
-                        for jsonItem in jsonItems[
-                                        2:
-                                        ]:  # skip first two entries.
+                        for jsonItem in jsonItems[2:]:  # skip first two entries.
                             if jsonItem["type"] == "attr":
                                 symbolAttributes[jsonItem["nam"]] = (
                                     jsonItem["def"]
@@ -337,6 +352,7 @@ class schematicItems:
                             for labelItem in symbolInstance.labels.values()
                         ]
                         symbolInstance.angle = item.get("ang", 0)
+                        symbolInstance.flipTuple = item.get('fl', (1,1))
                         return symbolInstance
                     except json.decoder.JSONDecodeError:
                         self.scene.logger.error(
@@ -491,6 +507,8 @@ class layoutItems:
             pcellInstance.counter = item["ic"]
             pcellInstance.instanceName = item["nam"]
             pcellInstance.setPos(QPoint(*item["loc"]))
+            pcellInstance.angle = item.get("ang", 0)
+            pcellInstance.flipTuple = item.get('fl', (1,1))
             return pcellInstance
         except Exception as e:
             self.scene.logger.error(f"Error creating PCell instance: {e}")
@@ -538,6 +556,7 @@ class layoutItems:
         layoutInstance.instanceName = item.get("nam", "")
         layoutInstance.setPos(item["loc"][0], item["loc"][1])
         layoutInstance.angle = item.get("ang", 0)
+        layoutInstance.flipTuple = item.get('fl', (1,1))
         layoutInstance.viewName = viewName
 
         return layoutInstance
@@ -549,6 +568,7 @@ class layoutItems:
         rect = lshp.layoutRect(start, end, layoutLayer)
         # rect.setPos(QPoint(item["loc"][0], item["loc"][1]))
         rect.angle = item.get("ang", 0)
+        rect.flipTuple = item.get('fl', (1,1))
         return rect
 
     def createPathShape(self, item):
@@ -565,6 +585,7 @@ class layoutItems:
         )
         path.name = item.get("nam", "")
         path.angle = item.get("ang", 0)
+        path.flipTuple = item.get('fl', (1,1))
         return path
 
     def createRulerShape(self, item):
@@ -595,6 +616,7 @@ class layoutItems:
             layoutLayer,
         )
         label.angle = item.get("ang", 0)
+        label.flipTuple = item.get('fl', (1,1))
         return label
 
     def createPinShape(self, item):
@@ -608,6 +630,7 @@ class layoutItems:
             layoutLayer,
         )
         pin.angle = item.get("ang", 0)
+        pin.flipTuple = item.get('fl', (1,1))
         return pin
 
     def createPolygonShape(self, item):
@@ -615,6 +638,7 @@ class layoutItems:
         pointsList = [QPoint(point[0], point[1]) for point in item["ps"]]
         polygon = lshp.layoutPolygon(pointsList, layoutLayer)
         polygon.angle = item.get("ang", 0)
+        polygon.flipTuple = item.get('fl', (1,1))
         return polygon
 
     def createViaArrayShape(self, item):
@@ -636,6 +660,7 @@ class layoutItems:
             item["yn"],
         )
         viaArray.angle = item.get("ang", 0)
+        viaArray.flipTuple = item.get('fl', (1,1))
         return viaArray
 
     def unknownItem(self):

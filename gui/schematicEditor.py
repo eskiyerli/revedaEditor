@@ -242,12 +242,13 @@ class schematicEditor(edw.editorWindow):
     def createNoteClick(self, s):
         textDlg = pdlg.noteTextEdit(self)
         if textDlg.exec() == QDialog.Accepted:
-            self.centralW.scene.noteText = textDlg.plainTextEdit.toPlainText()
-            self.centralW.scene.noteFontFamily = textDlg.familyCB.currentText()
-            self.centralW.scene.noteFontSize = textDlg.fontsizeCB.currentText()
-            self.centralW.scene.noteFontStyle = textDlg.fontStyleCB.currentText()
-            self.centralW.scene.noteAlign = textDlg.textAlignmCB.currentText()
-            self.centralW.scene.noteOrient = textDlg.textOrientCB.currentText()
+            noteText = textDlg.plainTextEdit.toPlainText()
+            noteFontFamily = textDlg.familyCB.currentText()
+            noteFontSize = textDlg.fontsizeCB.currentText()
+            noteFontStyle = textDlg.fontStyleCB.currentText()
+            noteAlign = textDlg.textAlignmCB.currentText()
+            noteOrient = textDlg.textOrientCB.currentText()
+            self.centralW.scene.textTuple = (noteText, noteFontFamily, noteFontStyle, noteFontSize,  noteAlign, noteOrient)
             self.centralW.scene.editModes.setMode("drawText")
 
     def createSymbolClick(self, s):

@@ -261,6 +261,14 @@ class editorWindow(QMainWindow):
         self.scaleAction = QAction(scaleIcon, "Scale...", self)
         self.scaleAction.setToolTip("Scale item")
 
+        verticalFlipIcon = QIcon(":/icons/layer-flip-vertical.png")
+        self.verticalFlipAction = QAction(verticalFlipIcon, "Vertical Flip", self)
+        self.verticalFlipAction.setToolTip("Vertical Flip")
+
+        horizontalFlipIcon = QIcon(":/icons/layer-flip.png")
+        self.horizontalFlipAction = QAction(horizontalFlipIcon, "Horizontal Flip", self)
+        self.horizontalFlipAction.setToolTip("Horizontal Flip")
+
         netNameIcon = QIcon(":/icons/node-design.png")
         self.netNameAction = QAction(netNameIcon, "Net Name...", self)
         self.netNameAction.setToolTip("Set net name")
@@ -412,6 +420,8 @@ class editorWindow(QMainWindow):
         self.toolbar.addAction(self.copyAction)
         self.toolbar.addAction(self.stretchAction)
         self.toolbar.addAction(self.rotateAction)
+        self.toolbar.addAction(self.horizontalFlipAction)
+        self.toolbar.addAction(self.verticalFlipAction)
         self.toolbar.addSeparator()
         self.toolbar.addAction(self.fitAction)
         self.toolbar.addAction(self.zoomInAction)
@@ -447,6 +457,8 @@ class editorWindow(QMainWindow):
         self.menuEdit.addAction(self.moveOriginAction)
         self.menuEdit.addAction(self.stretchAction)
         self.menuEdit.addAction(self.rotateAction)
+        self.menuEdit.addAction(self.horizontalFlipAction)
+        self.menuEdit.addAction(self.verticalFlipAction)
         self.selectMenu = QMenu('Selection', self)
         self.selectMenu.setIcon(QIcon('icons/node-select.png'))
         self.menuEdit.addMenu(self.selectMenu)
@@ -491,8 +503,11 @@ class editorWindow(QMainWindow):
         self.copyAction.triggered.connect(self.copyClick)
         self.undoAction.triggered.connect(self.undoClick)
         self.redoAction.triggered.connect(self.redoClick)
+        self.moveAction.triggered.connect(self.moveClick)
         self.moveByAction.triggered.connect(self.moveByClick)
         self.rotateAction.triggered.connect(self.rotateItemClick)
+        self.verticalFlipAction.triggered.connect(self.verticalFlipClick)
+        self.horizontalFlipAction.triggered.connect(self.horizontalFlipClick)
         self.goUpAction.triggered.connect(self.goUpHierarchy)
         self.helpAction.triggered.connect(self.helpClick)
         self.aboutAction.triggered.connect(self.aboutClick)
@@ -511,7 +526,10 @@ class editorWindow(QMainWindow):
 
     def _editorContextMenu(self):
         self.centralW.scene.itemContextMenu.addAction(self.copyAction)
+        self.centralW.scene.itemContextMenu.addAction(self.moveAction)
         self.centralW.scene.itemContextMenu.addAction(self.moveByAction)
+        self.centralW.scene.itemContextMenu.addAction(self.verticalFlipAction)
+        self.centralW.scene.itemContextMenu.addAction(self.horizontalFlipAction)
         self.centralW.scene.itemContextMenu.addAction(self.rotateAction)
         self.centralW.scene.itemContextMenu.addAction(self.deleteAction)
         self.centralW.scene.itemContextMenu.addAction(self.objPropAction)
@@ -614,13 +632,16 @@ class editorWindow(QMainWindow):
         self.centralW.scene.stretchSelectedItems()
 
     def moveClick(self):
+        self.messageLine.setText('Move Selected Items')
         self.centralW.scene.editModes.setMode("moveItem")
 
     def moveByClick(self):
         self.centralW.scene.editModes.setMode("moveItem")
+        self.messageLine.setText('Enter move distances.')
         self.centralW.scene.moveBySelectedItems()
 
     def rotateClick(self):
+        self.messageLine.setText('Rotate Selected Items')
         self.centralW.scene.editModes.setMode("rotateItem")
 
     def panView(self):
@@ -641,11 +662,23 @@ class editorWindow(QMainWindow):
         self.centralW.scene.editModes.setMode("copyItem")
         self.centralW.scene.copySelectedItems()
 
+    def horizontalFlipClick(self):
+        self.messageLine.setText('Flipping Selected Items Horizontally')
+        self.centralW.scene.flipHorizontal()
+
+    def verticalFlipClick(self):
+        self.messageLine.setText('Flipping Selected Items Vertically')
+        self.centralW.scene.flipVertical()
+
     def zoomIn(self):
         self.centralW.view.scale(1.25, 1.25)
+        self.centralW.view.viewRect = self.centralW.view.mapToScene(self.rect()).boundingRect(
+        ).toRect()
 
     def zoomOut(self):
         self.centralW.view.scale(0.8, 0.8)
+        self.centralW.view.viewRect = self.centralW.view.mapToScene(self.rect()).boundingRect(
+        ).toRect()
 
     def closeWindow(self):
         self.close()

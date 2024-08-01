@@ -28,12 +28,16 @@ from typing import List
 
 # import numpy as np
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, )
-from PySide6.QtGui import (QGuiApplication, QColor, QPen, )
-from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem, )
+from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
+from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
+                               QDialog, QCompleter )
 from dotenv import load_dotenv
 
 import revedaEditor.backend.dataDefinitions as ddef
+import revedaEditor.backend.libraryModelView as lmview
+import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.undoStack as us
+import revedaEditor.gui.propertyDialogues as pdlg
 
 load_dotenv()
 
@@ -60,7 +64,7 @@ class editorScene(QGraphicsScene):
             stretchItem=False, )
         self.readOnly = False  # if the scene is not editable
         self.undoStack = us.undoStack()
-
+        self.undoStack.setUndoLimit(99)
         self.origin = QPoint(0, 0)
         self.cellName = self.editorWindow.file.parent.stem
         self.partialSelection = True
@@ -94,21 +98,24 @@ class editorScene(QGraphicsScene):
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         modifiers = QGuiApplication.keyboardModifiers()
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and self.editModes.selectItem:
             self.mouseReleaseLoc = event.scenePos().toPoint()
-            if self.editModes.selectItem:
-                if modifiers == Qt.ShiftModifier:
-                    if self._selectionRectItem:
-                        selectionMode = (Qt.IntersectsItemShape if self.partialSelection else (
-                            Qt.ContainsItemShape))
-                        [item.setSelected(True) for item in
-                            self.items(
-                                self._selectionRectItem.mapRectToScene(self._selectionRectItem
-                                .rect()), mode=selectionMode) if
-                            item.parentItem() is None]
-                        self._items = self.selectedItems()
-                        self.removeItem(self._selectionRectItem)
-                        self._selectionRectItem = None
+
+            if modifiers == Qt.ShiftModifier:
+                if self._selectionRectItem:
+                    # Process existing selection rectangle
+                    selectionMode = Qt.IntersectsItemShape if self.partialSelection else Qt.ContainsItemShape
+                    selectionPath = QPainterPath()
+                    selectionPath.addRect(self._selectionRectItem.sceneBoundingRect())
+                    self.setSelectionArea(selectionPath, mode = selectionMode)
+
+                    self._items = [item for item in self.selectedItems() if item.parentItem() is None]
+                    self.removeItem(self._selectionRectItem)
+                    self._selectionRectItem = None
+
+                    self.editorWindow.messageLine.setText("Selection complete")
+                else:
+                    # Start a new selection rectangle
                     self.editorWindow.messageLine.setText("Draw Selection Rectangle")
                     self._selectionRectItem = QGraphicsRectItem(
                         QRectF(self.mouseReleaseLoc, self.mouseReleaseLoc))
@@ -116,13 +123,36 @@ class editorScene(QGraphicsScene):
                     selectionRectPen.setCosmetic(False)
                     self._selectionRectItem.setPen(selectionRectPen)
                     self.addItem(self._selectionRectItem)
-                elif self._items:
-                    if self.mouseReleaseLoc != self.mousePressLoc:
-                        self.moveShapesUndoStack(self._items, self._itemsOffset,
-                            self.mousePressLoc, self.mouseReleaseLoc, )
-                        self._items = None
-                self.editorWindow.messageLine.setText(
-                    "Item selected" if self.selectedItems() else "Nothing selected")
+            elif modifiers == Qt.ControlModifier:
+                    # Toggle select state if Control button is pressed
+                    clickedItems = [item for item in self.items(self.mouseReleaseLoc) if
+                                    item.parentItem() is None]
+                    if clickedItems:
+                        for item in clickedItems:
+                        # Toggle selection of clicked item
+                            item.setSelected(not item.isSelected())
+            else:
+                clickedItems = [item for item in self.items(self.mouseReleaseLoc) if
+                                    item.parentItem() is None]
+                # Select only the clicked item
+                self.clearSelection()
+                if clickedItems:
+                    for item in clickedItems:
+                        item.setSelected(True)
+
+            self._items = self.selectedItems()
+
+            # Clear selection rectangle if Shift is released
+            if self._selectionRectItem and modifiers != Qt.ShiftModifier:
+                self.removeItem(self._selectionRectItem)
+                self._selectionRectItem = None
+            elif self.editModes.moveItem and self._items:
+                if self.mouseReleaseLoc != self.mousePressLoc:
+                    self.moveShapesUndoStack(self._items, self._itemsOffset,
+                        self.mousePressLoc, self.mouseReleaseLoc, )
+                    self._items = None
+            self.editorWindow.messageLine.setText(
+                "Item selected" if self.selectedItems() else "Nothing selected")
 
     def mouseMoveEvent(self, event):
         modifiers = QGuiApplication.keyboardModifiers()
@@ -132,12 +162,12 @@ class editorScene(QGraphicsScene):
                 if self._selectionRectItem is not None:
                     self._selectionRectItem.setRect(
                         QRectF(self.mouseReleaseLoc, self.mouseMoveLoc))
-            else:
-                if self._items and self._itemsOffset:
-                    [item.setPos(self.mouseMoveLoc + self._itemsOffset[self._items.index(item)])
-                     for item in self._items]
-
-        super().mouseMoveEvent(event)
+        elif self.editModes.moveItem:
+            if self._items and self._itemsOffset:
+                [item.setPos(self.mouseMoveLoc + self._itemsOffset[self._items.index(item)])
+                    for item in self._items]
+        else:
+            super().mouseMoveEvent(event)
 
     def snapToBase(self, number, base):
         """
@@ -183,6 +213,14 @@ class editorScene(QGraphicsScene):
 
     def copySelectedItems(self):
         pass
+
+    def flipHorizontal(self):
+        for item in self.selectedItems():
+            item.flipTuple=(-1,1)
+
+    def flipVertical(self):
+        for item in self.selectedItems():
+            item.flipTuple= (1,-1)
 
     def selectAll(self):
         """
@@ -275,3 +313,30 @@ class editorScene(QGraphicsScene):
         for command in undoCommands:
             self.undoStack.push(command)
         self.undoStack.endMacro()
+
+    def moveBySelectedItems(self):
+        if self.selectedItems():
+            dlg = pdlg.moveByDialogue(self.editorWindow)
+            dlg.xEdit.setText("0")
+            dlg.yEdit.setText("0")
+            if dlg.exec() == QDialog.Accepted:
+                dx = self.snapToBase(float(dlg.xEdit.text()), self.snapTuple[0])
+                dy = self.snapToBase(float(dlg.yEdit.text()), self.snapTuple[1])
+                moveCommand = us.undoMoveByCommand(self, self.selectedItems() , dx, dy)
+                self.undoStack.push(moveCommand)
+                self.editorWindow.messageLine.setText(
+                    f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}"
+                )
+                self.editModes.setMode("selectItem")
+
+    def cellNameComplete(self, dlg: QDialog, cellNameList: List[str]):
+        cellNameCompleter = QCompleter(cellNameList)
+        cellNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
+        dlg.instanceCellName.setCompleter(cellNameCompleter)
+
+    def viewNameComplete(self, dlg: QDialog, viewNameList: List[str]):
+        viewNameCompleter = QCompleter(viewNameList)
+        viewNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
+        dlg.instanceViewName.setCompleter(viewNameCompleter)
+
+
