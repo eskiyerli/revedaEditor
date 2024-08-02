@@ -45,13 +45,15 @@ if os.environ.get("REVEDA_PDK_PATH"):
 else:
     import defaultPDK.process as fabproc
 
+from typing import Dict
 
-class layoutInstanceDialog(QDialog):
+
+class layoutInstanceDialogue(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Layout Instance/Pcell Options")
-        self.setMinimumWidth(250)
+        self.setMinimumWidth(400)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
@@ -62,7 +64,6 @@ class layoutInstanceDialog(QDialog):
         self.instanceParamsLayout = QFormLayout()
         instanceParamsGroup.setLayout(self.instanceParamsLayout)
         self.instanceLibName = edf.longLineEdit()
-        # self.pinstanceLibName.setReadOnly(True)
         self.instanceParamsLayout.addRow("Library:", self.instanceLibName)
         self.instanceCellName = edf.longLineEdit()
         self.instanceParamsLayout.addRow("Cell:", self.instanceCellName)
@@ -91,7 +92,7 @@ class layoutInstanceDialog(QDialog):
         self.show()
 
 
-class pcellInstancePropertiesDialog(pcellInstanceDialog):
+class layoutInstancePropertiesDialogue(layoutInstanceDialogue):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("PCell Instance Properties")
@@ -763,41 +764,61 @@ class layoutPolygonProperties(QDialog):
 #             self.adjustSize()
 #
 
-class layoutInstancePropertiesDialog(QDialog):
-    def __init__(self, parent: QWidget) -> None:
-        super().__init__(parent)
+# class layoutInstancePropertiesDialog(QDialog):
+#     def __init__(self, parent: QWidget) -> None:
+#         super().__init__(parent)
+#
+#         self.setWindowTitle("Layout Instance Properties")
+#         self.setMinimumWidth(300)
+#         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+#         self.buttonBox = QDialogButtonBox(QBtn)
+#         self.buttonBox.accepted.connect(self.accept)
+#         self.buttonBox.rejected.connect(self.reject)
+#         vLayout = QVBoxLayout()
+#         instanceParamsGroup = QGroupBox("Instance Parameters")
+#         self.instanceParamsLayout = QFormLayout()
+#         instanceParamsGroup.setLayout(self.instanceParamsLayout)
+#         self.instanceLibName = edf.longLineEdit()
+#         # self.instanceLibName.setReadOnly(True)
+#         self.instanceParamsLayout.addRow("Instance Library:", self.instanceLibName)
+#         self.instanceCellName = edf.longLineEdit()
+#         # self.instanceCellName.setReadOnly(True)
+#         self.instanceParamsLayout.addRow("Instance Cell:", self.instanceCellName)
+#         self.instanceViewName = edf.longLineEdit()
+#         # self.instanceViewName.setReadOnly(True)
+#         self.instanceParamsLayout.addRow("Instance View:", self.instanceViewName)
+#         self.instanceNameEdit = edf.longLineEdit()
+#         self.instanceParamsLayout.addRow("Instance Name:", self.instanceNameEdit)
+#         vLayout.addWidget(instanceParamsGroup)
+#
+#         self.locationGroup = QGroupBox("Location")
+#         self.locationLayout = QFormLayout()
+#         self.locationGroup.setLayout(self.locationLayout)
+#         self.xEdit = edf.shortLineEdit()
+#         self.yEdit = edf.shortLineEdit()
+#         self.locationLayout.addRow("Location X:", self.xEdit)
+#         self.locationLayout.addRow("Location Y:", self.yEdit)
+#         vLayout.addWidget(self.locationGroup)
+#         vLayout.addWidget(self.buttonBox)
+#         self.setLayout(vLayout)
+#         self.show()
 
-        self.setWindowTitle("Layout Instance Properties")
-        self.setMinimumWidth(300)
-        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        self.buttonBox = QDialogButtonBox(QBtn)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-        vLayout = QVBoxLayout()
-        instanceParamsGroup = QGroupBox("Instance Parameters")
-        self.instanceParamsLayout = QFormLayout()
-        instanceParamsGroup.setLayout(self.instanceParamsLayout)
-        self.instanceLibName = edf.longLineEdit()
-        # self.instanceLibName.setReadOnly(True)
-        self.instanceParamsLayout.addRow("Instance Library:", self.instanceLibName)
-        self.instanceCellName = edf.longLineEdit()
-        # self.instanceCellName.setReadOnly(True)
-        self.instanceParamsLayout.addRow("Instance Cell:", self.instanceCellName)
-        self.instanceViewName = edf.longLineEdit()
-        # self.instanceViewName.setReadOnly(True)
-        self.instanceParamsLayout.addRow("Instance View:", self.instanceViewName)
-        self.instanceNameEdit = edf.longLineEdit()
-        self.instanceParamsLayout.addRow("Instance Name:", self.instanceNameEdit)
-        vLayout.addWidget(instanceParamsGroup)
+class formDictionary:
+    def __init__(self, formLayout: QFormLayout):
+        self.formLayout = formLayout
 
-        self.locationGroup = QGroupBox("Location")
-        self.locationLayout = QFormLayout()
-        self.locationGroup.setLayout(self.locationLayout)
-        self.xEdit = edf.shortLineEdit()
-        self.yEdit = edf.shortLineEdit()
-        self.locationLayout.addRow("Location X:", self.xEdit)
-        self.locationLayout.addRow("Location Y:", self.yEdit)
-        vLayout.addWidget(self.locationGroup)
-        vLayout.addWidget(self.buttonBox)
-        self.setLayout(vLayout)
-        self.show()
+    def extractDictFormLayout(self) -> Dict[str, edf.longLineEdit]:
+        data = {}
+        for row in range(self.formLayout.rowCount()):
+            labelItem = self.formLayout.itemAt(row, QFormLayout.LabelRole)
+            fieldItem = self.formLayout.itemAt(row, QFormLayout.FieldRole)
+
+            if labelItem and fieldItem:
+                label = labelItem.widget()
+                field = fieldItem.widget()
+
+                if isinstance(label, QLabel) and isinstance(field, QLineEdit):
+                    key = label.text().rstrip(':')  # Remove trailing colon if present
+                    value = field
+                    data[key] = value
+        return data

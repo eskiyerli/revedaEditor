@@ -52,6 +52,7 @@ class longLineEdit(QLineEdit):
     def __init__(self, value: str = ""):
         super().__init__(None)
         self.setMaximumWidth(500)
+        self.setMinimumWidth(200)
         if isinstance(value, str):
             self.setText(value)
         else:

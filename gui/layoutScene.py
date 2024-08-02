@@ -344,17 +344,13 @@ class layoutScene(editorScene):
         self.addUndoStack(self._newPath)
 
     def addNewInstance(self) -> Union[lshp.layoutInstance, lshp.layoutPcell]:
-        newInstance = self.instLayout()
-        # if new instance is a pcell, start a dialogue for pcell parameters
+        newInstance = self.instLayout(self.layoutInstanceTuple)
+        dlg = ldlg.layoutInstanceDialogue(self.editorWindow)
         if isinstance(newInstance, pcells.baseCell):
-            dlg = ldlg.pcellInstanceDialog(self.editorWindow)
             dlg.instanceLibName.setText(newInstance.libraryName)
             dlg.instanceCellName.setText(newInstance.cellName)
             dlg.instanceViewName.setText(newInstance.viewName)
-            initArgs = inspect.signature(newInstance.__class__.__init__).parameters
-            argsUsed = [param for param in initArgs if (param != "self")]
-            argDict = {arg: getattr(newInstance, arg) for arg in argsUsed}
-            lineEditDict = {key: edf.shortLineEdit(value) for key, value in argDict.items()}
+            lineEditDict = self.extractPcellInstanceParameters(newInstance)
             if lineEditDict:
                 dlg.pcellParamsGroup.show()
                 for key, value in lineEditDict.items():
@@ -363,16 +359,18 @@ class layoutScene(editorScene):
                 instanceValuesDict = {}
                 for key, value in lineEditDict.items():
                     instanceValuesDict[key] = value.text()
-                newInstance(*instanceValuesDict.values())
+                if instanceValuesDict:
+                    newInstance(*instanceValuesDict.values())
         return newInstance
 
-    def instLayout(self) -> Union[lshp.layoutInstance, lshp.layoutPcell]:
+    def instLayout(self, layoutInstanceTuple: ddef.viewItemTuple) -> Union[lshp.layoutInstance,
+    lshp.layoutPcell]:
         """
         Read a layout file and create layoutShape objects from it.
         """
-        match self.layoutInstanceTuple.viewItem.viewType:
+        match layoutInstanceTuple.viewItem.viewType:
             case "layout":
-                with self.layoutInstanceTuple.viewItem.viewPath.open("r") as temp:
+                with layoutInstanceTuple.viewItem.viewPath.open("r") as temp:
                     try:
                         decodedData = json.load(temp)
                         if decodedData[0]["cellView"] != "layout":
@@ -383,11 +381,11 @@ class layoutScene(editorScene):
                                               item.get("type") in self.layoutShapes]
                             layoutInstance = lshp.layoutInstance(instanceShapes)
                             layoutInstance.libraryName = (
-                                self.layoutInstanceTuple.libraryItem.libraryName)
+                                layoutInstanceTuple.libraryItem.libraryName)
                             layoutInstance.cellName = (
-                                self.layoutInstanceTuple.cellItem.cellName)
+                                layoutInstanceTuple.cellItem.cellName)
                             layoutInstance.viewName = (
-                                self.layoutInstanceTuple.viewItem.viewName)
+                                layoutInstanceTuple.viewItem.viewName)
                             self.itemCounter += 1
                             layoutInstance.counter = self.itemCounter
                             layoutInstance.instanceName = f"I{layoutInstance.counter}"
@@ -396,7 +394,7 @@ class layoutScene(editorScene):
                     except json.JSONDecodeError:
                         self.logger.warning("Invalid JSON File")
             case "pcell":
-                with open(self.layoutInstanceTuple.viewItem.viewPath, "r") as temp:
+                with open(layoutInstanceTuple.viewItem.viewPath, "r") as temp:
                     try:
                         pcellRefDict = json.load(temp)
                         if pcellRefDict[0]["cellView"] != "pcell":
@@ -407,11 +405,11 @@ class layoutScene(editorScene):
                             # now evaluate pcell
 
                             pcellInstance.libraryName = (
-                                self.layoutInstanceTuple.libraryItem.libraryName)
+                                layoutInstanceTuple.libraryItem.libraryName)
                             pcellInstance.cellName = (
-                                self.layoutInstanceTuple.cellItem.cellName)
+                                layoutInstanceTuple.cellItem.cellName)
                             pcellInstance.viewName = (
-                                self.layoutInstanceTuple.viewItem.viewName)
+                                layoutInstanceTuple.viewItem.viewName)
                             self.itemCounter += 1
                             pcellInstance.counter = self.itemCounter
                             # This needs to become more sophisticated.
@@ -543,10 +541,11 @@ class layoutScene(editorScene):
                         case lshp.layoutPolygon:
                             self.layoutPolygonProperties(item)
                         case lshp.layoutInstance:
-                            self.layoutInstanceProperties(item)
+                            self.layoutInstanceProperties(item, False)
                         case _:
+
                             if item.__class__.__bases__[0] == pcells.baseCell:
-                                self.layoutPCellProperties(item)
+                                self.layoutInstanceProperties(item, True)
 
         except Exception as e:
             self.logger.error(f"{type(item)} property editor error: {e}")
@@ -747,30 +746,46 @@ class layoutScene(editorScene):
             self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item.label))
             self.undoStack.endMacro()
 
-    def layoutInstanceProperties(self, item):
+    def layoutInstanceProperties(self, item: Union[lshp.layoutInstance, lshp.layoutPcell],
+                                 pcell: bool = False):
+
         libraryModel = lmview.layoutViewsModel(self.editorWindow.libraryDict,
                                                self.editorWindow.layoutViews)
-        dlg = ldlg.layoutInstancePropertiesDialog(self.editorWindow)
+        dlg = ldlg.layoutInstancePropertiesDialogue(self.editorWindow)
+        if pcell:
+            dlg.pcellParamsGroup.show()
+            lineEditDict = self.extractPcellInstanceParameters(item)
+            if lineEditDict:
+                dlg.pcellParamsGroup.show()
+                for key, value in lineEditDict.items():
+                    dlg.pcellParamsLayout.addRow(key, value)
+        libItem = libm.getLibItem(libraryModel, item.libraryName)
+        cellItem = libm.getCellItem(libItem, item.cellName)
+        viewItem = libm.getViewItem(cellItem, item.viewName)
+        instanceTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
         dlg.instanceLibName.setText(item.libraryName)
         libNameCompleter = QCompleter(libraryModel.listLibraries())
         libNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
         dlg.instanceLibName.setCompleter(libNameCompleter)
+        # create cell name completer list.
         dlg.instanceLibName.editingFinished.connect(lambda: self.cellNameComplete(dlg,
                                                                                   libraryModel.listLibraryCells(
                                                                                       dlg.instanceLibName.text())))
         dlg.instanceCellName.setText(item.cellName)
+        # create view name completer list
         dlg.instanceCellName.editingFinished.connect(lambda: self.viewNameComplete(dlg,
                                                                                    libraryModel.listCellViews(
                                                                                        dlg.instanceLibName.text(),
                                                                                        dlg.instanceCellName.text(),
-                                                                                       [
-                                                                                           'layout',
-                                                                                           'pcell'])))
-
+                                                                                       ['layout','pcell'])))
         dlg.instanceViewName.setText(item.viewName)
+        dlg.instanceViewName.editingFinished.connect(
+            lambda: self.changePcellParameterFields(dlg, libraryModel, instanceTuple))
         dlg.instanceNameEdit.setText(item.instanceName)
+
         dlg.xEdit.setText(str(item.scenePos().x() / fabproc.dbu))
         dlg.yEdit.setText(str(item.scenePos().y() / fabproc.dbu))
+
         if dlg.exec() == QDialog.Accepted:
             libraryName = dlg.instanceLibName.text().strip()
             cellName = dlg.instanceCellName.text().strip()
@@ -780,64 +795,96 @@ class layoutScene(editorScene):
             cellItem = libm.getCellItem(libItem, cellName)
             viewItem = libm.getViewItem(cellItem, viewName)
 
-            self.layoutInstanceTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
-            newLayoutInstance = self.instLayout()
+            layoutInstanceTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
+            newLayoutInstance = self.instLayout(layoutInstanceTuple)
             newLayoutInstance.instanceName = instanceName
+            lineEditDict = ldlg.formDictionary(dlg.pcellParamsLayout).extractDictFormLayout()
+            instanceValuesDict = {}
+            for key, value in lineEditDict.items():
+                instanceValuesDict[key] = value.text()
+            if instanceValuesDict:
+                newLayoutInstance(*instanceValuesDict.values())
             newLayoutInstance.setPos(QPoint(
                 self.snapToBase(float(dlg.xEdit.text()) * fabproc.dbu, self.snapTuple[0]),
                 self.snapToBase(float(dlg.yEdit.text()) * fabproc.dbu, self.snapTuple[1]), ))
             self.undoStack.push(us.addDeleteShapeUndo(self, newLayoutInstance, item))
-            self.layoutInstanceTuple = None
 
-    def layoutPCellProperties(self, item: lshp.layoutPcell):
-        dlg = ldlg.pcellInstancePropertiesDialog(self.editorWindow)
-        libraryModel = lmview.layoutViewsModel(self.editorWindow.libraryDict,
-                                               self.editorWindow.layoutViews)
-        dlg.instanceLibName.setText(item.libraryName)
-        libNameCompleter = QCompleter(libraryModel.listLibraries())
-        libNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
-        dlg.instanceLibName.setCompleter(libNameCompleter)
-        dlg.instanceLibName.editingFinished.connect(lambda: self.cellNameComplete(dlg,
-                                                                                  libraryModel.listLibraryCells(
-                                                                                      dlg.instanceLibName.text())))
-        dlg.instanceCellName.setText(item.cellName)
-        dlg.instanceCellName.editingFinished.connect(lambda: self.viewNameComplete(dlg,
-                                                                                   libraryModel.listCellViews(
-                                                                                       dlg.instanceLibName.text(),
-                                                                                       dlg.instanceCellName.text(),
-                                                                                       [
-                                                                                           'layout',
-                                                                                           'pcell'])))
-        dlg.instanceViewName.setText(item.viewName)
-        libItem = libm.getLibItem(libraryModel, item.libraryName)
-        cellItem = libm.getCellItem(libItem, item.cellName)
-        viewItem = libm.getViewItem(cellItem, item.viewName)
-        itemInstanceTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
-        dlg.instanceNameEdit.setText(item.instanceName)
-        lineEditDict = self.extractPcellInstanceParameters(item)
-        if lineEditDict:
-            dlg.pcellParamsGroup.show()
-            for key, value in lineEditDict.items():
-                dlg.pcellParamsLayout.addRow(key, value)
-        dlg.xEdit.setText(str(item.scenePos().x() / fabproc.dbu))
-        dlg.yEdit.setText(str(item.scenePos().y() / fabproc.dbu))
-        dlg.instanceViewName.editingFinished.connect(
-            lambda: self.changePcellParameterFields(dlg, libraryModel, itemInstanceTuple))
-        if dlg.exec() == QDialog.Accepted:
-            libraryItem = libm.getLibItem(libraryModel, dlg.instanceLibName.text().strip())
-            cellItem = libm.getCellItem(libraryItem, dlg.instanceCellName.text().strip())
-            viewItem = libm.getViewItem(cellItem, dlg.instanceViewName.text().strip())
-            instanceName = dlg.instanceNameEdit.text().strip()
-            rowCount = dlg.pcellParamsLayout.rowCount()
-            instParamDict = {}
-            for row in range(rowCount):  # first 4 rows are already processed.
-                labelText = (dlg.pcellParamsLayout.itemAt(row,
-                                                             QFormLayout.LabelRole).widget().text().replace(
-                    "&", ""))
-                paramValue = (
-                    dlg.pcellParamsLayout.itemAt(row, QFormLayout.FieldRole).widget().text())
-                instParamDict[labelText] = paramValue
-            item(**instParamDict)
+    def changePcellParameterFields(self, dlg: ldlg.layoutInstancePropertiesDialogue,
+                                   libraryModel: lmview.layoutViewsModel,
+                                   instanceTuple: ddef.viewItemTuple):
+        libItem = libm.getLibItem(libraryModel, dlg.instanceLibName.text().strip())
+        cellItem = libm.getCellItem(libItem, dlg.instanceCellName.text().strip())
+        viewItem = libm.getViewItem(cellItem, dlg.instanceViewName.text().strip())
+        newItemTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
+        if newItemTuple != instanceTuple:
+            if newItemTuple.viewItem.viewType in ['layout', 'pcell']:
+                while dlg.pcellParamsLayout.count(): # first delete pcellparameters layout
+                    child = dlg.pcellParamsLayout.takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                newInstance = self.instLayout(newItemTuple)
+                if newItemTuple.viewItem.viewType == 'pcell':
+                    lineEditDict = self.extractPcellInstanceParameters(newInstance)
+                    if lineEditDict:
+                        dlg.pcellParamsGroup.show()
+                        for key, value in lineEditDict.items():
+                            dlg.pcellParamsLayout.addRow(key, value)
+
+                elif newItemTuple.viewItem.viewType == 'layout':
+                    dlg.pcellParamsGroup.hide()
+
+
+
+
+    # def layoutPCellProperties(self, item: lshp.layoutPcell):
+    #     dlg = ldlg.pcellInstancePropertiesDialog(self.editorWindow)
+    #     libraryModel = lmview.layoutViewsModel(self.editorWindow.libraryDict,
+    #                                            self.editorWindow.layoutViews)
+    #     dlg.instanceLibName.setText(item.libraryName)
+    #     libNameCompleter = QCompleter(libraryModel.listLibraries())
+    #     libNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
+    #     dlg.instanceLibName.setCompleter(libNameCompleter)
+    #     dlg.instanceLibName.editingFinished.connect(lambda: self.cellNameComplete(dlg,
+    #                                                                               libraryModel.listLibraryCells(
+    #                                                                                   dlg.instanceLibName.text())))
+    #     dlg.instanceCellName.setText(item.cellName)
+    #     dlg.instanceCellName.editingFinished.connect(lambda: self.viewNameComplete(dlg,
+    #                                                                                libraryModel.listCellViews(
+    #                                                                                    dlg.instanceLibName.text(),
+    #                                                                                    dlg.instanceCellName.text(),
+    #                                                                                    [
+    #                                                                                        'layout',
+    #                                                                                        'pcell'])))
+    #     dlg.instanceViewName.setText(item.viewName)
+    #     libItem = libm.getLibItem(libraryModel, item.libraryName)
+    #     cellItem = libm.getCellItem(libItem, item.cellName)
+    #     viewItem = libm.getViewItem(cellItem, item.viewName)
+    #     itemInstanceTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
+    #     dlg.instanceNameEdit.setText(item.instanceName)
+    #     lineEditDict = self.extractPcellInstanceParameters(item)
+    #     if lineEditDict:
+    #         dlg.pcellParamsGroup.show()
+    #         for key, value in lineEditDict.items():
+    #             dlg.pcellParamsLayout.addRow(key, value)
+    #     dlg.xEdit.setText(str(item.scenePos().x() / fabproc.dbu))
+    #     dlg.yEdit.setText(str(item.scenePos().y() / fabproc.dbu))
+    #     dlg.instanceViewName.editingFinished.connect(
+    #         lambda: self.changePcellParameterFields(dlg, libraryModel, itemInstanceTuple))
+    #     if dlg.exec() == QDialog.Accepted:
+    #         libraryItem = libm.getLibItem(libraryModel, dlg.instanceLibName.text().strip())
+    #         cellItem = libm.getCellItem(libraryItem, dlg.instanceCellName.text().strip())
+    #         viewItem = libm.getViewItem(cellItem, dlg.instanceViewName.text().strip())
+    #         instanceName = dlg.instanceNameEdit.text().strip()
+    #         rowCount = dlg.pcellParamsLayout.rowCount()
+    #         instParamDict = {}
+    #         for row in range(rowCount):  # first 4 rows are already processed.
+    #             labelText = (dlg.pcellParamsLayout.itemAt(row,
+    #                                                       QFormLayout.LabelRole).widget().text().replace(
+    #                 "&", ""))
+    #             paramValue = (
+    #                 dlg.pcellParamsLayout.itemAt(row, QFormLayout.FieldRole).widget().text())
+    #             instParamDict[labelText] = paramValue
+    #         item(**instParamDict)
 
     def extractPcellInstanceParameters(self, instance: lshp.layoutPcell) -> dict:
         initArgs = inspect.signature(instance.__class__.__init__).parameters
@@ -1014,24 +1061,3 @@ class layoutScene(editorScene):
 
         self.scene().logger.warning("No suitable font found. Using default font.")
         return QFont()
-
-    def changePcellParameterFields(self, dlg: ldlg.pcellInstancePropertiesDialog, libraryModel: lmview.layoutViewsModel,
-                                   instanceTuple: ddef.viewItemTuple):
-        libItem = libm.getLibItem(libraryModel, dlg.instanceLibName.text().strip())
-        cellItem = libm.getCellItem(libItem, dlg.instanceCellName.text().strip())
-        viewItem = libm.getViewItem(cellItem, dlg.instanceViewName.text().strip())
-        newItemTuple = ddef.viewItemTuple(libItem, cellItem, viewItem)
-        if newItemTuple != instanceTuple:
-            if newItemTuple.viewItem.viewType in ['layout', 'pcell']:
-                self.layoutInstanceTuple = newItemTuple
-                newInstance = self.instLayout()
-                if newItemTuple.viewItem.viewType == 'pcell':
-                    lineEditDict = self.extractPcellInstanceParameters(newInstance)
-                    while dlg.pcellParamsLayout.count():
-                        child = dlg.instanceParamsLayout.takeAt(0)
-                        if child.widget():
-                            child.widget().deleteLater()
-                    if lineEditDict:
-                        dlg.pcellParamsGroup.show()
-                        for key, value in lineEditDict.items():
-                            dlg.pcellParamsLayout.addRow(key, value)

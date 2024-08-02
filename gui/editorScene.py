@@ -338,5 +338,6 @@ class editorScene(QGraphicsScene):
         viewNameCompleter = QCompleter(viewNameList)
         viewNameCompleter.setCaseSensitivity(Qt.CaseInsensitive)
         dlg.instanceViewName.setCompleter(viewNameCompleter)
+        dlg.instanceViewName.setText(viewNameList[0])
 
 
