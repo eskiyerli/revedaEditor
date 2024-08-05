@@ -29,7 +29,7 @@ import json
 # from hashlib import new
 import pathlib
 from collections import Counter
-from typing import Union, Set, Dict, Tuple
+from typing import Union, Set, Dict, Tuple, List
 
 
 # import numpy as np
@@ -750,32 +750,42 @@ class schematicScene(editorScene):
         else:
             return set()
 
-    def addStretchWires(self, start: QPoint, end: QPoint) -> list[net.schematicNet]:
+    def addStretchWires(self, start: QPoint, end: QPoint) -> List['net.schematicNet']:
         """
-        Add a trio of wires between two points
+        Add a trio of wires between two points.
+
+        Args:
+            start (QPoint): The starting point of the wire.
+            end (QPoint): The ending point of the wire.
+
+        Returns:
+            List[net.schematicNet]: A list of schematic net objects representing the wires.
         """
         try:
-            if (
-                start.y() == end.y() or start.x() == end.x()
-            ):  # horizontal or vertical line
-                lines = [net.schematicNet(start, end)]
-            else:
-                firstPointX = self.snapToBase(
-                    (end.x() - start.x()) / 3 + start.x(), self.snapTuple[0]
-                )
-                firstPointY = start.y()
-                firstPoint = QPoint(firstPointX, firstPointY)
-                secondPoint = QPoint(firstPointX, end.y())
-                lines = list()
-                if start != firstPoint:
-                    lines.append(net.schematicNet(start, firstPoint))
-                if firstPoint != secondPoint:
-                    lines.append(net.schematicNet(firstPoint, secondPoint))
-                if secondPoint != end:
-                    lines.append(net.schematicNet(secondPoint, end))
+            if start == end:
+                self.logger.warning("Start and end points are the same. No wire added.")
+                return []
+
+            if start.y() == end.y() or start.x() == end.x():
+                # Horizontal or vertical line
+                return [net.schematicNet(start, end)]
+
+            # Calculate intermediate points
+            firstPointX = self.snapToBase((end.x() - start.x()) / 3 + start.x(), self.snapTuple[0])
+            firstPoint = QPoint(firstPointX, start.y())
+            secondPoint = QPoint(firstPointX, end.y())
+
+            # Create wire segments
+            lines = []
+            segments = [(start, firstPoint), (firstPoint, secondPoint), (secondPoint, end)]
+            for seg_start, seg_end in segments:
+                if seg_start != seg_end:
+                    lines.append(net.schematicNet(seg_start, seg_end))
+
             return lines
+
         except Exception as e:
-            self.logger.error(f"extend wires error{e}")
+            self.logger.error(f"Error in addStretchWires: {e}", exc_info=True)
             return []
 
     def addPin(self, pos: QPoint) -> shp.schematicPin:
@@ -931,7 +941,9 @@ class schematicScene(editorScene):
                 # increment item counter for next symbol
                 self.instanceCounter += 1
             shapesList.append(itemShape)
-        self.undoStack.push(us.loadShapesUndo(self, shapesList))
+        # self.undoStack.push(us.loadShapesUndo(self, shapesList))
+        for itemShape in shapesList:
+            self.addItem(itemShape)
 
     def reloadScene(self):
         topLevelItems = [item for item in self.items() if item.parentItem() is None]

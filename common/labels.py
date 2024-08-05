@@ -75,7 +75,7 @@ class symbolLabel(QGraphicsSimpleTextItem):
         self._start = start  # top left corner
         self._labelDefinition = labelDefinition
         # label definition is what is entered in the symbol editor
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
@@ -117,12 +117,21 @@ class symbolLabel(QGraphicsSimpleTextItem):
             f" {self._labelUse})"
         )
 
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if self.scene() and self.scene().editModes.moveItem:
+            self.setFlag(QGraphicsItem.ItemIsMovable, True)
+
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedHasChanged:
-            if value:
-                self.setBrush(symlyr.selectedLabelBrush)
-            else:
-                self.setBrush(symlyr.labelBrush)
+        if self.scene():
+            match change:
+                case QGraphicsItem.ItemSelectedHasChanged:
+                    if value:
+                        self.setBrush(symlyr.selectedLabelBrush)
+                        self.setZValue(self.zValue() + 10)
+                    else:
+                        self.setBrush(symlyr.labelBrush)
+                        self.setZValue(self.zValue() - 10)
         return super().itemChange(change, value)
 
     def contextMenuEvent(self, event):

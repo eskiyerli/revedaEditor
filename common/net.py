@@ -99,7 +99,7 @@ class schematicNet(QGraphicsItem):
 
     def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
         super().__init__()
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
         # self.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
@@ -200,29 +200,35 @@ class schematicNet(QGraphicsItem):
         return f"schematicNet({self.sceneEndPoints})"
 
     def itemChange(self, change, value):
-        if self.scene() and change == QGraphicsItem.ItemSelectedHasChanged:
-            if value:
-                self.scene().selectedNet= self
-            else:
-                self.scene().selectedNet = None
+        if self.scene():
+            match change:
+                case QGraphicsItem.ItemSelectedHasChanged:
+                    if value:
+                        self.setZValue(self.zValue() + 10)
+                        self.scene().selectedNet= self
+                    else:
+                        self.setZValue(self.zValue() - 10)
+                        self.scene().selectedNet = None
         return super().itemChange(change, value)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         super().mousePressEvent(event)
-        if self._stretch:
-            eventPos = event.pos().toPoint()
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            if (
-                eventPos - self._draftLine.p1().toPoint()
-            ).manhattanLength() <= self.scene().snapDistance:
-                self.setCursor(Qt.SizeHorCursor)
-                self._stretchSide = "p1"
-            elif (
-                eventPos - self._draftLine.p2().toPoint()
-            ).manhattanLength() <= self.scene().snapDistance:
-                self.setCursor(Qt.SizeHorCursor)
-                self._stretchSide = "p2"
-            self.scene().stretchNet(self, self._stretchSide)
+        if self.scene():
+            if self.scene().editModes.moveItem:
+                self.setFlag(QGraphicsItem.ItemIsMovable, True)
+            elif self._stretch:
+                eventPos = event.pos().toPoint()
+                if (
+                    eventPos - self._draftLine.p1().toPoint()
+                ).manhattanLength() <= self.scene().snapDistance:
+                    self.setCursor(Qt.SizeHorCursor)
+                    self._stretchSide = "p1"
+                elif (
+                    eventPos - self._draftLine.p2().toPoint()
+                ).manhattanLength() <= self.scene().snapDistance:
+                    self.setCursor(Qt.SizeHorCursor)
+                    self._stretchSide = "p2"
+                self.scene().stretchNet(self, self._stretchSide)
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         """
@@ -254,6 +260,8 @@ class schematicNet(QGraphicsItem):
                 self.scene().addItem(flightLine)
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.setSelected(True)
+        if self.scene().editModes.moveItem:
+            self.setFlag(QGraphicsItem.ItemIsMovable, True)
         super().mouseReleaseEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
@@ -289,11 +297,6 @@ class schematicNet(QGraphicsItem):
             set: A set of netItems that overlap with self.sceneShapeRect.
         """
         if self.scene():
-            # overlapNets = {
-            #     netItem
-            #     for netItem in self.scene().items(self.sceneShapeRect)
-            #     if isinstance(netItem, schematicNet)
-            # }
             overlapNets = {netItem for netItem in self.collidingItems() if isinstance(netItem, schematicNet)}
             return overlapNets - {self}
 

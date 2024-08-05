@@ -137,7 +137,9 @@ class symbolShape(QGraphicsItem):
         self._offset = value
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        if self.scene().editModes.moveItem:
+            self.setFlag(QGraphicsItem.ItemIsMovable, True)
+
         super().mousePressEvent(event)
 
     def sceneEvent(self, event):

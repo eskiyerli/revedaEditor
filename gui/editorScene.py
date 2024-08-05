@@ -24,7 +24,7 @@
 #
 
 import os
-from typing import List
+from typing import List, Sequence
 
 # import numpy as np
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, )
@@ -82,92 +82,110 @@ class editorScene(QGraphicsScene):
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.mousePressLoc = event.scenePos().toPoint()
+            self._items = [item for item in self.selectedItems() if item.parentItem() is
+                           None]
             if self.editModes.selectItem:
-                self._itemsOffset = []
-                self.mousePressLoc = event.scenePos().toPoint()
-                if not self._items:
-                    self._items = [item for item in self.selectedItems() if
-                        item.parentItem() is None]
-                for item in self._items:
-                    self._itemsOffset.append(item.pos().toPoint() - self.mousePressLoc)
+                if not self.selectedItems():
+                    # Start a new selection rectangle
+                    self._startNewSelectionRectangle()
+            elif self.editModes.moveItem:
+                self._itemsOffset = [item.scenePos().toPoint() - self.mousePressLoc for item in
+                                     self._items]
             elif self.editModes.panView:
                 self.centerViewOnPoint(self.mousePressLoc)
                 self.messageLine.setText("Pan View at mouse press position")
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
-        modifiers = QGuiApplication.keyboardModifiers()
-        if event.button() == Qt.LeftButton and self.editModes.selectItem:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.mouseReleaseLoc = event.scenePos().toPoint()
+            modifiers = QGuiApplication.keyboardModifiers()
 
-            if modifiers == Qt.ShiftModifier:
-                if self._selectionRectItem:
-                    # Process existing selection rectangle
-                    selectionMode = Qt.IntersectsItemShape if self.partialSelection else Qt.ContainsItemShape
-                    selectionPath = QPainterPath()
-                    selectionPath.addRect(self._selectionRectItem.sceneBoundingRect())
-                    self.setSelectionArea(selectionPath, mode = selectionMode)
-
-                    self._items = [item for item in self.selectedItems() if item.parentItem() is None]
-                    self.removeItem(self._selectionRectItem)
-                    self._selectionRectItem = None
-
-                    self.editorWindow.messageLine.setText("Selection complete")
-                else:
-                    # Start a new selection rectangle
-                    self.editorWindow.messageLine.setText("Draw Selection Rectangle")
-                    self._selectionRectItem = QGraphicsRectItem(
-                        QRectF(self.mouseReleaseLoc, self.mouseReleaseLoc))
-                    selectionRectPen = QPen(QColor("yellow"), 2, Qt.DashLine)
-                    selectionRectPen.setCosmetic(False)
-                    self._selectionRectItem.setPen(selectionRectPen)
-                    self.addItem(self._selectionRectItem)
-            elif modifiers == Qt.ControlModifier:
-                    # Toggle select state if Control button is pressed
-                    clickedItems = [item for item in self.items(self.mouseReleaseLoc) if
-                                    item.parentItem() is None]
-                    if clickedItems:
-                        for item in clickedItems:
-                        # Toggle selection of clicked item
-                            item.setSelected(not item.isSelected())
-            else:
-                clickedItems = [item for item in self.items(self.mouseReleaseLoc) if
-                                    item.parentItem() is None]
-                # Select only the clicked item
-                self.clearSelection()
-                if clickedItems:
-                    for item in clickedItems:
-                        item.setSelected(True)
-
-            self._items = self.selectedItems()
-
-            # Clear selection rectangle if Shift is released
-            if self._selectionRectItem and modifiers != Qt.ShiftModifier:
-                self.removeItem(self._selectionRectItem)
-                self._selectionRectItem = None
-            elif self.editModes.moveItem and self._items:
+            if self.editModes.moveItem and self._items:
                 if self.mouseReleaseLoc != self.mousePressLoc:
                     self.moveShapesUndoStack(self._items, self._itemsOffset,
-                        self.mousePressLoc, self.mouseReleaseLoc, )
-                    self._items = None
-            self.editorWindow.messageLine.setText(
-                "Item selected" if self.selectedItems() else "Nothing selected")
+                                             self.mousePressLoc, self.mouseReleaseLoc)
+            elif self.editModes.selectItem:
+                self._handleSelection(modifiers)
+
+            self._cleanupAfterMouseRelease(modifiers)
+
+    def _handleSelection(self, modifiers):
+        if modifiers == Qt.KeyboardModifier.ShiftModifier:
+            self._handleShiftSelection()
+        elif modifiers == Qt.KeyboardModifier.ControlModifier:
+            self._handleControlSelection()
+        elif modifiers == Qt.KeyboardModifier.AltModifier:
+            self._handleAltSelection()
+        else:
+            self._handleDefaultSelection()
+
+    def _cleanupAfterMouseRelease(self, modifiers):
+        if self._selectionRectItem and modifiers != Qt.KeyboardModifier.ShiftModifier:
+            self.removeItem(self._selectionRectItem)
+            self._selectionRectItem = None
+
+        self._items = self.selectedItems()
+        self.messageLine.setText("Item selected" if self._items else "Nothing selected")
+
+    def _handleShiftSelection(self):
+        if self._selectionRectItem:
+            self._processExistingSelectionRectangle()
+        else:
+            self._startNewSelectionRectangle()
+
+    def _processExistingSelectionRectangle(self):
+        selectionMode = Qt.ItemSelectionMode.IntersectsItemShape if self.partialSelection else Qt.ItemSelectionMode.ContainsItemShape
+        selectionPath = QPainterPath()
+        selectionPath.addRect(self._selectionRectItem.sceneBoundingRect())
+        self.setSelectionArea(selectionPath, mode=selectionMode)
+
+        self.removeItem(self._selectionRectItem)
+        self._selectionRectItem = None
+        self.messageLine.setText("Selection complete")
+
+    def _startNewSelectionRectangle(self):
+        self._selectionRectItem = QGraphicsRectItem(QRectF(self.mousePressLoc, self.mousePressLoc))
+        selectionRectPen = QPen(QColor("yellow"), 2, Qt.PenStyle.DashLine)
+        selectionRectPen.setCosmetic(True)
+        self._selectionRectItem.setPen(selectionRectPen)
+        self.addItem(self._selectionRectItem)
+
+    def _updateSelectionRectangle(self, currentPos):
+        if self._selectionRectItem:
+            rect = QRectF(self.mousePressLoc, currentPos).normalized()
+            self._selectionRectItem.setRect(rect)
+
+    def _handleControlSelection(self):
+        for item in self._getClickedItems():
+            item.setSelected(not item.isSelected())
+
+    def _handleAltSelection(self):
+        self.clearSelection()
+        clicked_items = self._getClickedItems()
+        if clicked_items:
+            clicked_items[0].setSelected(True)
+
+    def _handleDefaultSelection(self):
+        self.clearSelection()
+        for item in self._getClickedItems():
+            item.setSelected(True)
+
+    def _getClickedItems(self):
+        return [item for item in self.items(self.mouseReleaseLoc) if item.parentItem() is None]
+
 
     def mouseMoveEvent(self, event):
-        modifiers = QGuiApplication.keyboardModifiers()
-        self.mouseMoveLoc = event.scenePos().toPoint()
-        if self.editModes.selectItem:
-            if modifiers == Qt.ShiftModifier:
-                if self._selectionRectItem is not None:
-                    self._selectionRectItem.setRect(
-                        QRectF(self.mouseReleaseLoc, self.mouseMoveLoc))
-        elif self.editModes.moveItem:
-            if self._items and self._itemsOffset:
-                [item.setPos(self.mouseMoveLoc + self._itemsOffset[self._items.index(item)])
-                    for item in self._items]
-        else:
-            super().mouseMoveEvent(event)
+        super().mouseMoveEvent(event)
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            currentPos = event.scenePos().toPoint()
+            if self.editModes.moveItem and self._items:
+                for item, offset in zip(self._items, self._itemsOffset):
+                    item.setPos(currentPos + offset)
+            elif self.editModes.selectItem and self._selectionRectItem:
+                self._updateSelectionRectangle(currentPos)
 
     def snapToBase(self, number, base):
         """
@@ -191,11 +209,7 @@ class editorScene(QGraphicsScene):
         self.editModes.setMode("selectItem")
 
     def rotateAnItem(self, point: QPoint, item: QGraphicsItem, angle: int):
-        rotationOriginPoint = item.mapFromScene(point)
-        item.setTransformOriginPoint(rotationOriginPoint)
-        item.angle += angle
-        item.setRotation(item.angle)
-        undoCommand = us.undoRotateShape(self, item, item.angle)
+        undoCommand = us.undoRotateShape(self, item, point, angle)
         self.undoStack.push(undoCommand)
 
     def eventFilter(self, source, event):
@@ -299,12 +313,15 @@ class editorScene(QGraphicsScene):
         undoCommand = us.deleteShapeUndo(self, item)
         self.undoStack.push(undoCommand)
 
-    def addListUndoStack(self, itemList: List):
+    def addListUndoStack(self, itemList: List) -> None:
         undoCommand = us.addShapesUndo(self, itemList)
         self.undoStack.push(undoCommand)
 
-    def moveShapesUndoStack(self, items: list[QGraphicsItem], itemsOffsetList: List[int],
-            start: QPoint, end: QPoint, ):
+    def moveShapesUndoStack(self,
+                            items: Sequence[QGraphicsItem],
+                            itemsOffsetList: Sequence[QPoint],
+                            start: QPoint,
+                            end: QPoint) -> None:
         undoCommand = us.undoMoveShapesCommand(items, itemsOffsetList, start, end)
         self.undoStack.push(undoCommand)
 

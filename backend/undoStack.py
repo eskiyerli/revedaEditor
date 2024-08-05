@@ -27,7 +27,9 @@
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QUndoCommand, QUndoStack
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsItem
-from typing import List, Tuple
+import revedaEditor.common.shapes as shp
+import revedaEditor.common.layoutShapes as lshp
+from typing import List, Tuple, Sequence, Union
 
 class undoStack(QUndoStack):
     def __init__(self):
@@ -164,6 +166,7 @@ class updateSymUndo(QUndoCommand):
         self._item = item
         self._oldItemList = oldItemList
         self._newItemList = newItemList
+        self.setText("Update Symbol undo")
 
     def undo(self):
         pass
@@ -186,6 +189,7 @@ class moveShapeUndo(QUndoCommand):
         self._attribute = attribute
         self._oldPosition = oldPosition
         self._newPosition = newPosition
+        self.setText('move shape undo')
 
     def undo(self):
         setattr(self._item, self._attribute, self._oldPosition)
@@ -195,37 +199,44 @@ class moveShapeUndo(QUndoCommand):
 
 
 class undoRotateShape(QUndoCommand):
-    def __init__(self, scene, shape, angle, parent=None):
+    def __init__(self, scene: QGraphicsScene, shape: Union[shp.symbolShape, lshp.layoutShape],
+                 point:QPoint,
+                 angle:int):
         super().__init__()
         self._scene = scene
         self._shape = shape
+        self._point = point
         self._angle = angle
         self.setText("Undo Shape rotation")
 
     def undo(self) -> None:
-        self._shape.setRotation(self._angle - 90)
+        # self._shape.setRotation(self._angle - 90)
+        rotationOriginPoint = self._shape.mapFromScene(self._point)
+        self._shape.setTransformOriginPoint(rotationOriginPoint)
+        self._shape.angle -= self._angle
 
     def redo(self) -> None:
-        # self.angle += 90
-        self._shape.setRotation(self._angle)
-
+        rotationOriginPoint = self._shape.mapFromScene(self._point)
+        self._shape.setTransformOriginPoint(rotationOriginPoint)
+        self._shape.angle += self._angle
 
 class undoMoveShapesCommand(QUndoCommand):
-    def __init__(self, shapes: list[QGraphicsItem], shapesOffsetList: list[int], startPos, endPos):
+    def __init__(self, shapes: Sequence[QGraphicsItem], shapesOffsetList: Sequence[QPoint],
+                 startPos: QPoint, endPos: QPoint):
         super().__init__()
         self._shapes = shapes
         self._shapesOffsetList = shapesOffsetList
         self._startPos = startPos
         self._endPos = endPos
+        self.setText('undo move shapes')
 
+    def undo(self) -> None:
+        for shape, offset in zip(self._shapes, self._shapesOffsetList):
+            shape.setPos(self._startPos + offset)
 
-    def undo(self):
-        for index, item in enumerate(self._shapes):
-            item.setPos(self._startPos + self._shapesOffsetList[index])
-
-    def redo(self):
-        for index, item in enumerate(self._shapes):
-            item.setPos(self._endPos + self._shapesOffsetList[index])
+    def redo(self) -> None:
+        for shape, offset in zip(self._shapes, self._shapesOffsetList):
+            shape.setPos(self._endPos + offset)
 
 class undoMoveByCommand(QUndoCommand):
     def __init__(self, scene, items: List, dx: float, dy: float, description: str = "Move Items"):
@@ -235,6 +246,7 @@ class undoMoveByCommand(QUndoCommand):
         self.dx = dx
         self.dy = dy
         self.oldPositions: List[Tuple[QPoint, QPoint]] = []
+        self.setText('undo move by command')
 
     def redo(self):
         for item in self.items:

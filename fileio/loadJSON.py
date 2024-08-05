@@ -109,7 +109,7 @@ class symbolItems:
         rect.setPos(
             QPoint(item["loc"][0], item["loc"][1]),
         )
-        rect.angle = item.get(["ang"],0)
+        rect.angle = item.get("ang",0)
         rect.flipTuple = item.get('fl',(1,1))
         return rect
 

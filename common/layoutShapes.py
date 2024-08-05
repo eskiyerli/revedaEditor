@@ -120,7 +120,7 @@ class textureCache:
 class layoutShape(QGraphicsItem):
     def __init__(self) -> None:
         super().__init__()
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIsFocusable, True)
@@ -211,12 +211,8 @@ class layoutShape(QGraphicsItem):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
-        if self.scene().editModes.changeOrigin or self.scene().drawMode:
-            self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, False)
-        else:
+        if self.scene() and self.scene().editModes.moveItem:
             self.setFlag(QGraphicsItem.ItemIsMovable, True)
-            self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
     def sceneEvent(self, event):
         """
@@ -234,7 +230,8 @@ class layoutShape(QGraphicsItem):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        super().mouseReleaseEvent(event)  # self.setSelected(False)
+        super().mouseReleaseEvent(event)
+
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         self.setCursor(Qt.ArrowCursor)

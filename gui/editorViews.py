@@ -276,7 +276,6 @@ class schematicView(editorView):
             if isinstance(guideLineItem, net.guideLine)
         }
         self.removeSnapLines(viewSnapLinesSet)
-
         self.mergeSplitViewNets()
 
     def mergeSplitViewNets(self):
@@ -292,17 +291,18 @@ class schematicView(editorView):
     def removeSnapLines(self, viewSnapLinesSet):
         undoCommandList = []
         for snapLine in viewSnapLinesSet:
-            lines: list[net.schematicNet] = self.scene.addStretchWires(
+            lines = self.scene.addStretchWires(
                 snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
             )
 
-            if lines:
+            if lines != []:
                 for line in lines:
                     line.inheritGuideLine(snapLine)
-                undoCommandList.append(us.addShapesUndo(self.scene, lines))
+                    undoCommandList.append(us.addShapeUndo(self.scene, line))
+                self.scene.addUndoMacroStack(undoCommandList, "Stretch Wires")
+                # undoCommandList.append(us.addShapesUndo(self.scene, lines))
             self.scene.removeItem(snapLine)
-        # undoCommandList.append(us.deleteShapesUndo(self.scene, list(viewSnapLinesSet)))
-        self.scene.addUndoMacroStack(undoCommandList, "Stretch Wires")
+
 
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)

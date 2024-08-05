@@ -26,18 +26,21 @@
 # from hashlib import new
 import json
 import os
+
 # from hashlib import new
 import pathlib
 from copy import deepcopy
 from typing import List
 
+from dotenv import load_dotenv
+
 # import numpy as np
 from PySide6.QtCore import (
+    QLineF,
     QPoint,
     QPointF,
     QRectF,
     Qt,
-    QLineF,
 )
 from PySide6.QtGui import (
     QColor,
@@ -46,10 +49,9 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QDialog,
-    QGraphicsSceneMouseEvent,
     QGraphicsLineItem,
+    QGraphicsSceneMouseEvent,
 )
-from dotenv import load_dotenv
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.undoStack as us
@@ -401,193 +403,228 @@ class symbolScene(editorScene):
         """
         When item properties is queried.
         """
-        selectedItems = [item for item in self.selectedItems() if item.parentItem() is None]
+        selectedItems = [
+            item for item in self.selectedItems() if item.parentItem() is None
+        ]
         for item in selectedItems:
             if isinstance(item, shp.symbolRectangle):
-                self.queryDlg = pdlg.rectPropertyDialog(self.editorWindow)
-                [left, top, width, height] = item.rect.getRect()
-                sceneTopLeftPoint = item.mapToScene(QPoint(left, top))
-                self.queryDlg.rectLeftLine.setText(str(sceneTopLeftPoint.x()))
-                self.queryDlg.rectTopLine.setText(str(sceneTopLeftPoint.y()))
-                self.queryDlg.rectWidthLine.setText(str(width))  # str(width))
-                self.queryDlg.rectHeightLine.setText(str(height))  # str(height))
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    newRectItem = shp.symbolRectangle(QPoint(0, 0), QPoint(0, 0))
-                    newRectItem.left = self.snapToBase(
-                        float(self.queryDlg.rectLeftLine.text()), self.snapTuple[0]
-                    )
-                    newRectItem.top = self.snapToBase(
-                        float(self.queryDlg.rectTopLine.text()), self.snapTuple[1]
-                    )
-                    newRectItem.width = self.snapToBase(
-                        float(self.queryDlg.rectWidthLine.text()), self.snapTuple[0]
-                    )
-                    newRectItem.height = self.snapToBase(
-                        float(self.queryDlg.rectHeightLine.text()), self.snapTuple[1]
-                    )
-
-                    self.undoStack.push(us.addDeleteShapeUndo(self, newRectItem, item))
+                self.updateSymbolRectangle(item)
             elif isinstance(item, shp.symbolCircle):
-                self.queryDlg = pdlg.circlePropertyDialog(self.editorWindow)
-                centre = item.mapToScene(item.centre).toTuple()
-                radius = item.radius
-                self.queryDlg.centerXEdit.setText(str(centre[0]))
-                self.queryDlg.centerYEdit.setText(str(centre[1]))
-                self.queryDlg.radiusEdit.setText(str(radius))
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    newCircleItem = shp.symbolCircle(QPoint(0,0), QPoint(0,0))
-                    centerX = self.snapToBase(
-                        float(self.queryDlg.centerXEdit.text()), self.snapTuple[0]
-                    )
-                    centerY = self.snapToBase(
-                        float(self.queryDlg.centerYEdit.text()), self.snapTuple[1]
-                    )
-                    newCircleItem.centre = QPoint(centerX, centerY)
-                    radius = self.snapToBase(
-                        float(self.queryDlg.radiusEdit.text()), self.snapTuple[0]
-                    )
-                    newCircleItem.radius = radius
-                    self.undoStack.push(us.addDeleteShapeUndo(self,newCircleItem, item))
+                self.updateSymbolCircle(item)
             elif isinstance(item, shp.symbolArc):
-                self.queryDlg = pdlg.arcPropertyDialog(self.editorWindow)
-                sceneStartPoint = item.mapToScene(item.start)
-                self.queryDlg.startXEdit.setText(str(sceneStartPoint.x()))
-                self.queryDlg.startYEdit.setText(str(sceneStartPoint.y()))
-                self.queryDlg.widthEdit.setText(str(item.width))
-                self.queryDlg.heightEdit.setText(str(item.height))
-                self.queryDlg.arcTypeCombo.addItems(shp.symbolArc.arcTypes)
-                self.queryDlg.arcTypeCombo.setCurrentText(item.arcType)
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    newArc = shp.symbolArc(QPoint(0,0), QPoint(0,0))
-                    startX = int(float(self.queryDlg.startXEdit.text()))
-                    startY = int(float(self.queryDlg.startYEdit.text()))
-                    start = self.snapToGrid(QPoint(startX, startY), self.snapTuple)
-                    width = self.snapToBase(
-                        float(self.queryDlg.widthEdit.text()), self.snapTuple[0]
-                    )
-                    height = self.snapToBase(
-                        float(self.queryDlg.heightEdit.text()), self.snapTuple[1]
-                    )
-                    newArc.arcType = self.queryDlg.arcTypeCombo.currentText()
-                    newArc.start = start
-                    newArc.width = width
-                    newArc.height = height
-                    self.undoStack.push(us.addDeleteShapeUndo(self,newArc,item))
+                self.updateSymbolArc(item)
             elif isinstance(item, shp.symbolLine):
-                self.queryDlg = pdlg.linePropertyDialog(self.editorWindow)
-                sceneLineStartPoint = item.mapToScene(item.start).toPoint()
-                sceneLineEndPoint = item.mapToScene(item.end).toPoint()
-                self.queryDlg.startXLine.setText(str(sceneLineStartPoint.x()))
-                self.queryDlg.startYLine.setText(str(sceneLineStartPoint.y()))
-                self.queryDlg.endXLine.setText(str(sceneLineEndPoint.x()))
-                self.queryDlg.endYLine.setText(str(sceneLineEndPoint.y()))
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    startX = self.snapToBase(
+                self.updateSymbolLine(item)
+            elif isinstance(item, shp.symbolPin):
+                self.updateSymbolPin(item)
+            elif isinstance(item, lbl.symbolLabel):
+                self.updateSymbolLabel(item)
+            elif isinstance(item, shp.symbolPolygon):
+                self.updateSymbolPolygon(item)
+
+    def updateSymbolRectangle(self, item):
+        self.queryDlg = pdlg.rectPropertyDialog(self.editorWindow)
+        [left, top, width, height] = item.rect.getRect()
+        sceneTopLeftPoint = item.mapToScene(QPoint(left, top))
+        self.queryDlg.rectLeftLine.setText(str(sceneTopLeftPoint.x()))
+        self.queryDlg.rectTopLine.setText(str(sceneTopLeftPoint.y()))
+        self.queryDlg.rectWidthLine.setText(str(width))  # str(width))
+        self.queryDlg.rectHeightLine.setText(str(height))  # str(height))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            newRectItem = shp.symbolRectangle(QPoint(0, 0), QPoint(0, 0))
+            newRectItem.left = self.snapToBase(
+                float(self.queryDlg.rectLeftLine.text()), self.snapTuple[0]
+            )
+            newRectItem.top = self.snapToBase(
+                float(self.queryDlg.rectTopLine.text()), self.snapTuple[1]
+            )
+            newRectItem.width = self.snapToBase(
+                float(self.queryDlg.rectWidthLine.text()), self.snapTuple[0]
+            )
+            newRectItem.height = self.snapToBase(
+                float(self.queryDlg.rectHeightLine.text()), self.snapTuple[1]
+            )
+
+            self.undoStack.push(us.addDeleteShapeUndo(self, newRectItem, item))
+
+    def updateSymbolCircle(self, item):
+        self.queryDlg = pdlg.circlePropertyDialog(self.editorWindow)
+        centre = item.mapToScene(item.centre).toTuple()
+        radius = item.radius
+        self.queryDlg.centerXEdit.setText(str(centre[0]))
+        self.queryDlg.centerYEdit.setText(str(centre[1]))
+        self.queryDlg.radiusEdit.setText(str(radius))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            newCircleItem = shp.symbolCircle(QPoint(0, 0), QPoint(0, 0))
+            centerX = self.snapToBase(
+                float(self.queryDlg.centerXEdit.text()), self.snapTuple[0]
+            )
+            centerY = self.snapToBase(
+                float(self.queryDlg.centerYEdit.text()), self.snapTuple[1]
+            )
+            newCircleItem.centre = QPoint(centerX, centerY)
+            radius = self.snapToBase(
+                float(self.queryDlg.radiusEdit.text()), self.snapTuple[0]
+            )
+            newCircleItem.radius = radius
+            self.undoStack.push(us.addDeleteShapeUndo(self, newCircleItem, item))
+
+    def updateSymbolLine(self, item):
+        self.queryDlg = pdlg.linePropertyDialog(self.editorWindow)
+        sceneLineStartPoint = item.mapToScene(item.start).toPoint()
+        sceneLineEndPoint = item.mapToScene(item.end).toPoint()
+        self.queryDlg.startXLine.setText(str(sceneLineStartPoint.x()))
+        self.queryDlg.startYLine.setText(str(sceneLineStartPoint.y()))
+        self.queryDlg.endXLine.setText(str(sceneLineEndPoint.x()))
+        self.queryDlg.endYLine.setText(str(sceneLineEndPoint.y()))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            startX = self.snapToBase(
                         float(self.queryDlg.startXLine.text()), self.snapTuple[0]
                     )
-                    startY = self.snapToBase(
+            startY = self.snapToBase(
                         float(self.queryDlg.startYLine.text()), self.snapTuple[1]
                     )
-                    endX = self.snapToBase(float(self.queryDlg.endXLine.text()),
-                                           self.snapTuple[0])
-                    endY = self.snapToBase(float(self.queryDlg.endYLine.text()),
-                                           self.snapTuple[1])
-                    newLine = shp.symbolLine(QPoint(startX, startY), QPoint(endX, endY))
-                    self.undoStack.push(us.addDeleteShapeUndo(self,newLine, item))
+            endX = self.snapToBase(
+                        float(self.queryDlg.endXLine.text()), self.snapTuple[0]
+                    )
+            endY = self.snapToBase(
+                        float(self.queryDlg.endYLine.text()), self.snapTuple[1]
+                    )
+            newLine = shp.symbolLine(QPoint(startX, startY), QPoint(endX, endY))
+            self.undoStack.push(us.addDeleteShapeUndo(self, newLine, item))
 
-            elif isinstance(item, shp.symbolPin):
-                self.queryDlg = pdlg.pinPropertyDialog(self.editorWindow)
-                self.queryDlg.pinName.setText(str(item.pinName))
-                self.queryDlg.pinType.setCurrentText(item.pinType)
-                self.queryDlg.pinDir.setCurrentText(item.pinDir)
-                sceneStartPoint = item.mapToScene(item.start).toPoint()
-                self.queryDlg.pinXLine.setText(str(sceneStartPoint.x()))
-                self.queryDlg.pinYLine.setText(str(sceneStartPoint.y()))
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    sceneStartX = int(float(self.queryDlg.pinXLine.text()))
-                    sceneStartY = int(float(self.queryDlg.pinYLine.text()))
-                    start = self.snapToGrid(QPoint(sceneStartX, sceneStartY), self.snapTuple)
-                    pinName = self.queryDlg.pinName.text()
-                    pinType = self.queryDlg.pinType.currentText()
-                    pinDir = self.queryDlg.pinDir.currentText()
-                    newPin = shp.symbolPin(start,pinName,pinDir,pinType)
-                    self.undoStack.push(us.addDeleteShapeUndo(self, newPin, item))
+    def updateSymbolArc(self, item):
+        self.queryDlg = pdlg.arcPropertyDialog(self.editorWindow)
+        sceneStartPoint = item.mapToScene(item.start)
+        self.queryDlg.startXEdit.setText(str(sceneStartPoint.x()))
+        self.queryDlg.startYEdit.setText(str(sceneStartPoint.y()))
+        self.queryDlg.widthEdit.setText(str(item.width))
+        self.queryDlg.heightEdit.setText(str(item.height))
+        self.queryDlg.arcTypeCombo.addItems(shp.symbolArc.arcTypes)
+        self.queryDlg.arcTypeCombo.setCurrentText(item.arcType)
+        if self.queryDlg.exec() == QDialog.Accepted:
+            newArc = shp.symbolArc(QPoint(0, 0), QPoint(0, 0))
+            startX = int(float(self.queryDlg.startXEdit.text()))
+            startY = int(float(self.queryDlg.startYEdit.text()))
+            start = self.snapToGrid(QPoint(startX, startY), self.snapTuple)
+            width = self.snapToBase(
+                float(self.queryDlg.widthEdit.text()), self.snapTuple[0]
+            )
+            height = self.snapToBase(
+                float(self.queryDlg.heightEdit.text()), self.snapTuple[1]
+            )
+            newArc.arcType = self.queryDlg.arcTypeCombo.currentText()
+            newArc.start = start
+            newArc.width = width
+            self.undoStack.push(us.addDeleteShapeUndo(self, newArc, item))
+            newArc.height = height
 
-            elif isinstance(item, lbl.symbolLabel):
-                self.queryDlg = pdlg.labelPropertyDialog(self.editorWindow)
-                self.queryDlg.labelDefinition.setText(str(item.labelDefinition))
-                self.queryDlg.labelHeightEdit.setText(str(item.labelHeight))
-                self.queryDlg.labelAlignCombo.setCurrentText(item.labelAlign)
-                self.queryDlg.labelOrientCombo.setCurrentText(item.labelOrient)
-                self.queryDlg.labelUseCombo.setCurrentText(item.labelUse)
-                if item.labelVisible:
-                    self.queryDlg.labelVisiCombo.setCurrentText("Yes")
-                else:
-                    self.queryDlg.labelVisiCombo.setCurrentText("No")
-                if item.labelType == "Normal":
-                    self.queryDlg.normalType.setChecked(True)
-                elif item.labelType == "NLPLabel":
-                    self.queryDlg.NLPType.setChecked(True)
-                elif item.labelType == "PyLabel":
-                    self.queryDlg.pyLType.setChecked(True)
-                sceneStartPoint = item.mapToScene(item.start)
-                self.queryDlg.labelXLine.setText(str(sceneStartPoint.x()))
-                self.queryDlg.labelYLine.setText(str(sceneStartPoint.y()))
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    startX = int(float(self.queryDlg.labelXLine.text()))
-                    startY = int(float(self.queryDlg.labelYLine.text()))
-                    start = self.snapToGrid(QPoint(startX, startY), self.snapTuple)
-                    labelDefinition = self.queryDlg.labelDefinition.text()
-                    labelHeight = int(float(self.queryDlg.labelHeightEdit.text()))
-                    labelAlign = self.queryDlg.labelAlignCombo.currentText()
-                    labelOrient = self.queryDlg.labelOrientCombo.currentText()
-                    labelUse = self.queryDlg.labelUseCombo.currentText()
-                    labelType = lbl.symbolLabel.labelTypes[0]
-                    if self.queryDlg.NLPType.isChecked():
-                        labelType = lbl.symbolLabel.labelTypes[1]
-                    elif self.queryDlg.pyLType.isChecked():
-                        labelType = lbl.symbolLabel.labelTypes[2]
-                    newLabel = lbl.symbolLabel(start, labelDefinition, labelType,
-                                               labelHeight, labelAlign, labelOrient, labelUse)
-                    newLabel.labelVisible = self.queryDlg.labelVisiCombo.currentText() == "Yes"
-                    newLabel.labelDefs()
-                    newLabel.setOpacity(1)
-                    self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item))
-            elif isinstance(item, shp.symbolPolygon):
-                pointsTupleList = [(point.x(), point.y()) for point in item.points]
-                self.queryDlg = pdlg.symbolPolygonProperties(
+    def updateSymbolLabel(self, item):
+        self.queryDlg = pdlg.labelPropertyDialog(self.editorWindow)
+        self.queryDlg.labelDefinition.setText(str(item.labelDefinition))
+        self.queryDlg.labelHeightEdit.setText(str(item.labelHeight))
+        self.queryDlg.labelAlignCombo.setCurrentText(item.labelAlign)
+        self.queryDlg.labelOrientCombo.setCurrentText(item.labelOrient)
+        self.queryDlg.labelUseCombo.setCurrentText(item.labelUse)
+        if item.labelVisible:
+            self.queryDlg.labelVisiCombo.setCurrentText("Yes")
+        else:
+            self.queryDlg.labelVisiCombo.setCurrentText("No")
+        if item.labelType == "Normal":
+            self.queryDlg.normalType.setChecked(True)
+        elif item.labelType == "NLPLabel":
+            self.queryDlg.NLPType.setChecked(True)
+        elif item.labelType == "PyLabel":
+            self.queryDlg.pyLType.setChecked(True)
+        sceneStartPoint = item.mapToScene(item.start)
+        self.queryDlg.labelXLine.setText(str(sceneStartPoint.x()))
+        self.queryDlg.labelYLine.setText(str(sceneStartPoint.y()))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            startX = int(float(self.queryDlg.labelXLine.text()))
+            startY = int(float(self.queryDlg.labelYLine.text()))
+            start = self.snapToGrid(QPoint(startX, startY), self.snapTuple)
+            labelDefinition = self.queryDlg.labelDefinition.text()
+            labelHeight = int(float(self.queryDlg.labelHeightEdit.text()))
+            labelAlign = self.queryDlg.labelAlignCombo.currentText()
+            labelOrient = self.queryDlg.labelOrientCombo.currentText()
+            labelUse = self.queryDlg.labelUseCombo.currentText()
+            labelType = lbl.symbolLabel.labelTypes[0]
+            if self.queryDlg.NLPType.isChecked():
+                labelType = lbl.symbolLabel.labelTypes[1]
+            elif self.queryDlg.pyLType.isChecked():
+                labelType = lbl.symbolLabel.labelTypes[2]
+            newLabel = lbl.symbolLabel(
+                        start,
+                        labelDefinition,
+                        labelType,
+                        labelHeight,
+                        labelAlign,
+                        labelOrient,
+                        labelUse,
+                    )
+            newLabel.labelVisible = (
+                        self.queryDlg.labelVisiCombo.currentText() == "Yes"
+                    )
+            newLabel.labelDefs()
+            newLabel.setOpacity(1)
+            self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item))
+
+    def updateSymbolPin(self, item):
+        self.queryDlg = pdlg.pinPropertyDialog(self.editorWindow)
+        self.queryDlg.pinName.setText(str(item.pinName))
+        self.queryDlg.pinType.setCurrentText(item.pinType)
+        self.queryDlg.pinDir.setCurrentText(item.pinDir)
+        sceneStartPoint = item.mapToScene(item.start).toPoint()
+        self.queryDlg.pinXLine.setText(str(sceneStartPoint.x()))
+        self.queryDlg.pinYLine.setText(str(sceneStartPoint.y()))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            sceneStartX = int(float(self.queryDlg.pinXLine.text()))
+            sceneStartY = int(float(self.queryDlg.pinYLine.text()))
+            start = self.snapToGrid(
+                        QPoint(sceneStartX, sceneStartY), self.snapTuple
+                    )
+            pinName = self.queryDlg.pinName.text()
+            pinType = self.queryDlg.pinType.currentText()
+            pinDir = self.queryDlg.pinDir.currentText()
+            newPin = shp.symbolPin(start, pinName, pinDir, pinType)
+            self.undoStack.push(us.addDeleteShapeUndo(self, newPin, item))
+
+    def updateSymbolPolygon(self, item):
+        pointsTupleList = [(point.x(), point.y()) for point in item.points]
+        self.queryDlg = pdlg.symbolPolygonProperties(
                     self.editorWindow, pointsTupleList
                 )
-                if self.queryDlg.exec() == QDialog.Accepted:
-                    tempPoints = []
-                    for i in range(self.queryDlg.tableWidget.rowCount()):
-                        xcoor = self.queryDlg.tableWidget.item(i, 1).text()
-                        ycoor = self.queryDlg.tableWidget.item(i, 2).text()
-                        if xcoor != "" and ycoor != "":
-                            tempPoints.append(QPointF(float(xcoor), float(ycoor)))
-                    newPolygon = shp.symbolPolygon(tempPoints)
-                    self.undoStack.push(us.addDeleteShapeUndo(self, newPolygon, item))
+        if self.queryDlg.exec() == QDialog.Accepted:
+            tempPoints = []
+            for i in range(self.queryDlg.tableWidget.rowCount()):
+                xcoor = self.queryDlg.tableWidget.item(i, 1).text()
+                ycoor = self.queryDlg.tableWidget.item(i, 2).text()
+                if xcoor != "" and ycoor != "":
+                    tempPoints.append(QPointF(float(xcoor), float(ycoor)))
+            newPolygon = shp.symbolPolygon(tempPoints)
+            self.undoStack.push(us.addDeleteShapeUndo(self, newPolygon, item))
 
-    def loadSymbol(self, itemsList: list):
-        snapGrid = itemsList[1].get("snapGrid")
-        self.majorGrid = snapGrid[0]  # dot/line grid spacing
-        self.snapGrid = snapGrid[1]  # snapping grid size
-        self.snapTuple = (self.snapGrid, self.snapGrid)
-        self.snapDistance = 2 * self.snapGrid
-        self.parent.view.snapTuple = self.snapTuple
-        self.editorWindow.snapTuple = self.snapTuple
-        self.attributeList = []
-        for item in itemsList[2:]:
-            if item is not None:
-                if item["type"] in self.symbolShapes:
-                    itemShape = lj.symbolItems(self).create(item)
-                    # items should be always visible in symbol view
-                    if isinstance(itemShape, lbl.symbolLabel):
-                        itemShape.setOpacity(1)
-                    self.addItem(itemShape)
-                elif item["type"] == "attr":
-                    attr = lj.symbolItems(self).createSymbolAttribute(item)
-                    self.attributeList.append(attr)
+    def loadSymbol(self, itemsList: List):
+        if len(itemsList) > 2:
+            snapGrid = itemsList[1].get("snapGrid", 10)
+            self.majorGrid = snapGrid[0]  # dot/line grid spacing
+            self.snapGrid = snapGrid[1]  # snapping grid size
+            self.snapTuple = (self.snapGrid, self.snapGrid)
+            self.snapDistance = 2 * self.snapGrid
+            self.parent.view.snapTuple = self.snapTuple
+            self.editorWindow.snapTuple = self.snapTuple
+            self.attributeList = []
+            for item in itemsList[2:]:
+                if item is not None:
+                    if item["type"] in self.symbolShapes:
+                        itemShape = lj.symbolItems(self).create(item)
+                        # items should be always visible in symbol view
+                        if isinstance(itemShape, lbl.symbolLabel):
+                            itemShape.setOpacity(1)
+                        self.addItem(itemShape)
+                    elif item["type"] == "attr":
+                        attr = lj.symbolItems(self).createSymbolAttribute(item)
+                        self.attributeList.append(attr)
 
     def saveSymbolCell(self, fileName: pathlib.Path):
         # items = self.items(self.sceneRect())  # get items in scene rect
