@@ -170,7 +170,6 @@ class schematicScene(editorScene):
                 elif self.editModes.drawPin:
                     if self._newPin:
                         self._newPin = None
-                        self.editModes.setMode("selectItem")
                     self._newPin = self.addPin(self.mouseReleaseLoc)
                     self._newPin.setSelected(True)
 
