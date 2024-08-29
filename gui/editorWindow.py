@@ -82,6 +82,7 @@ class editorWindow(QMainWindow):
         self.libraryDict = libraryDict
         self.libraryView = libraryView
         self.parentEditor = None  # type: editorWindow
+        self.parentObj = None # type symbol or layoutInstance
         self._app = QApplication.instance()  # main application pointer
         self.appMainW = self.libraryView.parent.parent.appMainW
         self.logger = self.appMainW.logger
@@ -94,6 +95,7 @@ class editorWindow(QMainWindow):
         self.snapGrid = 5  # snapping grid size
         self.snapTuple = (self.snapGrid, self.snapGrid)
         self.init_UI()
+        self._createSignalConnections()
 
     def init_UI(self):
         self.resize(1600, 800)
@@ -103,6 +105,7 @@ class editorWindow(QMainWindow):
         self._addActions()
         self._createTriggers()
         self._createShortcuts()
+        
 
     def _createMenuBar(self):
         """
@@ -707,3 +710,14 @@ class editorWindow(QMainWindow):
     def redraw(self):
         self.messageLine.setText("Redrawing...")
         self.centralW.view.update()
+
+    def _findTopParent(self):
+        current = self
+        while current is not None and hasattr(current, 'parentObj'):
+            if current.parentObj is None:
+                return current
+            current = current.parentObj
+        return current
+
+    def _createSignalConnections(self):
+        self.centralW.scene.selectionChanged.connect(self.appMainW.selectionChangedScene)

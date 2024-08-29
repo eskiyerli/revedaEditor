@@ -246,6 +246,7 @@ class layoutShape(QGraphicsItem):
         self.clearFocus()
 
     def contextMenuEvent(self, event):
+        self.setSelected(True)
         self.scene().itemContextMenu.exec_(event.screenPos())
 
     @property

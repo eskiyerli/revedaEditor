@@ -93,6 +93,10 @@ class netNameStrengthEnum(customIntEnum):
     INHERIT = 2
     SET = 3
 
+class schematicNetLine(QGraphicsLineItem):
+    def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
+        super().__init__(start, end)
+        
 
 class schematicNet(QGraphicsItem):
     # _netSnapLines: dict

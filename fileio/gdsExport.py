@@ -49,6 +49,7 @@ class gdsExporter:
         self._precision = 1e-9
         self._topCell = None
         self._cellNamesSet = set()
+        self._itemCounter = 0
 
     def gds_export(self):
         self._outputFileObj.parent.mkdir(parents=True, exist_ok=True)
@@ -59,14 +60,16 @@ class gdsExporter:
 
         lib.write_gds(self._outputFileObj)
 
+
     def createCells(
         self, library: gdstk.Library, item: lshp.layoutShape, parentCell: gdstk.Cell
     ):
         match type(item):
             case lshp.layoutInstance:  # recursive search under a layout cell
                 if item.cellName not in self._cellNamesSet:
-                    cellGDSName = f"{item.libraryName}_{item.cellName}_{item.viewName}"
+                    cellGDSName = f"{item.libraryName}_{item.cellName}_{item.viewName}_{self._itemCounter}"
                     library.new_cell(cellGDSName)
+                    self._itemCounter += 1
                     self._cellNamesSet.add(cellGDSName)
                     for shape in item.shapes:
                         self.createCells(library, shape, library[cellGDSName])

@@ -986,11 +986,9 @@ class symbolPin(symbolShape):
                 self._pinNameItem.setVisible(False)
         elif change == QGraphicsItem.ItemSelectedHasChanged:
             if value:
-                self._pinRectItem.setPen(symlyr.selectedSymbolPinPen)
-                self._pinRectItem.setBrush(symlyr.selectedSymbolPinBrush)
+                self.scene().selectedSymbolPin = self
             else:
-                self._pinRectItem.setPen(symlyr.symbolPinPen)
-                self._pinRectItem.setBrush(symlyr.symbolPinBrush)
+                self.scene().selectedSymbolPin = None
         return super().itemChange(change, value)
 
     def shape(self):
@@ -1582,7 +1580,6 @@ class schematicPin(symbolShape):
     def paint(self, painter, option, widget):
         if self.isSelected():
             painter.setPen(schlyr.selectedSchematicPinPen)
-            painter.setBrush(schlyr.selectedSchematicPinBrush)
             painter.drawRect(self.childrenBoundingRect())
         self.setZValue(schlyr.schematicPinLayer.z)
 

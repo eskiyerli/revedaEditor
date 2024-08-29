@@ -27,7 +27,7 @@ import os
 from typing import List, Sequence
 
 # import numpy as np
-from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, )
+from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, Signal)
 from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem, QDialog,
                                QCompleter)
@@ -46,6 +46,7 @@ else:
 
 
 class editorScene(QGraphicsScene):
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent

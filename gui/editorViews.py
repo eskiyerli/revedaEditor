@@ -40,6 +40,7 @@ class editorView(QGraphicsView):
     """
     The qgraphicsview for qgraphicsscene. It is used for both schematic and layout editors.
     """
+    keyPressed = Signal(int)
 
     # zoomFactorChanged = Signal(float)
     def __init__(self, scene, parent):
@@ -184,6 +185,7 @@ class editorView(QGraphicsView):
         return x_coords, y_coords
 
     def keyPressEvent(self, event: QKeyEvent):
+        self.keyPressed.emit(event.key())
         match event.key():
             case Qt.Key_M:
                 self.scene.editModes.setMode('moveItem')

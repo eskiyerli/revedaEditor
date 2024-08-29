@@ -26,9 +26,9 @@ import logging
 import logging.config
 import pathlib
 
-from PySide6.QtCore import QThreadPool
-from PySide6.QtGui import QAction, QFont, QIcon
-from PySide6.QtWidgets import (
+from PySide6.QtCore import (QThreadPool, Slot, Signal,)
+from PySide6.QtGui import (QAction, QFont, QIcon,)
+from PySide6.QtWidgets import (QGraphicsScene, QGraphicsItem,
     QApplication,
     QDialog,
     QMainWindow,
@@ -80,6 +80,9 @@ class mainwContainer(QWidget):
 
 #
 class MainWindow(QMainWindow):
+
+    sceneSelectionChanged = Signal(QGraphicsScene)
+
     def __init__(self):
         super().__init__()
         self.resize(900, 300)
@@ -431,3 +434,14 @@ class MainWindow(QMainWindow):
 
     def exitApp(self):
         self.app.closeAllWindows()
+
+    @Slot()
+    def selectionChangedScene(self):
+        sender = self.sender()
+        self.sceneSelectionChanged.emit(sender)
+    
+    @Slot()
+
+    def viewKeyPressed(self, key:int):
+        sender = self.sender()
+        self.KeyPressedView.emit(sender)

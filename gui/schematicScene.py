@@ -121,7 +121,6 @@ class schematicScene(editorScene):
         self.pinName = ""
         self.pinType = "Signal"
         self.pinDir = "Input"
-        self.parentView = None
         # self.wires = None
         self._newNet = None
         self._stretchNet = None
@@ -1171,6 +1170,7 @@ class schematicScene(editorScene):
                                 openViewTuple
                             ]
                             childWindow.parentEditor = self.editorWindow
+                            childWindow.parentObj = item
                             childWindowType = self.findEditorTypeString(childWindow)
 
                             if childWindowType == "symbolEditor":

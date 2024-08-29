@@ -898,6 +898,7 @@ class layoutScene(editorScene):
                         if self.editorWindow.appMainW.openViews[openViewT]:
                             childWindow = self.editorWindow.appMainW.openViews[openViewT]
                             childWindow.parentEditor = self.editorWindow
+                            childWindow.parentObj = item
                             childWindow.layoutToolbar.addAction(childWindow.goUpAction)
                             if dlg.buttonId == 2:
                                 childWindow.centralW.scene.readOnly = True
