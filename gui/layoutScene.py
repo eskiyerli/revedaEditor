@@ -845,6 +845,13 @@ class layoutScene(editorScene):
                 # Hide the PCell parameters group
                 dlg.pcellParamsGroup.hide()
 
+    def extractPcellInstanceParameters(self, instance: lshp.layoutPcell) -> dict:
+        initArgs = inspect.signature(instance.__class__.__init__).parameters
+        argsUsed = [param for param in initArgs if (param != "self")]
+        argDict = {arg: getattr(instance, arg) for arg in argsUsed}
+        lineEditDict = {key: edf.shortLineEdit(value) for key, value in argDict.items()}
+        return lineEditDict
+
     def clearLayout(self, layout):
         """Clear the layout by deleting all its children."""
         while layout.count():

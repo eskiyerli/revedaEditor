@@ -52,127 +52,119 @@ import revedaEditor.resources.resources
 import revedaEditor.backend.dataDefinitions as ddef
 
 
-class verilogaHighlighter(QSyntaxHighlighter):
+class BaseHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.highlightingRules = []
+        self.commentFormat = QTextCharFormat()
+        self.commentFormat.setForeground(QColor("#007F00"))
 
+    def highlightBlock(self, text):
+        for pattern, format in self.highlightingRules:
+            expression = re.compile(pattern)
+            for match in expression.finditer(text):
+                start, end = match.span()
+                self.setFormat(start, end - start, format)
+        self.highlightComments(text)
+
+    def highlightComments(self, text):
+        pass
+
+
+class VerilogAHighlighter(BaseHighlighter):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         keywordFormat = QTextCharFormat()
         keywordFormat.setForeground(QColor("#0000FF"))
         keywordFormat.setFontWeight(QFont.Bold)
+
+        keywords = [
+            "module", "endmodule", "input", "output", "inout", "parameter",
+            "analog", "real", "electrical", "discipline", "nature"
+        ]
+        self.highlightingRules.append((
+            r'\b(' + '|'.join(keywords) + r')\b', keywordFormat
+        ))
+
         functionFormat = QTextCharFormat()
         functionFormat.setForeground(QColor("#00FF00"))
         functionFormat.setFontWeight(QFont.Bold)
 
-        self.highlightingRules = [
-            (
-                r"\b(module|endmodule|input|output|inout|parameter|analog|real|electrical)\b",
-                keywordFormat,
-            ),
-            (
-                r"\b(cos|sin|ln|log|min|pow|sinh|sqrt|tan|tanh|exp|cosh|ddt|ddx|idt)\b",
-                functionFormat,
-            ),
-            # Add more highlighting rules as needed
+        functions = [
+            "cos", "sin", "ln", "log", "min", "pow", "sinh", "sqrt",
+            "tan", "tanh", "exp", "cosh", "ddt", "ddx", "idt",
+            "laplace_nd", "laplace_zd"
         ]
+        self.highlightingRules.append((
+            r'\b(' + '|'.join(functions) + r')\b', functionFormat
+        ))
 
-        self.highlightingComment = QTextCharFormat()
-        self.highlightingComment.setForeground(
-            QColor("#007F00")
-        )  # Green color for comments
+    def highlightComments(self, text):
+        self.highlightSingleLineComments(text, '//')
+        self.highlightMultiLineComments(text, r'/\*', r'\*/')
 
-        self.commentStart = "//"
-        self.multi_comment_start = "/*"
-        self.multi_comment_end = "*/"
+    def highlightSingleLineComments(self, text, commentStart):
+        expression = re.compile(commentStart + '.*$')
+        for match in expression.finditer(text):
+            start, end = match.span()
+            self.setFormat(start, end - start, self.commentFormat)
 
-    def highlightBlock(self, text):
-        for pattern, char_format in self.highlightingRules:
-            for match in re.finditer(pattern, text):
-                self.setFormat(match.start(), match.end() - match.start(), char_format)
-
-        index = text.find(self.commentStart)
-        while index >= 0:
-            comment_length = len(text) - index
-            self.setFormat(index, comment_length, self.highlightingComment)
-            index = text.find(self.commentStart, index + comment_length)
-
-        self.setCurrentBlockState(0)
+    def highlightMultiLineComments(self, text, commentStart, commentEnd):
         startIndex = 0
         if self.previousBlockState() != 1:
-            startIndex = text.find(self.multi_comment_start)
+            startIndex = text.find(commentStart)
 
         while startIndex >= 0:
-            endIndex = text.find(self.multi_comment_end, startIndex)
+            endIndex = text.find(commentEnd, startIndex)
             if endIndex == -1:
                 self.setCurrentBlockState(1)
-                comment_length = len(text) - startIndex
+                commentLength = len(text) - startIndex
             else:
-                comment_length = endIndex - startIndex + len(self.multi_comment_end)
-            self.setFormat(startIndex, comment_length, self.highlightingComment)
-            startIndex = text.find(
-                self.multi_comment_start, startIndex + comment_length
-            )
+                commentLength = endIndex - startIndex + len(commentEnd)
+
+            self.setFormat(startIndex, commentLength, self.commentFormat)
+            startIndex = text.find(commentStart, startIndex + commentLength)
 
 
-class xyceHighlighter(QSyntaxHighlighter):
+class XyceHighlighter(BaseHighlighter):
     def __init__(self, parent=None):
         super().__init__(parent)
-
         keywordFormat = QTextCharFormat()
         keywordFormat.setForeground(QColor("#0000FF"))
         keywordFormat.setFontWeight(QFont.Bold)
+
+        keywords = [".print", ".plot", ".include",
+            ".subckt", ".end", ".ends", ".param", ".model", ".lib", ".sweep"
+        ]
+        self.highlightingRules.append((
+            r'\b(' + '|'.join(keywords) + r')\b', keywordFormat
+        ))
+
         analysisFormat = QTextCharFormat()
         analysisFormat.setForeground(QColor("#00FF0F"))
         analysisFormat.setFontWeight(QFont.Bold)
 
-        self.highlightingRules = [
-            (
-                r"(\.subckt|\.end|\.ends|\.param|\.model|\.lib|\.sweep)\b",
-                keywordFormat,
-            ),
-            (
-                r"\b(\.ac|\.dc|\.tran|\.hb|\.noise|\.op)\b",
-                analysisFormat,
-            ),
-            # Add more highlighting rules as needed
-        ]
+        analyses = [".ac", ".dc", ".tran", ".hb", ".noise", ".op"]
+        self.highlightingRules.append((
+            r'\b(' + '|'.join(analyses) + r')\b', analysisFormat
+        ))
 
-        self.highlightingComment = QTextCharFormat()
-        self.highlightingComment.setForeground(
-            QColor("#007F00")
-        )  # Green color for comments
+        componentFormat = QTextCharFormat()
+        componentFormat.setForeground(QColor("#FF0000"))
 
-        self.comment_start = "*"
-        self.multi_comment_start = "/*"
-        self.multi_comment_end = "*/"
+        components = "RCLVIQMDJBEFGHKTSWZUOPXx"
+        self.highlightingRules.append((
+            r'^[' + components + r']', componentFormat
+        ))
 
-    def highlightBlock(self, inputText):
-        text = inputText.lower()
-        for pattern, char_format in self.highlightingRules:
-            for match in re.finditer(pattern, text):
-                self.setFormat(match.start(), match.end() - match.start(), char_format)
+    def highlightComments(self, text):
+        self.highlightSingleLineComments(text, r'\*')
 
-        index = text.find(self.comment_start)
-        while index >= 0:
-            comment_length = len(text) - index
-            self.setFormat(index, comment_length, self.highlightingComment)
-            index = text.find(self.comment_start, index + comment_length)
-
-        self.setCurrentBlockState(0)
-        startIndex = 0
-        if self.previousBlockState() != 1:
-            startIndex = text.find(self.multi_comment_start)
-
-        while startIndex >= 0:
-            endIndex = text.find(self.multi_comment_end, startIndex)
-            if endIndex == -1:
-                self.setCurrentBlockState(1)
-                comment_length = len(text) - startIndex
-            else:
-                comment_length = endIndex - startIndex + len(self.multi_comment_end)
-            self.setFormat(startIndex, comment_length, self.highlightingComment)
-            startIndex = text.find(
-                self.multi_comment_start, startIndex + comment_length
-            )
+    def highlightSingleLineComments(self, text, commentStart):
+        expression = re.compile('^' + commentStart + '.*$')
+        for match in expression.finditer(text):
+            start, end = match.span()
+            self.setFormat(start, end - start, self.commentFormat)
 
 
 class verilogaEditor(QMainWindow):
@@ -201,7 +193,7 @@ class verilogaEditor(QMainWindow):
         self.initEditor()
 
     def initEditor(self):
-        self.highlighter = verilogaHighlighter(self.textEdit.document())
+        self.highlighter = VerilogAHighlighter(self.textEdit.document())
         if self.fileName:
             with open(self.fileName, "r") as file:
                 text = file.read()
@@ -259,7 +251,7 @@ class verilogaEditor(QMainWindow):
 
     def createMenus(self):
         menubar = self.menuBar()
-
+        menubar.setNativeMenuBar(False)
         fileMenu = menubar.addMenu("&File")
         fileMenu.addAction(self.openAction)
         fileMenu.addAction(self.saveAction)
@@ -386,7 +378,7 @@ class xyceEditor(verilogaEditor):
         self.setWindowTitle("Xyce/SPICE Editor")
 
     def initEditor(self):
-        self.highlighter = xyceHighlighter(self.textEdit.document())
+        self.highlighter = XyceHighlighter(self.textEdit.document())
         if self.fileName:
             with open(self.fileName, "r") as file:
                 text = file.read()
@@ -413,7 +405,7 @@ class xyceEditor(verilogaEditor):
 
 def main():
     app = QApplication(sys.argv)
-    editor = verilogaEditor('')
+    editor = verilogaEditor(None,'')
     editor.show()
     sys.exit(app.exec())
 

@@ -97,7 +97,7 @@ class schematicEditor(edw.editorWindow):
         self.renumberInstanceAction = QAction("Renumber Instances", self)
         self.renumberInstanceAction.setToolTip("Renumber Instances")
         simulationIcon = QIcon("icons/application-run.png")
-        self.simulateAction = QAction(simulationIcon, "Simulaiton GUI...", self)
+        self.simulateAction = QAction(simulationIcon, "Revolution EDA SAE...", self)
 
 
     def _createTriggers(self):
@@ -259,9 +259,9 @@ class schematicEditor(edw.editorWindow):
         self.centralW.scene.viewObjProperties()
 
     def startSimClick(self, s):
-        import revedasim.simMainWindow as smw
+        import revedasim.SimMainWindow as smw
 
-        simguiw = smw.simMainWindow(self)
+        simguiw = smw.SimMainWindow(self)
         simguiw.show()
 
     def renumberInstanceClick(self, s):
@@ -345,64 +345,75 @@ class schematicEditor(edw.editorWindow):
         dlg = fd.netlistExportDialogue(self)
         dlg.libNameEdit.setText(self.libName)
         dlg.cellNameEdit.setText(self.cellName)
-        configViewItems = [
+
+        netlistableViews = self._getNetlistableViews()
+        dlg.viewNameCombo.addItems(netlistableViews)
+
+        if hasattr(self.appMainW, "simulationPath"):
+            dlg.netlistDirEdit.setText(str(self.appMainW.simulationPath))
+
+        if dlg.exec() == QDialog.Accepted:
+            self._startNetlisting(dlg)
+
+    def _getNetlistableViews(self):
+        views = [self.viewItem.viewName]
+        config_items = [
             self.cellItem.child(row)
             for row in range(self.cellItem.rowCount())
             if self.cellItem.child(row).viewType == "config"
         ]
-        netlistableViews = [self.viewItem.viewName]
-        for item in configViewItems:
-            # is there a better way of doing it?
-            with item.data(Qt.UserRole + 2).open(mode="r") as f:
-                configItems = json.load(f)
-                if configItems[1]["reference"] == self.viewItem.viewName:
-                    netlistableViews.append(item.viewName)
-        dlg.viewNameCombo.addItems(netlistableViews)
-        if hasattr(self.appMainW, "simulationPath"):
-            dlg.netlistDirEdit.setText(str(self.appMainW.simulationPath))
-        if dlg.exec() == QDialog.Accepted:
-            netlistObj = None
-            try:
-                self._startNetlisting(dlg, netlistObj)
-            except Exception as e:
-                self.logger.error(f"Error in creating netlist: {e}")
 
-    def _startNetlisting(self, dlg, netlistObj):
-        self.appMainW.simulationPath = pathlib.Path(dlg.netlistDirEdit.text())
-        selectedViewName = dlg.viewNameCombo.currentText()
-        self.switchViewList = [
-            item.strip() for item in dlg.switchViewEdit.text().split(",")
-        ]
-        self.stopViewList = [dlg.stopViewEdit.text().strip()]
-        subDirPathObj = self.appMainW.simulationPath.joinpath(self.cellName).joinpath(
-            self.viewName
-        )
-        subDirPathObj.mkdir(parents=True, exist_ok=True)
-        netlistFilePathObj = subDirPathObj.joinpath(
-            f"{self.cellName}_{selectedViewName}"
-        ).with_suffix(".cir")
-        simViewName = dlg.viewNameCombo.currentText()
-        if "schematic" in simViewName:
-            netlistObj = xyceNetlist(self, netlistFilePathObj)
-        elif "config" in simViewName:
-            netlistObj = xyceNetlist(self, netlistFilePathObj, True)
-            configItem = libm.findViewItem(
+        for item in config_items:
+            with item.data(Qt.UserRole + 2).open(mode="r") as f:
+                config = json.load(f)
+                if config[1]["reference"] == self.viewItem.viewName:
+                    views.append(item.viewName)
+
+        return views
+
+    def _startNetlisting(self, dlg):
+        try:
+            self.appMainW.simulationPath = pathlib.Path(dlg.netlistDirEdit.text())
+            selectedViewName = dlg.viewNameCombo.currentText()
+            self.switchViewList = [item.strip() for item in
+                                   dlg.switchViewEdit.text().split(",")]
+            self.stopViewList = [dlg.stopViewEdit.text().strip()]
+
+            subDirPath = self.appMainW.simulationPath / self.cellName / selectedViewName
+            subDirPath.mkdir(parents=True, exist_ok=True)
+
+            netlistFilePath = subDirPath / f"{self.cellName}_{selectedViewName}.cir"
+
+            netlistObj = self.createNetlistObject(selectedViewName, netlistFilePath)
+
+            if netlistObj:
+                self.runNetlisting(netlistObj)
+        except Exception as e:
+            self.logger.error(f"Error in creating netlist: {e}")
+
+    def createNetlistObject(self, view_name: str, file_path:pathlib.Path):
+        if "schematic" in view_name:
+            return xyceNetlist(self, file_path)
+        elif "config" in view_name:
+            netlist_obj = xyceNetlist(self, file_path, True)
+            config_item = libm.findViewItem(
                 self.libraryView.libraryModel,
                 self.libName,
                 self.cellName,
-                dlg.viewNameCombo.currentText(),
+                view_name
             )
-            with configItem.data(Qt.UserRole + 2).open(mode="r") as f:
-                netlistObj.configDict = json.load(f)[2]
+            with config_item.data(Qt.UserRole + 2).open(mode="r") as f:
+                netlist_obj.configDict = json.load(f)[2]
+            return netlist_obj
+        return None
 
-        if netlistObj:
-            startTime = time.perf_counter()
-            xyceNetlRunner = startThread(netlistObj.writeNetlist())
-            self.appMainW.threadPool.start(xyceNetlRunner)
-            # netlistObj.writeNetlist()
-            endTime = time.perf_counter()
-            self.logger.info(f"Netlisting time: {endTime - startTime}")
-            print("Netlisting finished.")
+    def runNetlisting(self, netlist_obj):
+        start_time = time.perf_counter()
+        xyceNetlRunner = startThread(netlist_obj.writeNetlist())
+        self.appMainW.threadPool.start(xyceNetlRunner)
+        end_time = time.perf_counter()
+        self.logger.info(f"Netlisting time: {end_time - start_time}")
+        self.logger.info("Netlisting finished.")
 
     def goDownClick(self, s):
         self.centralW.scene.goDownHier()

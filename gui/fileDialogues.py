@@ -648,19 +648,23 @@ class appProperties(QDialog):
     def __init__(self, parent):
         self.parent = parent
         super().__init__(parent)
-        self.setMinimumSize(550, 200)
+        self.setMinimumSize(650, 450)
         self.setWindowTitle("Revolution EDA Options")
         mainLayout = QVBoxLayout()
+        mainLayout.setStretch(0,2)
+        mainLayout.setStretch(1,2)
         filePathsGroup = QGroupBox("Paths")
         filePathsLayout = QVBoxLayout()
-        fileDialogLayout = QHBoxLayout()
-        fileDialogLayout.addWidget(edf.boldLabel("Text Editor Path:"), 2)
-        self.editorPathEdit = edf.longLineEdit()
-        fileDialogLayout.addWidget(self.editorPathEdit, 5)
-        self.editFileButton = QPushButton("...")
-        self.editFileButton.clicked.connect(self.onFileButtonClicked)
-        fileDialogLayout.addWidget(self.editFileButton, 1)
-        filePathsLayout.addLayout(fileDialogLayout)
+        filePathsLayout.setSpacing(20)
+
+        rootPathDialogLayout = QHBoxLayout()
+        rootPathDialogLayout.addWidget(edf.boldLabel("Root Path:"), 2)
+        self.rootPathEdit = edf.longLineEdit()
+        rootPathDialogLayout.addWidget(self.rootPathEdit, 5)
+        self.rootPathButton = QPushButton("...")
+        self.rootPathButton.clicked.connect(self.onRootPathButtonClicked)
+        filePathsLayout.addLayout(rootPathDialogLayout)
+        rootPathDialogLayout.addWidget(self.rootPathButton, 1)
         simPathDialogLayout = QHBoxLayout()
         simPathDialogLayout.addWidget(edf.boldLabel("Simulation Path:"), 2)
         self.simPathEdit = edf.longLineEdit()
@@ -673,6 +677,7 @@ class appProperties(QDialog):
         mainLayout.addWidget(filePathsGroup)
         switchViewsGroup = QGroupBox("Switch and Stop Views")
         switchViewsLayout = QFormLayout()
+        switchViewsLayout.setSpacing(20)
         self.switchViewsEdit = edf.longLineEdit()
         switchViewsLayout.addRow(edf.boldLabel("Switch Views:"), self.switchViewsEdit)
         self.stopViewsEdit = edf.longLineEdit()
@@ -696,6 +701,11 @@ class appProperties(QDialog):
     def onFileButtonClicked(self):
         self.editorPathEdit.setText(
             QFileDialog.getOpenFileName(self, caption="Select text " "editor path.")[0]
+        )
+
+    def onRootPathButtonClicked(self):
+        self.rootPathEdit.setText(
+            QFileDialog.getExistingDirectory(self, caption="Root run path:")
         )
 
     def onSimPathButtonClicked(self):

@@ -28,7 +28,7 @@ import pathlib
 
 # import numpy as np
 from PySide6.QtCore import (
-    Qt,
+    Qt, QSize,
 )
 from PySide6.QtGui import (
     QAction,
@@ -408,6 +408,7 @@ class editorWindow(QMainWindow):
     def _createToolBars(self):
         # Create tools bar called "main toolbar"
         self.toolbar = QToolBar("Main Toolbar", self)
+        self.toolbar.setIconSize(QSize(32, 32))
         # place toolbar at top
         self.addToolBar(self.toolbar)
         self.toolbar.addAction(self.saveCellAction)
@@ -721,3 +722,4 @@ class editorWindow(QMainWindow):
 
     def _createSignalConnections(self):
         self.centralW.scene.selectionChanged.connect(self.appMainW.selectionChangedScene)
+        self.centralW.view.keyPressedSignal.connect(self.appMainW.viewKeyPressed)
