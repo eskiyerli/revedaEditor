@@ -27,7 +27,7 @@ import logging.config
 import pathlib
 import os
 
-from PySide6.QtCore import (QThreadPool, Slot, Signal,)
+from PySide6.QtCore import (QThreadPool, Slot, Signal,QTimer, QObject)
 from PySide6.QtGui import (QAction, QFont, QIcon,)
 from PySide6.QtWidgets import (QGraphicsScene, QGraphicsItem,
     QApplication,
@@ -51,6 +51,16 @@ import revedaEditor.gui.revinit as revinit
 import revedaEditor.gui.stippleEditor as stip
 import revedaEditor.resources.resources
 
+
+class EventLoopMonitor(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.check_event_loop)
+        self.timer.start(1000)  # Check every second
+
+    def check_event_loop(self):
+        print("Event loop is responsive")
 
 class mainwContainer(QWidget):
     """
@@ -90,15 +100,7 @@ class MainWindow(QMainWindow):
         self._createActions()
         self._createMenuBar()
         self._createTriggers()
-        self.cellViews = [
-            "schematic",
-            "symbol",
-            "layout",
-            "veriloga",
-            "config",
-            "spice",
-            "pcell",
-        ]
+
         self.switchViewList = ["schematic", "veriloga", "spice", "symbol"]
         self.stopViewList = ["symbol"]
         self.openViews = dict()
@@ -423,7 +425,7 @@ class MainWindow(QMainWindow):
     def selectionChangedScene(self):
         sender = self.sender()
         self.sceneSelectionChanged.emit(sender)
-    
+
     @Slot()
     def viewKeyPressed(self, key:int):
         self.keyPressedView.emit(key)

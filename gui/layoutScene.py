@@ -439,7 +439,7 @@ class layoutScene(editorScene):
             # Only save the top-level items
 
             topLevelItems = list({item for item in self.items() if item.parentItem() is None})
-            topLevelItems.insert(0, {"cellView": "layout"})
+            topLevelItems.insert(0, {"viewType": "layout"})
             topLevelItems.insert(1, {"snapGrid": self.snapTuple})
             with filePathObj.open("w") as file:
                 # Serialize items to JSON using layoutEncoder class
@@ -462,7 +462,7 @@ class layoutScene(editorScene):
                 decodedData = json.load(file)
 
             # Unpack grid settings
-            _, gridSettings, *itemData = decodedData
+            viewType, gridSettings, *itemData = decodedData
             snapGrid = gridSettings.get("snapGrid", [1, 1])
             self.majorGrid, self.snapGrid = snapGrid
             self.snapTuple = (self.snapGrid, self.snapGrid)
@@ -501,8 +501,6 @@ class layoutScene(editorScene):
     def reloadScene(self):
         # Get the top level items from the scene
         topLevelItems = [item for item in self.items() if item.parentItem() is None]
-        # Insert a layout item at the beginning of the list
-        topLevelItems.insert(0, {"cellView": "layout"})
         # Convert the top level items to JSON string
         # Decode the JSON string back to Python objects
         decodedData = json.loads(json.dumps(topLevelItems, cls=layenc.layoutEncoder))

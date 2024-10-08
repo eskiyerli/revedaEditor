@@ -23,7 +23,7 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-# from hashlib import new
+
 import pathlib
 
 # import numpy as np
@@ -50,7 +50,7 @@ from PySide6.QtWidgets import (
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryModelView as lmview
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as libb
 import revedaEditor.gui.helpBrowser as hlp
 import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.resources.resources
@@ -64,7 +64,7 @@ class editorWindow(QMainWindow):
 
     def __init__(
         self,
-        viewItem: scb.viewItem,
+        viewItem: libb.viewItem,
         libraryDict: dict,
         libraryView: lmview.designLibrariesView,
     ):  # file is a pathlib.Path object
@@ -77,8 +77,8 @@ class editorWindow(QMainWindow):
         self.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
-        self.libName = self.libItem.libraryName
-        self.viewName = self.viewItem.viewName
+        self.libName:str = self.libItem.libraryName
+        self.viewName:str = self.viewItem.viewName
         self.libraryDict = libraryDict
         self.libraryView = libraryView
         self.parentEditor = None  # type: editorWindow
@@ -577,11 +577,11 @@ class editorWindow(QMainWindow):
             self.centralW.scene.partialSelection = scd.partialSelection.isChecked()
             self.centralW.scene._snapDistance = int(float(scd.snapDistanceEntry.text()))
 
-    def checkSaveCell(self):
-        pass
-
-    def saveCell(self):
-        pass
+    # def checkSaveCell(self):
+    #     pass
+    #
+    # def saveCell(self):
+    #     pass
 
     def readOnlyCellClick(self):
         self.centralW.scene.readOnly = self.readOnlyCellAction.isChecked()
@@ -689,7 +689,8 @@ class editorWindow(QMainWindow):
 
     def closeEvent(self, event):
         cellViewTuple = ddef.viewTuple(self.libName, self.cellName, self.viewName)
-        self.appMainW.openViews.pop(cellViewTuple)
+        if cellViewTuple in self.appMainW.openViews:
+            self.appMainW.openViews.pop(cellViewTuple)
         event.accept()
         super().closeEvent(event)
 

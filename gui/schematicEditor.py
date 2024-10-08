@@ -25,6 +25,7 @@
 
 import datetime
 import json
+
 # from hashlib import new
 import pathlib
 import time
@@ -33,8 +34,8 @@ from functools import lru_cache
 
 # import numpy as np
 from PySide6.QtCore import (
-    Qt,
     QPoint,
+    Qt,
 )
 from PySide6.QtGui import (
     QAction,
@@ -52,21 +53,22 @@ from PySide6.QtWidgets import (
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.libraryModelView as lmview
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as libb
 import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.fileio.symbolEncoder as symenc
-import revedaEditor.gui.schematicScene as schscn
 import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
+import revedaEditor.gui.schematicScene as schscn
 import revedaEditor.resources.resources
 from revedaEditor.gui.startThread import startThread
-
+from typing import List
+import importlib
 
 class schematicEditor(edw.editorWindow):
-    def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView) -> None:
+    def __init__(self, viewItem: libb.viewItem, libraryDict: dict, libraryView) -> None:
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Schematic Editor - {self.cellName} - {self.viewName}")
         self.setWindowIcon(QIcon(":/icons/edLayer-shape.png"))
@@ -85,7 +87,6 @@ class schematicEditor(edw.editorWindow):
         self.centralW = schematicContainer(self)
         self.setCentralWidget(self.centralW)
 
-
     def _createActions(self):
         super()._createActions()
         self.netNameAction = QAction("Net Name", self)
@@ -98,30 +99,6 @@ class schematicEditor(edw.editorWindow):
         self.renumberInstanceAction.setToolTip("Renumber Instances")
         simulationIcon = QIcon("icons/application-run.png")
         self.simulateAction = QAction(simulationIcon, "Revolution EDA SAE...", self)
-
-
-    def _createTriggers(self):
-        super()._createTriggers()
-
-        self.createNetAction.triggered.connect(self.createNetClick)
-        self.createInstAction.triggered.connect(self.createInstClick)
-        self.createPinAction.triggered.connect(self.createPinClick)
-        self.createTextAction.triggered.connect(self.createNoteClick)
-        self.createSymbolAction.triggered.connect(self.createSymbolClick)
-
-        self.objPropAction.triggered.connect(self.objPropClick)
-        self.netlistAction.triggered.connect(self.createNetlistClick)
-        self.simulateAction.triggered.connect(self.startSimClick)
-        self.ignoreAction.triggered.connect(self.ignoreClick)
-        self.goDownAction.triggered.connect(self.goDownClick)
-
-        self.hilightNetAction.triggered.connect(self.hilightNetClick)
-        self.netNameAction.triggered.connect(self.netNameClick)
-        self.selectDeviceAction.triggered.connect(self.selectDeviceClick)
-        self.selectNetAction.triggered.connect(self.selectNetClick)
-        self.selectPinAction.triggered.connect(self.selectPinClick)
-        self.removeSelectFilterAction.triggered.connect(self.removeSelectFilterClick)
-        self.renumberInstanceAction.triggered.connect(self.renumberInstanceClick)
 
 
     def _addActions(self):
@@ -162,11 +139,34 @@ class schematicEditor(edw.editorWindow):
         self.simulationMenu = QMenu("&Simulation")
         # help menu
         self.simulationMenu.addAction(self.netlistAction)
-        self.editorMenuBar.insertMenu(
-            self.menuHelp.menuAction(), self.simulationMenu)
+        self.editorMenuBar.insertMenu(self.menuHelp.menuAction(), self.simulationMenu)
         # self.menuHelp = self.editorMenuBar.addMenu("&Help")
         if self._app.revedasim_path:
             self.simulationMenu.addAction(self.simulateAction)
+
+
+    def _createTriggers(self):
+        super()._createTriggers()
+
+        self.createNetAction.triggered.connect(self.createNetClick)
+        self.createInstAction.triggered.connect(self.createInstClick)
+        self.createPinAction.triggered.connect(self.createPinClick)
+        self.createTextAction.triggered.connect(self.createNoteClick)
+        self.createSymbolAction.triggered.connect(self.createSymbolClick)
+
+        self.objPropAction.triggered.connect(self.objPropClick)
+        self.netlistAction.triggered.connect(self.createNetlistClick)
+        self.simulateAction.triggered.connect(self.startSimClick)
+        self.ignoreAction.triggered.connect(self.ignoreClick)
+        self.goDownAction.triggered.connect(self.goDownClick)
+
+        self.hilightNetAction.triggered.connect(self.hilightNetClick)
+        self.netNameAction.triggered.connect(self.netNameClick)
+        self.selectDeviceAction.triggered.connect(self.selectDeviceClick)
+        self.selectNetAction.triggered.connect(self.selectNetClick)
+        self.selectPinAction.triggered.connect(self.selectPinClick)
+        self.removeSelectFilterAction.triggered.connect(self.removeSelectFilterClick)
+        self.renumberInstanceAction.triggered.connect(self.renumberInstanceClick)
 
     def _createToolBars(self):
         super()._createToolBars()
@@ -220,12 +220,8 @@ class schematicEditor(edw.editorWindow):
             libItem = libm.getLibItem(
                 libraryModel, self.symbolChooser.libNamesCB.currentText()
             )
-            cellItem = libm.getCellItem(
-                libItem, self.symbolChooser.cellCB.currentText()
-            )
-            viewItem = libm.getViewItem(
-                cellItem, self.symbolChooser.viewCB.currentText()
-            )
+            cellItem = libm.getCellItem(libItem, self.symbolChooser.cellCB.currentText())
+            viewItem = libm.getViewItem(cellItem, self.symbolChooser.viewCB.currentText())
             self.centralW.scene.instanceSymbolTuple = ddef.viewItemTuple(
                 libItem, cellItem, viewItem
             )
@@ -248,7 +244,14 @@ class schematicEditor(edw.editorWindow):
             noteFontStyle = textDlg.fontStyleCB.currentText()
             noteAlign = textDlg.textAlignmCB.currentText()
             noteOrient = textDlg.textOrientCB.currentText()
-            self.centralW.scene.textTuple = (noteText, noteFontFamily, noteFontStyle, noteFontSize,  noteAlign, noteOrient)
+            self.centralW.scene.textTuple = (
+                noteText,
+                noteFontFamily,
+                noteFontStyle,
+                noteFontSize,
+                noteAlign,
+                noteOrient,
+            )
             self.centralW.scene.editModes.setMode("drawText")
 
     def createSymbolClick(self, s):
@@ -259,10 +262,14 @@ class schematicEditor(edw.editorWindow):
         self.centralW.scene.viewObjProperties()
 
     def startSimClick(self, s):
-        import revedasim.SimMainWindow as smw
-
-        simguiw = smw.SimMainWindow(self)
-        simguiw.show()
+        try:
+            simdlg=importlib.import_module("revedasim.dialogueWindows", str(self._app.revedasim_path))
+            revsimdlg = simdlg.createOpenRevBenchDialogue(self,
+                                                          self.libraryView.libraryModel,
+                                                          self.cellItem)
+            revsimdlg.show()
+        except (ImportError or NameError):
+            self.logger.error('Reveda SAE is not installed.')
 
     def renumberInstanceClick(self, s):
         self.centralW.scene.renumberInstances()
@@ -276,15 +283,16 @@ class schematicEditor(edw.editorWindow):
         self.centralW.scene.saveSchematic(self.file)
 
     def loadSchematic(self):
-        with open(self.file) as tempFile:
-            items = json.load(tempFile)
-        self.centralW.scene.loadSchematicItems(items)
+        # with open(self.file) as tempFile:
+        #     items = json.load(tempFile)
+        # self.centralW.scene.loadSchematicItems(items)
+        self.centralW.scene.loadSchematic(self.file)
 
         # because we do not save dot points, it is necessary to recreate them.
 
     def createConfigView(
         self,
-        configItem: scb.viewItem,
+        configItem: libb.viewItem,
         configDict: dict,
         newConfigDict: dict,
         processedCells: set,
@@ -375,8 +383,9 @@ class schematicEditor(edw.editorWindow):
         try:
             self.appMainW.simulationPath = pathlib.Path(dlg.netlistDirEdit.text())
             selectedViewName = dlg.viewNameCombo.currentText()
-            self.switchViewList = [item.strip() for item in
-                                   dlg.switchViewEdit.text().split(",")]
+            self.switchViewList = [
+                item.strip() for item in dlg.switchViewEdit.text().split(",")
+            ]
             self.stopViewList = [dlg.stopViewEdit.text().strip()]
 
             subDirPath = self.appMainW.simulationPath / self.cellName / selectedViewName
@@ -391,16 +400,13 @@ class schematicEditor(edw.editorWindow):
         except Exception as e:
             self.logger.error(f"Error in creating netlist: {e}")
 
-    def createNetlistObject(self, view_name: str, file_path:pathlib.Path):
+    def createNetlistObject(self, view_name: str, file_path: pathlib.Path):
         if "schematic" in view_name:
             return xyceNetlist(self, file_path)
         elif "config" in view_name:
             netlist_obj = xyceNetlist(self, file_path, True)
             config_item = libm.findViewItem(
-                self.libraryView.libraryModel,
-                self.libName,
-                self.cellName,
-                view_name
+                self.libraryView.libraryModel, self.libName, self.cellName, view_name
             )
             with config_item.data(Qt.UserRole + 2).open(mode="r") as f:
                 netlist_obj.configDict = json.load(f)[2]
@@ -427,6 +433,7 @@ class schematicEditor(edw.editorWindow):
             for item in self.centralW.scene.selectedItems():
                 if isinstance(item, net.schematicNet):
                     self.centralW.scene.setNetProperties(item)
+
     def hilightNetClick(self, s):
         self.centralW.scene.hilightNets()
 
@@ -437,7 +444,6 @@ class schematicEditor(edw.editorWindow):
     def selectNetClick(self):
         self.centralW.scene.selectModes.setMode("selectNet")
         self.messageLine.setText("Select Only Nets")
-
 
     def selectPinClick(self):
         self.centralW.scene.selectModes.setMode("selectPin")
@@ -475,13 +481,12 @@ class schematicEditor(edw.editorWindow):
         symbolWindow = None
         libName = self.libName
         cellName = self.cellName
-        libItem = libm.getLibItem(
-            self.libraryView.libraryModel, libName
-        )
+        libItem = libm.getLibItem(self.libraryView.libraryModel, libName)
         cellItem = libm.getCellItem(libItem, cellName)
         # libraryView = self.libraryView
         schematicPins: list[shp.schematicPin] = list(
-            self.centralW.scene.findSceneSchemPinsSet())
+            self.centralW.scene.findSceneSchemPinsSet()
+        )
         schematicPinNames: list[str] = [pinItem.pinName for pinItem in schematicPins]
         rectXDim: int = 0
         rectYDim: int = 0
@@ -509,21 +514,17 @@ class schematicEditor(edw.editorWindow):
         dlg.rightPinsEdit.setText(", ".join(outputPins))
         dlg.topPinsEdit.setText(", ".join(inoutPins))
         if dlg.exec() == QDialog.Accepted:
-            symbolViewItem = scb.createCellView(
-                self, symbolViewName, cellItem
-            )
+            symbolViewItem = libb.createCellView(self, symbolViewName, cellItem)
             libraryDict = self.libraryDict
             # create symbol editor window with an empty items list
             from revedaEditor.gui.symbolEditor import symbolEditor
+
             symbolWindow = symbolEditor(symbolViewItem, libraryDict, self.libraryView)
             try:
                 leftPinNames = list(
                     filter(
                         None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.leftPinsEdit.text().split(",")
-                        ],
+                        [pinName.strip() for pinName in dlg.leftPinsEdit.text().split(",")],
                     )
                 )
                 rightPinNames = list(
@@ -538,10 +539,7 @@ class schematicEditor(edw.editorWindow):
                 topPinNames = list(
                     filter(
                         None,
-                        [
-                            pinName.strip()
-                            for pinName in dlg.topPinsEdit.text().split(",")
-                        ],
+                        [pinName.strip() for pinName in dlg.topPinsEdit.text().split(",")],
                     )
                 )
                 bottomPinNames = list(
@@ -555,12 +553,8 @@ class schematicEditor(edw.editorWindow):
                 )
                 stubLength = int(float(dlg.stubLengthEdit.text().strip()))
                 pinDistance = int(float(dlg.pinDistanceEdit.text().strip()))
-                rectXDim = (
-                    max(len(topPinNames), len(bottomPinNames)) + 1
-                ) * pinDistance
-                rectYDim = (
-                    max(len(leftPinNames), len(rightPinNames)) + 1
-                ) * pinDistance
+                rectXDim = (max(len(topPinNames), len(bottomPinNames)) + 1) * pinDistance
+                rectYDim = (max(len(leftPinNames), len(rightPinNames)) + 1) * pinDistance
             except ValueError:
                 self.logger.error("Enter valid value")
 
@@ -588,8 +582,7 @@ class schematicEditor(edw.editorWindow):
                 "Instance",
             )
             leftPinLocs = [
-                QPoint(-stubLength, (i + 1) * pinDistance)
-                for i in range(len(leftPinNames))
+                QPoint(-stubLength, (i + 1) * pinDistance) for i in range(len(leftPinNames))
             ]
             rightPinLocs = [
                 QPoint(rectXDim + stubLength, (i + 1) * pinDistance)
@@ -600,13 +593,10 @@ class schematicEditor(edw.editorWindow):
                 for i in range(len(bottomPinNames))
             ]
             topPinLocs = [
-                QPoint((i + 1) * pinDistance, -stubLength)
-                for i in range(len(topPinNames))
+                QPoint((i + 1) * pinDistance, -stubLength) for i in range(len(topPinNames))
             ]
             for i in range(len(leftPinNames)):
-                symbolScene.lineDraw(
-                    leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0)
-                )
+                symbolScene.lineDraw(leftPinLocs[i], leftPinLocs[i] + QPoint(stubLength, 0))
                 symbolScene.addItem(
                     schematicPins[schematicPinNames.index(leftPinNames[i])].toSymbolPin(
                         leftPinLocs[i]
@@ -617,14 +607,12 @@ class schematicEditor(edw.editorWindow):
                     rightPinLocs[i], rightPinLocs[i] + QPoint(-stubLength, 0)
                 )
                 symbolScene.addItem(
-                    schematicPins[
-                        schematicPinNames.index(rightPinNames[i])
-                    ].toSymbolPin(rightPinLocs[i])
+                    schematicPins[schematicPinNames.index(rightPinNames[i])].toSymbolPin(
+                        rightPinLocs[i]
+                    )
                 )
             for i in range(len(topPinNames)):
-                symbolScene.lineDraw(
-                    topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength)
-                )
+                symbolScene.lineDraw(topPinLocs[i], topPinLocs[i] + QPoint(0, stubLength))
                 symbolScene.addItem(
                     schematicPins[schematicPinNames.index(topPinNames[i])].toSymbolPin(
                         topPinLocs[i]
@@ -635,9 +623,9 @@ class schematicEditor(edw.editorWindow):
                     bottomPinLocs[i], bottomPinLocs[i] + QPoint(0, -stubLength)
                 )
                 symbolScene.addItem(
-                    schematicPins[
-                        schematicPinNames.index(bottomPinNames[i])
-                    ].toSymbolPin(bottomPinLocs[i])
+                    schematicPins[schematicPinNames.index(bottomPinNames[i])].toSymbolPin(
+                        bottomPinLocs[i]
+                    )
                 )  # symbol attribute generation for netlisting.
             symbolScene.attributeList = list()  # empty attribute list
 
@@ -656,7 +644,6 @@ class schematicEditor(edw.editorWindow):
             openCellViewTuple = ddef.viewTuple(libName, cellName, symbolViewName)
             self.appMainW.openViews[openCellViewTuple] = symbolWindow
             symbolWindow.show()
-
 
 
 class schematicContainer(QWidget):
@@ -678,18 +665,16 @@ class schematicContainer(QWidget):
         gLayout.setColumnStretch(0, 5)
         gLayout.setRowStretch(0, 6)
         self.setLayout(gLayout)
-
-
 class xyceNetlist:
     def __init__(
         self,
         schematic: schematicEditor,
         filePathObj: pathlib.Path,
-        use_config: bool = False,
+        useConfig: bool = False,
     ):
         self.filePathObj = filePathObj
         self.schematic = schematic
-        self._use_config = use_config
+        self._use_config = useConfig
         self._scene = self.schematic.centralW.scene
         self.libraryDict = self.schematic.libraryDict
         self.libraryView = self.schematic.libraryView
@@ -700,12 +685,29 @@ class xyceNetlist:
         )
         self.cellItem = libm.getCellItem(self.libItem, self.schematic.cellName)
 
-        self.switchViewList = schematic.switchViewList
-        self.stopViewList = schematic.stopViewList
+        self._switchViewList = schematic.switchViewList
+        self._stopViewList = schematic.stopViewList
         self.netlistedViewsSet = set()  # keeps track of netlisted views.
         self.includeLines = set()  # keeps track of include lines.
         self.vamodelLines = set()  # keeps track of vamodel lines.
         self.vahdlLines = set()  # keeps track of *.HDL lines.
+
+
+    @property
+    def switchViewList(self) -> List[str]:
+        return self._switchViewList
+
+    @switchViewList.setter
+    def switchViewList(self, value:List[str]):
+        self._switchViewList = value
+
+    @property
+    def stopViewList(self) -> List[str]:
+        return self._stopViewList
+
+    @stopViewList.setter
+    def stopViewList(self, value:List[str]):
+        self._stopViewList = value
 
     def writeNetlist(self):
         with self.filePathObj.open(mode="w") as cirFile:
@@ -723,6 +725,7 @@ class xyceNetlist:
                         80 * "*",
                         "\n",
                         ".GLOBAL gnd!\n\n",
+
                     ]
                 )
             )
@@ -747,55 +750,6 @@ class xyceNetlist:
         assert isinstance(value, dict)
         self._configDict = value
 
-
-    # def recursiveNetlisting(self, schematic: schematicEditor, cirFile):
-    #     """
-    #     Recursively traverse all sub-circuits and netlist them.
-    #     """
-    #     try:
-    #         schematicScene = schematic.centralW.scene
-    #         schematicNets = schematicScene.findSceneNetsSet()
-    #         schematicScene.groupAllNets(schematicNets)  # name all nets in the
-    #         # schematic
-    #         sceneSymbolSet = schematicScene.findSceneSymbolSet()
-    #         schematicScene.generatePinNetMap(tuple(sceneSymbolSet))
-    #         for elementSymbol in sceneSymbolSet:
-    #             if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
-    #                 not elementSymbol.netlistIgnore
-    #             ):
-    #                 libItem = libm.getLibItem(
-    #                     schematic.libraryView.libraryModel, elementSymbol.libraryName
-    #                 )
-    #                 cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
-    #                 viewItems = [
-    #                     cellItem.child(row) for row in range(cellItem.rowCount())
-    #                 ]
-    #                 viewNames = [view.viewName for view in viewItems]
-    #
-    #                 netlistView = "symbol"
-    #                 if self._use_config:
-    #                     netlistView = self.configDict.get(elementSymbol.cellName)[1]
-    #                 else:
-    #                     for viewName in self.switchViewList:
-    #                         if viewName in viewNames:
-    #                             netlistView = viewName
-    #                             break
-    #                 # these are qstandarditem in library browser.
-    #                 # viewItem = libm.getViewItem(cellItem, netlistView)
-    #
-    #                 # now create the netlist line for that item.
-    #                 self.createItemLine(cirFile, elementSymbol, cellItem, netlistView)
-    #             elif elementSymbol.netlistIgnore:
-    #                 cirFile.write(
-    #                     f"*{elementSymbol.instanceName} is marked to be ignored\n"
-    #                 )
-    #             elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
-    #                 cirFile.write(
-    #                     f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n"
-    #                 )
-    #
-    #     except Exception as e:
-    #         self.schematic.logger.error(f"Netlisting error: {e}")
     @lru_cache(maxsize=16)
     def recursiveNetlisting(self, schematic: schematicEditor, cirFile):
         """
@@ -837,7 +791,7 @@ class xyceNetlist:
         if self._use_config:
             return self.configDict.get(elementSymbol.cellName)[1]
         else:
-            for viewName in self.switchViewList:
+            for viewName in self._switchViewList:
                 if viewName in viewNames:
                     return viewName
             return "symbol"
@@ -846,14 +800,14 @@ class xyceNetlist:
         self,
         cirFile,
         elementSymbol: shp.schematicSymbol,
-        cellItem: scb.cellItem,
+        cellItem: libb.cellItem,
         netlistView: str,
     ):
         if "schematic" in netlistView:
             # First write subckt call in the netlist.
             cirFile.write(self.createXyceSymbolLine(elementSymbol))
             schematicItem = libm.getViewItem(cellItem, netlistView)
-            if netlistView not in self.stopViewList:
+            if netlistView not in self._stopViewList:
                 # now load the schematic
                 schematicObj = schematicEditor(
                     schematicItem, self.libraryDict, self.libraryView
@@ -990,4 +944,3 @@ class xyceNetlist:
             )
             # if there is no NLPDeviceFormat line, create a warning line
             return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
-

@@ -24,7 +24,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QStandardItemModel
 
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as scb
 
 
 def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryItem:
@@ -33,7 +33,8 @@ def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryIte
         for item in libraryModel.findItems(libName)
         if item.data(Qt.UserRole + 1) == "library"
     ][0]
-    return libItem
+    if libItem:
+        return libItem
 
 
 def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> scb.cellItem:
@@ -44,8 +45,6 @@ def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> scb.cellItem:
     ]
     if cellItems:
         return cellItems[0]
-    else:
-        return libItem.child(0)
 
 
 def getViewItem(cellItem: scb.cellItem, viewNameInp: str) -> scb.viewItem:
@@ -57,11 +56,11 @@ def getViewItem(cellItem: scb.cellItem, viewNameInp: str) -> scb.viewItem:
         ]
     if viewItems:
         return viewItems[0]
-    else:
-        return cellItem.child(0)
 
 
 def findViewItem(libraryModel, libName: str, cellName: str, viewName: str):
     libItem = getLibItem(libraryModel, libName)
-    cellItem = getCellItem(libItem, cellName)
-    return getViewItem(cellItem, viewName)
+    if libItem:
+        cellItem = getCellItem(libItem, cellName)
+    if cellItem:
+        return getViewItem(cellItem, viewName)

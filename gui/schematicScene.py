@@ -25,6 +25,7 @@
 # from hashlib import new
 import itertools as itt
 import json
+import time
 
 # from hashlib import new
 import pathlib
@@ -40,6 +41,8 @@ from PySide6.QtCore import (
     QRectF,
     Qt,
     QLineF,
+    QProcess,
+    Slot,
 )
 from PySide6.QtGui import (
     QGuiApplication,
@@ -130,6 +133,7 @@ class schematicScene(editorScene):
         self.textTuple = None
         self._snapPointRect = None
         self.highlightNets = False
+        self.hierarchyTrail = ""
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
         fixedFamily = [
             family for family in fontFamilies if QFontDatabase.isFixedPitch(family)
@@ -142,6 +146,15 @@ class schematicScene(editorScene):
         ]
         self.fixedFont.setPointSize(fontSize)
         self.fixedFont.setKerning(False)
+        self.selectionChanged.connect(self.selectionChangedHandler)
+
+    @Slot()
+    def selectionChangedHandler(self):
+        for editorWindow in self.editorWindow.appMainW.openViews.values():
+            if  (isinstance(editorWindow.centralW.scene, schematicScene) and
+                    editorWindow.centralW.scene is not
+                    self):
+                editorWindow.centralW.scene.clearSelection()
 
     @property
     def drawMode(self):
@@ -150,81 +163,189 @@ class schematicScene(editorScene):
         )
 
     def mousePressEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+        self.selectionChangedHandler()
         super().mousePressEvent(mouseEvent)
         try:
             self.mousePressLoc = mouseEvent.scenePos().toPoint()
         except Exception as e:
             self.logger.error(f"Mouse press error: {e}")
 
+    # def mouseReleaseEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+    #     try:
+    #         self.mouseReleaseLoc = mouseEvent.scenePos().toPoint()
+    #         if mouseEvent.button() == Qt.LeftButton:
+    #             if self.editModes.addInstance:
+    #                 if self._newInstance:
+    #                     self._newInstance = None
+
+    #                 self._newInstance = self.drawInstance(self.mouseReleaseLoc)
+    #                 self._newInstance.setSelected(True)
+    #             elif self.editModes.drawPin:
+    #                 if self._newPin:
+    #                     self._newPin = None
+    #                 self._newPin = self.addPin(self.mouseReleaseLoc)
+    #                 self._newPin.setSelected(True)
+
+    #             elif self.editModes.drawWire:
+    #                 if self._newNet:  # finish net drawing
+    #                     self.checkNewNet(self._newNet)
+    #                     self._newNet = None
+    #                 self.mouseReleaseLoc = self.findSnapPoint(
+    #                     self.mouseReleaseLoc, set()
+    #                 )
+    #                 self._newNet = net.schematicNet(
+    #                     self.mouseReleaseLoc, self.mouseReleaseLoc
+    #                 )
+    #                 self._newNet.nameStrength = net.netNameStrengthEnum.NONAME
+
+    #             elif self.editModes.drawText:
+    #                 if self._newText:
+    #                     self._newText = None
+    #                     self.textTuple = None
+    #                 if self.textTuple:
+    #                     self._newText = shp.text(self.mouseReleaseLoc, *self.textTuple)
+
+    #             elif self.editModes.rotateItem:
+    #                 self.rotateSelectedItems(self.mouseReleaseLoc)
+    #     except Exception as e:
+    #         self.logger.error(f"Mouse release error: {e}")
+    #     super().mouseReleaseEvent(mouseEvent)
+
     def mouseReleaseEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+        """
+        Handle mouse release event.
+
+        :param mouseEvent: QGraphicsSceneMouseEvent instance
+        """
         try:
             self.mouseReleaseLoc = mouseEvent.scenePos().toPoint()
-            if mouseEvent.button() == Qt.LeftButton:
-                if self.editModes.addInstance:
-                    if self._newInstance:
-                        self._newInstance = None
-
-                    self._newInstance = self.drawInstance(self.mouseReleaseLoc)
-                    self._newInstance.setSelected(True)
-                elif self.editModes.drawPin:
-                    if self._newPin:
-                        self._newPin = None
-                    self._newPin = self.addPin(self.mouseReleaseLoc)
-                    self._newPin.setSelected(True)
-
-                elif self.editModes.drawWire:
-                    if self._newNet:  # finish net drawing
-                        self.checkNewNet(self._newNet)
-                        self._newNet = None
-                    self.mouseReleaseLoc = self.findSnapPoint(
-                        self.mouseReleaseLoc, set()
-                    )
-                    self._newNet = net.schematicNet(
-                        self.mouseReleaseLoc, self.mouseReleaseLoc
-                    )
-                    self._newNet.nameStrength = net.netNameStrengthEnum.NONAME
-
-                elif self.editModes.drawText:
-                    if self._newText:
-                        self._newText = None
-                        self.textTuple = None
-                    if self.textTuple:
-                        self._newText = shp.text(self.mouseReleaseLoc, *self.textTuple)
-
-                elif self.editModes.rotateItem:
-                    self.rotateSelectedItems(self.mouseReleaseLoc)
+            self._handleMouseRelease(self.mouseReleaseLoc, mouseEvent.button())
         except Exception as e:
             self.logger.error(f"Mouse release error: {e}")
         super().mouseReleaseEvent(mouseEvent)
+        
+    # def mouseMoveEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+    #     super().mouseMoveEvent(mouseEvent)
+    #     self.mouseMoveLoc = mouseEvent.scenePos().toPoint()
+    #     try:
+    #         if self._newInstance and self.editModes.addInstance:
+    #             self._newInstance.setPos(self.mouseMoveLoc)
+    #         elif self._newPin and self.editModes.drawPin:
+    #             self._newPin.setPos(self.mouseMoveLoc - self._newPin.start)
+    #         elif self._newNet and self.editModes.drawWire:
+    #             if not self._newNet.scene():
+    #                 self.addUndoStack(self._newNet)
+    #             self._newNet.draftLine = QLineF(
+    #                 self._newNet.draftLine.p1(),
+    #                 self.findSnapPoint(self.mouseMoveLoc, set()),
+    #             )
+    #         elif self.editModes.stretchItem and self._stretchNet is not None:
+    #             self.updateStretchNet()
+    #         elif self._newText and self.editModes.drawText:
+    #             if self._newText.scene() is None:
+    #                 self.addUndoStack(self._newText)
+    #                 self._newText.setSelected(True)
+    #             self._newText.setPos(self.mouseMoveLoc - self._newText.start)
+
+    #         self.editorWindow.statusLine.showMessage(
+    #             f"Cursor Position: {str((self.mouseMoveLoc - self.origin).toTuple())}"
+    #         )
+    #     except Exception as e:
+    #         self.logger.error(f"Mouse move error: {e}")
 
     def mouseMoveEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+        """
+        Handle mouse move event.
+
+        :param mouseEvent: QGraphicsSceneMouseEvent instance
+        """
         super().mouseMoveEvent(mouseEvent)
         self.mouseMoveLoc = mouseEvent.scenePos().toPoint()
-        try:
-            if self._newInstance and self.editModes.addInstance:
-                self._newInstance.setPos(self.mouseMoveLoc)
-            elif self._newPin and self.editModes.drawPin:
-                self._newPin.setPos(self.mouseMoveLoc - self._newPin.start)
-            elif self._newNet and self.editModes.drawWire:
-                if not self._newNet.scene():
-                    self.addUndoStack(self._newNet)
-                self._newNet.draftLine = QLineF(
-                    self._newNet.draftLine.p1(),
-                    self.findSnapPoint(self.mouseMoveLoc, set()),
-                )
-            elif self.editModes.stretchItem and self._stretchNet is not None:
-                self.updateStretchNet()
-            elif self._newText and self.editModes.drawText:
-                if self._newText.scene() is None:
-                    self.addUndoStack(self._newText)
-                    self._newText.setSelected(True)
-                self._newText.setPos(self.mouseMoveLoc - self._newText.start)
+        self._handleMouseMove(self.mouseMoveLoc)
 
-            self.editorWindow.statusLine.showMessage(
-                f"Cursor Position: {str((self.mouseMoveLoc - self.origin).toTuple())}"
+    def _handleMouseRelease(self, mouseReleaseLoc: QPoint, button: Qt.MouseButton) -> None:
+        """
+        Handle mouse release logic.
+
+        :param mouseReleaseLoc: QPoint instance
+        :param button: Qt.MouseButton instance
+        """
+        if button == Qt.LeftButton:
+            if self.editModes.addInstance:
+                self._handleAddInstance(mouseReleaseLoc)
+            elif self.editModes.drawPin:
+                self._handleDrawPin(mouseReleaseLoc)
+            elif self.editModes.drawWire:
+                self._handleDrawWire(mouseReleaseLoc)
+            elif self.editModes.drawText:
+                self._handleDrawText(mouseReleaseLoc)
+            elif self.editModes.rotateItem:
+                self.rotateSelectedItems(mouseReleaseLoc)
+
+    def _handleMouseMove(self, mouseMoveLoc: QPoint) -> None:
+        """
+        Handle mouse move logic.
+
+        :param mouseMoveLoc: QPoint instance
+        """
+        if self._newInstance and self.editModes.addInstance:
+            self._newInstance.setPos(mouseMoveLoc)
+        elif self._newPin and self.editModes.drawPin:
+            self._newPin.setPos(mouseMoveLoc - self._newPin.start)
+        elif self._newNet and self.editModes.drawWire:
+            if not self._newNet.scene():
+                self.addUndoStack(self._newNet)
+            self._newNet.draftLine = QLineF(
+                self._newNet.draftLine.p1(),
+                self.findSnapPoint(self.mouseMoveLoc, set()),
             )
-        except Exception as e:
-            self.logger.error(f"Mouse move error: {e}")
+
+    def _handleAddInstance(self, mouseReleaseLoc: QPoint) -> None:
+        """
+        Handle add instance logic.
+
+        :param mouseReleaseLoc: QPoint instance
+        """
+        if self._newInstance:
+            self._newInstance = None
+        self._newInstance = self.drawInstance(mouseReleaseLoc)
+        self._newInstance.setSelected(True)
+
+    def _handleDrawPin(self, mouseReleaseLoc: QPoint) -> None:
+        """
+        Handle draw pin logic.
+
+        :param mouseReleaseLoc: QPoint instance
+        """
+        if self._newPin:
+            self._newPin = None
+        self._newPin = self.addPin(mouseReleaseLoc)
+        self._newPin.setSelected(True)
+
+    def _handleDrawWire(self, mouseReleaseLoc: QPoint) -> None:
+        """
+        Handle draw wire logic.
+
+        :param mouseReleaseLoc: QPoint instance
+        """
+        if self._newNet:  # finish net drawing
+            self.checkNewNet(self._newNet)
+            self._newNet = None
+        mouseReleaseLoc = self.findSnapPoint(mouseReleaseLoc, set())
+        self._newNet = net.schematicNet(mouseReleaseLoc, mouseReleaseLoc)
+        self._newNet.nameStrength = net.netNameStrengthEnum.NONAME
+
+    def _handleDrawText(self, mouseReleaseLoc: QPoint) -> None:
+        """
+        Handle draw text logic.
+
+        :param mouseReleaseLoc: QPoint instance
+        """
+        if self._newText:
+            self._newText = None
+            self.textTuple = None
+        if self.textTuple:
+            self._newText = shp.text(mouseReleaseLoc, *self.textTuple)
 
     def updateSnapPointRect(self):
         if self._snapPointRect is None:
@@ -285,7 +406,6 @@ class schematicScene(editorScene):
                 list(Counter(self.orderPoints(splitPointsList)).keys()),
             )
             orderedPoints = [opoint.toPoint() for opoint in orderedPointsObj]
-            # print(f'ordered points: {orderedPoints}')
             splitNetList = []
             for i in range(len(orderedPoints) - 1):
                 splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
@@ -317,6 +437,7 @@ class schematicScene(editorScene):
             return origNet
 
         # Remove original net and add merged net
+
         self.removeItem(origNet)
         self.addItem(mergedNet)
 
@@ -675,7 +796,7 @@ class schematicScene(editorScene):
         except Exception as e:
             self.logger.error(e)
 
-    def generatePinNetMap(self, sceneSymbolSet: tuple[set[shp.schematicSymbol]]):
+    def generatePinNetMap(self, sceneSymbolSet: set[shp.schematicSymbol]):
         """
         For symbols in sceneSymbolSet, find which pin is connected to which net. If a
         pin is not connected, assign to it a default net starting with d prefix.
@@ -748,7 +869,7 @@ class schematicScene(editorScene):
         else:
             return set()
 
-    def addStretchWires(self, start: QPoint, end: QPoint) -> List['net.schematicNet']:
+    def addStretchWires(self, start: QPoint, end: QPoint) -> List["net.schematicNet"]:
         """
         Add a trio of wires between two points.
 
@@ -769,13 +890,19 @@ class schematicScene(editorScene):
                 return [net.schematicNet(start, end)]
 
             # Calculate intermediate points
-            firstPointX = self.snapToBase((end.x() - start.x()) / 3 + start.x(), self.snapTuple[0])
+            firstPointX = self.snapToBase(
+                (end.x() - start.x()) / 3 + start.x(), self.snapTuple[0]
+            )
             firstPoint = QPoint(firstPointX, start.y())
             secondPoint = QPoint(firstPointX, end.y())
 
             # Create wire segments
             lines = []
-            segments = [(start, firstPoint), (firstPoint, secondPoint), (secondPoint, end)]
+            segments = [
+                (start, firstPoint),
+                (firstPoint, secondPoint),
+                (secondPoint, end),
+            ]
             for seg_start, seg_end in segments:
                 if seg_start != seg_end:
                     lines.append(net.schematicNet(seg_start, seg_end))
@@ -853,7 +980,9 @@ class schematicScene(editorScene):
             self.logger.warning(f"instantiation error: {e}")
 
     def copySelectedItems(self):
-        selectedItems = [item for item in self.selectedItems() if item.parentItem() is None]
+        selectedItems = [
+            item for item in self.selectedItems() if item.parentItem() is None
+        ]
         if selectedItems is not None:
             for item in selectedItems:
                 selectedItemJson = json.dumps(item, cls=schenc.schematicEncoder)
@@ -889,7 +1018,7 @@ class schematicScene(editorScene):
         try:
             topLevelItems = []
             # Insert a cellview item at the beginning of the list
-            topLevelItems.insert(0, {"cellView": "schematic"})
+            topLevelItems.insert(0, {"viewType": "schematic"})
             topLevelItems.insert(1, {"snapGrid": self.snapTuple})
             topLevelItems.extend(
                 [item for item in self.items() if item.parentItem() is None]
@@ -897,7 +1026,6 @@ class schematicScene(editorScene):
             with file.open(mode="w") as f:
                 json.dump(topLevelItems, f, cls=schenc.schematicEncoder, indent=4)
             # if there is a parent editor, to reload the changes.
-            print(self.editorWindow.parentEditor)
             if self.editorWindow.parentEditor is not None:
                 editorType = self.findEditorTypeString(self.editorWindow.parentEditor)
                 if editorType == "schematicEditor":
@@ -920,16 +1048,34 @@ class schematicScene(editorScene):
         else:
             return str(type(editorWindow))[index + 1 : -2]
 
-    def loadSchematicItems(self, itemsList: list[dict]) -> None:
+    def loadSchematic(self, filePathObj: pathlib.Path) -> None:
         """
         load schematic from item list
         """
-        snapGrid = itemsList[1].get("snapGrid")
-        self.majorGrid = snapGrid[0]  # dot/line grid spacing
-        self.snapTuple = (snapGrid[1], snapGrid[1])
-        self.snapDistance = 2 * snapGrid[1]
+        try:
+            with filePathObj.open("r") as file:
+                decodedData = json.load(file)
+
+            # Unpack grid settings
+            viewType, gridSettings, *itemData = decodedData
+            snapGrid = gridSettings.get("snapGrid", [1, 1])
+            self.majorGrid, self.snapGrid = snapGrid
+            self.snapTuple = (self.snapGrid, self.snapGrid)
+            self.snapDistance = 2 * self.snapGrid
+
+            startTime = time.perf_counter()
+            self.createSchematicItems(itemData)
+            endTime = time.perf_counter()
+
+            self.logger.info(f"Load time: {endTime - startTime:.4f} seconds")
+            print(f"Load time: {endTime - startTime:.4f} seconds")
+        except Exception as e:
+            self.logger.error(f"Cannot load layout: {e}")
+
+
+    def createSchematicItems(self, itemsList):
         shapesList = list()
-        for itemDict in itemsList[2:]:
+        for itemDict in itemsList:
             itemShape = lj.schematicItems(self).create(itemDict)
             if (
                 isinstance(itemShape, shp.schematicSymbol)
@@ -946,7 +1092,7 @@ class schematicScene(editorScene):
     def reloadScene(self):
         topLevelItems = [item for item in self.items() if item.parentItem() is None]
         # Insert a layout item at the beginning of the list
-        topLevelItems.insert(0, {"cellView": "schematic"})
+        topLevelItems.insert(0, {"viewType": "schematic"})
         topLevelItems.insert(1, {"snapGrid": self.snapTuple})
         items = json.loads(json.dumps(topLevelItems, cls=schenc.schematicEncoder))
         self.clear()
@@ -957,7 +1103,9 @@ class schematicScene(editorScene):
         Display the properties of the selected object.
         """
         try:
-            selectedItems = [item for item in self.selectedItems() if item.parentItem() is None]
+            selectedItems = [
+                item for item in self.selectedItems() if item.parentItem() is None
+            ]
             if selectedItems is not None:
                 for item in selectedItems:
                     item.prepareGeometryChange()
@@ -1033,7 +1181,9 @@ class schematicScene(editorScene):
                     if newInstance.labels.get(tempLabelName):
                         # this is where the label value is set.
                         newInstance.labels[tempLabelName].labelValue = (
-                            dlg.instanceLabelsLayout.itemAtPosition(i, 1).widget().text()
+                            dlg.instanceLabelsLayout.itemAtPosition(i, 1)
+                            .widget()
+                            .text()
                         )
                         visible = (
                             dlg.instanceLabelsLayout.itemAtPosition(i, 2)
@@ -1045,8 +1195,10 @@ class schematicScene(editorScene):
                         else:
                             newInstance.labels[tempLabelName].labelVisible = False
                 [labelItem.labelDefs() for labelItem in newInstance.labels.values()]
-                newInstance.setPos(self.snapToGrid(location - self.origin, self.snapTuple))
-                self.undoStack.push(us.addDeleteShapeUndo(self,newInstance, item))
+                newInstance.setPos(
+                    self.snapToGrid(location - self.origin, self.snapTuple)
+                )
+                self.undoStack.push(us.addDeleteShapeUndo(self, newInstance, item))
 
     def setNetProperties(self, netItem: net.schematicNet):
         dlg = pdlg.netProperties(self.editorWindow)
@@ -1077,7 +1229,6 @@ class schematicScene(editorScene):
                 newNet.nameStrength = net.netNameStrengthEnum.SET
                 newNet.name = netname
             self.undoStack.push(us.addDeleteNetUndo(self, newNet, netItem))
-
 
     def setTextProperties(self, item):
         dlg = pdlg.noteTextEdit(self.editorWindow)
@@ -1123,7 +1274,7 @@ class schematicScene(editorScene):
             angle = float(dlg.angleEdit.text().strip())
             newPin = shp.schematicPin(start, pinName, pinDir, pinType)
             newPin.angle = angle
-            self.undoStack.push(us.addDeleteShapeUndo(self,newPin, item))
+            self.undoStack.push(us.addDeleteShapeUndo(self, newPin, item))
 
     def hilightNets(self):
         """
@@ -1135,54 +1286,60 @@ class schematicScene(editorScene):
             self.logger.error(e)
 
     def goDownHier(self):
-        if self.selectedItems() is not None:
-            for item in self.selectedItems():
-                if isinstance(item, shp.schematicSymbol):
-                    dlg = fd.goDownHierDialogue(self.editorWindow)
-                    libItem = libm.getLibItem(
-                        self.editorWindow.libraryView.libraryModel, item.libraryName
+        """
+        Go down the hierarchy, opening the selected view.
+        """
+        if isinstance(self.selectedSymbol, shp.schematicSymbol):
+            dlg = fd.goDownHierDialogue(self.editorWindow)
+            libItem = libm.getLibItem(
+                self.editorWindow.libraryView.libraryModel, self.selectedSymbol.libraryName
+            )
+            cellItem = libm.getCellItem(libItem, self.selectedSymbol.cellName)
+            viewNames = [
+                cellItem.child(i).text()
+                for i in range(cellItem.rowCount())
+                if "schematic" in cellItem.child(i).text()
+                or "symbol" in cellItem.child(i).text()
+            ]
+            dlg.viewListCB.addItems(viewNames)
+            if dlg.exec() == QDialog.Accepted:
+                libItem = libm.getLibItem(
+                    self.editorWindow.libraryView.libraryModel, self.selectedSymbol.libraryName
+                )
+                cellItem = libm.getCellItem(libItem, self.selectedSymbol.cellName)
+                viewItem = libm.getViewItem(
+                    cellItem, dlg.viewListCB.currentText()
+                )
+                openViewTuple = (
+                    self.editorWindow.libraryView.libBrowsW.openCellView(
+                        viewItem, cellItem, libItem
                     )
-                    cellItem = libm.getCellItem(libItem, item.cellName)
-                    viewNames = [
-                        cellItem.child(i).text()
-                        for i in range(cellItem.rowCount())
-                        # if cellItem.child(i).text() != item.viewName
-                        if "schematic" in cellItem.child(i).text()
-                        or "symbol" in cellItem.child(i).text()
+                )
+                if viewItem.viewType == "schematic":
+                    parentInstanceName = [labelItem.labelValue for labelItem in self.selectedSymbol.labels.values() if
+                                    labelItem.labelType == "NLPLabel" and
+                                    labelItem.labelDefinition == "[@instName]"][0]
+                    self.editorWindow.appMainW.openViews[
+                        openViewTuple
+                    ].centralW.scene.hierarchyTrail = f'{self.hierarchyTrail}{parentInstanceName}.'
+                if self.editorWindow.appMainW.openViews[openViewTuple]:
+                    childWindow = self.editorWindow.appMainW.openViews[
+                        openViewTuple
                     ]
-                    dlg.viewListCB.addItems(viewNames)
-                    if dlg.exec() == QDialog.Accepted:
-                        libItem = libm.getLibItem(
-                            self.editorWindow.libraryView.libraryModel, item.libraryName
-                        )
-                        cellItem = libm.getCellItem(libItem, item.cellName)
-                        viewItem = libm.getViewItem(
-                            cellItem, dlg.viewListCB.currentText()
-                        )
-                        openViewTuple = (
-                            self.editorWindow.libraryView.libBrowsW.openCellView(
-                                viewItem, cellItem, libItem
-                            )
-                        )
+                    childWindow.parentEditor = self.editorWindow
+                    childWindow.parentObj = self.selectedSymbol
+                    childWindowType = self.findEditorTypeString(childWindow)
 
-                        if self.editorWindow.appMainW.openViews[openViewTuple]:
-                            childWindow = self.editorWindow.appMainW.openViews[
-                                openViewTuple
-                            ]
-                            childWindow.parentEditor = self.editorWindow
-                            childWindow.parentObj = item
-                            childWindowType = self.findEditorTypeString(childWindow)
-
-                            if childWindowType == "symbolEditor":
-                                childWindow.symbolToolbar.addAction(
-                                    childWindow.goUpAction
-                                )
-                            elif childWindowType == "schematicEditor":
-                                childWindow.schematicToolbar.addAction(
-                                    childWindow.goUpAction
-                                )
-                            if dlg.buttonId == 2:
-                                childWindow.centralW.scene.readOnly = True
+                    if childWindowType == "symbolEditor":
+                        childWindow.symbolToolbar.addAction(
+                            childWindow.goUpAction
+                        )
+                    elif childWindowType == "schematicEditor":
+                        childWindow.schematicToolbar.addAction(
+                            childWindow.goUpAction
+                        )
+                    if dlg.buttonId == 2:
+                        childWindow.centralW.scene.readOnly = True
 
     def ignoreSymbol(self):
         if self.selectedItems() is not None:

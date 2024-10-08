@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 
 
 import revedaEditor.backend.libraryMethods as libm
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as scb
 import revedaEditor.gui.fileDialogues as fd
 
 from typing import List
@@ -58,7 +58,7 @@ class designLibrariesView(QTreeView):
         self.libBrowsW = self.parent.parent
         self.appMainW = self.libBrowsW.appMainW
         self.libraryDict = self.appMainW.libraryDict  # type: dict
-        self.cellViews = self.appMainW.cellViews  # type: list
+        self.cellViews = self.libBrowsW.cellViews  # type: list
         self.openViews = self.appMainW.openViews  # type: dict
         self.logger = self.appMainW.logger
         self.selectedItem = None

@@ -459,7 +459,6 @@ class goDownHierDialogue(QDialog):
         buttonBox.rejected.connect(self.reject)
         _mainLayout.addWidget(buttonBox)
         self.setLayout(_mainLayout)
-        self.show()
 
     def onButtonClicked(self):
         self.buttonId = self.buttonGroup.checkedId()

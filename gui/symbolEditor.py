@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 
 
 import revedaEditor.backend.libraryModelView as lmview
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as libb
 import revedaEditor.gui.symbolScene as symscn
 import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.propertyDialogues as pdlg
@@ -51,7 +51,7 @@ import revedaEditor.gui.editorWindow as edw
 class symbolEditor(edw.editorWindow):
     def __init__(
         self,
-        viewItem: scb.viewItem,
+        viewItem: libb.viewItem,
         libraryDict: dict,
         libraryView: lmview.designLibrariesView,
     ):

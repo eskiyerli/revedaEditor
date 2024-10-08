@@ -1241,7 +1241,6 @@ class text(symbolShape):
 class schematicSymbol(symbolShape):
     def __init__(self, shapes: list, attr: dict):
         super().__init__()
-        assert shapes is not None  # must not be an empty list
         self._shapes = shapes  # list of shapes in the symbol
         self._symattrs = attr  # parameters common to all instances of symbol
         self._counter = 0  # item's number on schematic
@@ -1280,16 +1279,13 @@ class schematicSymbol(symbolShape):
         return f"schematicSymbol({self._instanceName})"
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
-        if not self.scene():
-            return super().itemChange(change, value)
-
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
-            return self._handlePositionChange(value)
-        elif change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
-            self._updateSnapLines()
-        elif change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            self.scene().selectedSymbol = self if value else None
-
+        if self.scene():
+            if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+                return self._handlePositionChange(value)
+            elif change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+                self._updateSnapLines()
+            elif change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                self.scene().selectedSymbol = self if value else None
         return super().itemChange(change, value)
 
     def _handlePositionChange(self, newPos: QPointF) -> QPointF:

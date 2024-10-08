@@ -70,6 +70,43 @@ class BaseHighlighter(QSyntaxHighlighter):
     def highlightComments(self, text):
         pass
 
+class JsonHighlighter(BaseHighlighter):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # String format (green)
+        stringFormat = QTextCharFormat()
+        stringFormat.setForeground(QColor("#009900"))
+        self.highlightingRules.append((r'"(?:\\.|[^"\\])*"', stringFormat))
+
+        # Number format (blue)
+        numberFormat = QTextCharFormat()
+        numberFormat.setForeground(QColor("#0000FF"))
+        self.highlightingRules.append((r'\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b', numberFormat))
+
+        # Boolean format (purple)
+        booleanFormat = QTextCharFormat()
+        booleanFormat.setForeground(QColor("#990099"))
+        self.highlightingRules.append((r'\b(true|false)\b', booleanFormat))
+
+        # Null format (red)
+        nullFormat = QTextCharFormat()
+        nullFormat.setForeground(QColor("#FF0000"))
+        self.highlightingRules.append((r'\bnull\b', nullFormat))
+
+        # Object key format (brown)
+        keyFormat = QTextCharFormat()
+        keyFormat.setForeground(QColor("#8B4513"))
+        keyFormat.setFontWeight(QFont.Bold)
+        self.highlightingRules.append((r'"([^"\\]|\\.)*"\s*:', keyFormat))
+
+        # Braces and brackets format (dark gray)
+        bracesFormat = QTextCharFormat()
+        bracesFormat.setForeground(QColor("#666666"))
+        bracesFormat.setFontWeight(QFont.Bold)
+        self.highlightingRules.append((r'[{}\[\]]', bracesFormat))
+
+
 
 class VerilogAHighlighter(BaseHighlighter):
     def __init__(self, parent=None):
@@ -166,11 +203,10 @@ class XyceHighlighter(BaseHighlighter):
             start, end = match.span()
             self.setFormat(start, end - start, self.commentFormat)
 
-
-class verilogaEditor(QMainWindow):
+class textEditor(QMainWindow):
     closedSignal = Signal(ddef.viewTuple, str)
 
-    def __init__(self, parent, fileName=""):
+    def __init__(self, parent, fileName:str=""):
         super().__init__(parent=parent)
         self._cellViewTuple = ddef.viewTuple("", "", "")
         self.parent = parent
@@ -188,12 +224,10 @@ class verilogaEditor(QMainWindow):
 
         self.textEdit.cursorPositionChanged.connect(self.updateStatus)
 
-        self.setWindowTitle("Verilog-A Editor")
         self.resize(600, 800)
         self.initEditor()
 
     def initEditor(self):
-        self.highlighter = VerilogAHighlighter(self.textEdit.document())
         if self.fileName:
             with open(self.fileName, "r") as file:
                 text = file.read()
@@ -286,31 +320,6 @@ class verilogaEditor(QMainWindow):
         toolbar.addAction(self.findAction)
         toolbar.addAction(self.replaceAction)
 
-    def openFile(self):
-        (self.fileName, _) = QFileDialog.getOpenFileName(
-            self, "Open File", "", "Verilog-A Files (*.va);;All Files (*)"
-        )
-        if self.fileName:
-            with open(self.fileName, "r") as file:
-                text = file.read()
-                self.textEdit.setPlainText(text)
-
-    def saveFile(self):
-        if self.fileName:
-            with open(self.fileName, "w") as file:
-                text = self.textEdit.toPlainText()
-                file.write(text)
-        else:
-            self.saveAsFile()
-
-    def saveAsFile(self):
-        (self.fileName, _) = QFileDialog.getSaveFileName(
-            self, "Save File", "", "Verilog-A Files (*.va);;All Files (*)"
-        )
-        if self.fileName:
-            with open(self.fileName, "w") as file:
-                text = self.textEdit.toPlainText()
-                file.write(text)
 
     def changeFont(self):
         ok, font = QFontDialog.getFont(self.textEdit.font(), self)
@@ -370,19 +379,89 @@ class verilogaEditor(QMainWindow):
         if isinstance(viewTuple, ddef.viewTuple):
             self._cellViewTuple = viewTuple
 
+class jsonEditor(textEditor):
+    def __init__(self,parent, fileName=""):
+        super().__init__(parent, fileName)
+        self.initEditor()
+        self.setWindowTitle("JSON Editor")
 
-class xyceEditor(verilogaEditor):
+    def initEditor(self):
+        self.highlighter = JsonHighlighter(self.textEdit.document())
+        super().initEditor()
+
+    def openFile(self):
+        (self.fileName, _) = QFileDialog.getOpenFileName(
+            self, "Open File", "", "JSON Files (*.json);;All Files (*)")
+        if self.fileName:
+            with open(self.fileName, "r") as file:
+                text = file.read()
+                self.textEdit.setPlainText(text)
+
+    def saveFile(self):
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
+        else:
+            self.saveAsFile()
+
+    def saveAsFile(self):
+        (self.fileName, _) = QFileDialog.getSaveFileName(
+            self, "Save File", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
+
+
+class verilogaEditor(textEditor):
+    def __init__(self,parent, fileName=""):
+        super().__init__(parent, fileName)
+        self.initEditor()
+        self.setWindowTitle("Verilog-A Editor")
+
+    def initEditor(self):
+        self.highlighter = VerilogAHighlighter(self.textEdit.document())
+        super().initEditor()
+
+    def openFile(self):
+        (self.fileName, _) = QFileDialog.getOpenFileName(
+            self, "Open File", "", "Verilog-A Files (*.va);;All Files (*)"
+        )
+        if self.fileName:
+            with open(self.fileName, "r") as file:
+                text = file.read()
+                self.textEdit.setPlainText(text)
+
+    def saveFile(self):
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
+        else:
+            self.saveAsFile()
+
+    def saveAsFile(self):
+        (self.fileName, _) = QFileDialog.getSaveFileName(
+            self, "Save File", "", "Verilog-A Files (*.va);;All Files (*)"
+        )
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
+
+
+class xyceEditor(textEditor):
     def __init__(self,parent, fileName=""):
         super().__init__(parent, fileName)
         self.initEditor()
         self.setWindowTitle("Xyce/SPICE Editor")
 
+
     def initEditor(self):
         self.highlighter = XyceHighlighter(self.textEdit.document())
-        if self.fileName:
-            with open(self.fileName, "r") as file:
-                text = file.read()
-                self.textEdit.setPlainText(text)
+        super().initEditor()
 
     def openFile(self):
         (self.fileName, _) = QFileDialog.getOpenFileName(

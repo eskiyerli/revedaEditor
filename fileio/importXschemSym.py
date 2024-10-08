@@ -34,7 +34,7 @@ from PySide6.QtCore import (
 )
 import revedaEditor.backend.libraryModelView as lmview
 import revedaEditor.backend.libraryMethods as libm
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as scb
 import revedaEditor.gui.editorWindow as edw
 import revedaEditor.common.shapes as shp
 import revedaEditor.common.labels as lbl

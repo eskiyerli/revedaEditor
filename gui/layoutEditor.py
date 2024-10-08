@@ -38,7 +38,7 @@ import pdk.process
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.libraryModelView as lmview
-import revedaEditor.backend.schBackEnd as scb
+import revedaEditor.backend.libBackEnd as libb
 import revedaEditor.fileio.gdsExport as gdse
 import revedaEditor.fileio.layoutEncoder as layenc
 import revedaEditor.fileio.loadJSON as lj
@@ -61,7 +61,7 @@ else:
 
 
 class layoutEditor(edw.editorWindow):
-    def __init__(self, viewItem: scb.viewItem, libraryDict: dict, libraryView) -> None:
+    def __init__(self, viewItem: libb.viewItem, libraryDict: dict, libraryView) -> None:
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Layout Editor - {self.cellName} - {self.viewName}")
         self.setWindowIcon(QIcon(":/icons/edLayer-shape.png"))
@@ -346,6 +346,7 @@ class layoutEditor(edw.editorWindow):
             libItem = libm.getLibItem(libraryModel, self.layoutChooser.libNamesCB.currentText())
             cellItem = libm.getCellItem(libItem, self.layoutChooser.cellCB.currentText())
             viewItem = libm.getViewItem(cellItem, self.layoutChooser.viewCB.currentText())
+            libm.findViewItem(libraryModel, self.layoutChooser.libNamesCB.currentText())
             self.centralW.scene.layoutInstanceTuple = ddef.viewItemTuple(libItem, cellItem,
                 viewItem)
 

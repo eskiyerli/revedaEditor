@@ -32,7 +32,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QStandardItem,
 )
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget
+from typing import Union
 
 
 class libraryItem(QStandardItem):
@@ -48,7 +49,9 @@ class libraryItem(QStandardItem):
         return Qt.StandardItem.UserType
 
     def __str__(self):
-        return f"library item path: {self.libraryPath}, library item name: {self.libraryName}"
+        return (
+            f"library item path: {self.libraryPath}, library item name: {self.libraryName}"
+        )
 
     def __repr__(self):
         return f"{type(self).__name__}({self.libraryPath})"
@@ -136,6 +139,8 @@ class viewItem(QStandardItem):
             return "layout"
         elif "pcell" in self.viewPath.stem:
             return "pcell"
+        elif "revbench" in self.viewPath.stem:
+            return "revbench"
         else:
             return None
 
@@ -144,7 +149,7 @@ class viewItem(QStandardItem):
         return str(self.viewPath.stem)
 
 
-def createLibrary(parent, model, libraryDir, libraryName) -> libraryItem:
+def createLibrary(parent, model, libraryDir: str, libraryName: str) -> libraryItem:
     """
     Create a library item with the given parameters and add it to the model.
     If the library name is empty, show a warning message.
@@ -168,7 +173,7 @@ def createLibrary(parent, model, libraryDir, libraryName) -> libraryItem:
     return newLibraryItem
 
 
-def createCell(parent, model, selectedLib, cellName):
+def createCell(parent, model, selectedLib, cellName) -> Union[cellItem, None]:
     if selectedLib.data(Qt.UserRole + 1) == "library":
         selectedLibPath = selectedLib.data(Qt.UserRole + 2)
         cellPath = selectedLibPath.joinpath(cellName)
@@ -176,9 +181,7 @@ def createCell(parent, model, selectedLib, cellName):
             QMessageBox.warning(parent, "Error", "Please enter a cell name")
             return None
         elif cellPath.exists():
-            QMessageBox.warning(
-                parent, "Error", "Cell already exits. Delete cell first."
-            )
+            QMessageBox.warning(parent, "Error", "Cell already exits. Delete cell first.")
             return None
         else:
             cellPath.mkdir()
@@ -188,7 +191,7 @@ def createCell(parent, model, selectedLib, cellName):
             return newCellItem
 
 
-def createCellView(parent, viewName, cellItem: cellItem):
+def createCellView(parent: QWidget, viewName: str, cellItem: cellItem) -> viewItem:
     """
     Create a cell view with the given view name and cell item.
     If the view name is empty, show a warning message.
@@ -212,27 +215,30 @@ def createCellView(parent, viewName, cellItem: cellItem):
     viewPath.touch()  # create empty cell view path
     items = list()
     if "schematic" in viewName:
-        items.insert(0, {"viewName": "schematic"})
+        items.insert(0, {"viewType": "schematic"})
         items.insert(1, {"snapGrid": (10, 5)})
     elif "symbol" in viewName:
-        items.insert(0, {"viewName": "symbol"})
+        items.insert(0, {"viewType": "symbol"})
         items.insert(1, {"snapGrid": (10, 5)})
     elif "layout" in viewName:
-        items.insert(0, {"viewName": "layout"})
+        items.insert(0, {"viewType": "layout"})
         items.insert(1, {"snapGrid": (10, 5)})
     elif "pcell" in viewName:
-        items.insert(0, {"viewName": "pcell"})
+        items.insert(0, {"viewType": "pcell"})
     elif "spice" in viewName:
-        items.insert(0, {"viewName": "spice"})
+        items.insert(0, {"viewType": "spice"})
     elif "veriloga" in viewName:
-        items.insert(0, {"viewName": "veriloga"})
+        items.insert(0, {"viewType": "veriloga"})
     elif "config" in viewName:
-        items.insert(0, {"viewName": "config"})
+        items.insert(0, {"viewType": "config"})
+    elif "revbench" in viewName:
+        items.insert(0, {"viewType": "revbench"})
     with viewPath.open(mode="w") as f:
         json.dump(items, f, indent=4)
     parent.logger.warning(f"Created {viewName} at {str(viewPath)}")
     cellItem.appendRow(newViewItem)
     return newViewItem
+
 
 # function for copying a cell
 def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -> bool:
@@ -243,9 +249,7 @@ def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -
     copyName: the name of the new cell
     selectedLibPath: the path of the selected library
     """
-    cellPath = origCellItem.data(
-        Qt.UserRole + 2
-    )  # get the cell path from item user data
+    cellPath = origCellItem.data(Qt.UserRole + 2)  # get the cell path from item user data
     if copyName == "":  # assign a default name for the cell
         copyName = "newCell"
     copyPath = selectedLibPath.joinpath(copyName)
