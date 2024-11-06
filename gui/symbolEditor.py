@@ -36,7 +36,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-
 import revedaEditor.backend.libraryModelView as lmview
 import revedaEditor.backend.libBackEnd as libb
 import revedaEditor.gui.symbolScene as symscn
@@ -50,10 +49,10 @@ import revedaEditor.gui.editorWindow as edw
 
 class symbolEditor(edw.editorWindow):
     def __init__(
-        self,
-        viewItem: libb.viewItem,
-        libraryDict: dict,
-        libraryView: lmview.designLibrariesView,
+            self,
+            viewItem: libb.viewItem,
+            libraryDict: dict,
+            libraryView: lmview.designLibrariesView,
     ):
         super().__init__(viewItem, libraryDict, libraryView)
         self.setWindowTitle(f"Symbol Editor - {self.cellName} - {self.viewName}")
@@ -75,7 +74,6 @@ class symbolEditor(edw.editorWindow):
         self.createLineAction.setShortcut(Qt.Key_W)
         self.createLabelAction.setShortcut(Qt.Key_L)
         self.createPinAction.setShortcut(Qt.Key_P)
-
 
     def _createToolBars(self):  # redefine the toolbar in the editorWindow class
         super()._createToolBars()
@@ -200,7 +198,7 @@ class symbolEditor(edw.editorWindow):
             )
             self.centralW.scene.labelUse = createLabelDlg.labelUseCombo.currentText()
             self.centralW.scene.labelOpaque = (
-                createLabelDlg.labelVisiCombo.currentText() == "Yes"
+                    createLabelDlg.labelVisiCombo.currentText() == "Yes"
             )
             self.centralW.scene.labelType = "Normal"  # default button
             if createLabelDlg.normalType.isChecked():
@@ -209,8 +207,6 @@ class symbolEditor(edw.editorWindow):
                 self.centralW.scene.labelType = "NLPLabel"
             elif createLabelDlg.pyLType.isChecked():
                 self.centralW.scene.labelType = "PyLabel"
-
-
 
     def closeEvent(self, event):
         """

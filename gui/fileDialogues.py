@@ -137,31 +137,27 @@ class selectCellViewDialog(createCellDialog):
 
 
 class createCellViewDialog(QDialog):
-    def __init__(self, parent, model, cellItem):
+    def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.parent = parent
-        self.model = model
-        self.cellItem = cellItem
-        self.cellPath = self.cellItem.data(Qt.UserRole + 2)
         self.init_UI()
 
     def init_UI(self):
         self.setWindowTitle("Create CellView")
-        layout = QFormLayout()
+        layout = QFormLayout(self)
         layout.setSpacing(10)
         self.viewComboBox = QComboBox()
-        self.viewComboBox.addItems(self.parent.cellViews)
-        layout.addRow("Select View:", self.viewComboBox)
+
         self.nameEdit = QLineEdit()
         self.nameEdit.setPlaceholderText("CellView Name")
         self.nameEdit.setFixedWidth(200)
-        layout.addRow(QLabel("View Name:"), self.nameEdit)
-        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        self.buttonBox = QDialogButtonBox(QBtn)
+
+        layout.addRow(edf.boldLabel("Select View:"), self.viewComboBox)
+        layout.addRow(edf.boldLabel("View Name:"), self.nameEdit)
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         layout.addRow(self.buttonBox)
-        self.setLayout(layout)
 
 
 class renameCellDialog(QDialog):
@@ -179,7 +175,7 @@ class renameCellDialog(QDialog):
         self.nameEdit = QLineEdit()
         self.nameEdit.setPlaceholderText("Cell Name")
         self.nameEdit.setFixedWidth(200)
-        layout.addRow(QLabel("Cell Name:"), self.nameEdit)
+        layout.addRow(edf.boldLabel("Cell Name:"), self.nameEdit)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
@@ -208,11 +204,11 @@ class copyCellDialog(QDialog):
         self.libraryComboBox.setCurrentIndex(0)
         self.selectedLibPath = self.libraryComboBox.itemData(0, Qt.UserRole + 2)
         self.libraryComboBox.currentTextChanged.connect(self.selectLibrary)
-        layout.addRow(QLabel("Library:"), self.libraryComboBox)
+        layout.addRow(edf.boldLabel("Library:"), self.libraryComboBox)
         self.copyName = QLineEdit()
         self.copyName.setPlaceholderText("Enter Cell Name")
         self.copyName.setFixedWidth(130)
-        layout.addRow(QLabel("Cell Name:"), self.copyName)
+        layout.addRow(edf.boldLabel("Cell Name:"), self.copyName)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
@@ -424,8 +420,8 @@ class gdsExportDialogue(QDialog):
 
 class goDownHierDialogue(QDialog):
     def __init__(
-        self,
-        parent,
+            self,
+            parent,
     ):
         super().__init__(parent=parent)
         self._parent = parent
@@ -650,8 +646,8 @@ class appProperties(QDialog):
         self.setMinimumSize(650, 450)
         self.setWindowTitle("Revolution EDA Options")
         mainLayout = QVBoxLayout()
-        mainLayout.setStretch(0,2)
-        mainLayout.setStretch(1,2)
+        mainLayout.setStretch(0, 2)
+        mainLayout.setStretch(1, 2)
         filePathsGroup = QGroupBox("Paths")
         filePathsLayout = QVBoxLayout()
         filePathsLayout.setSpacing(20)
@@ -832,9 +828,10 @@ class klayoutLaypImportDialogue(QDialog):
         fileDialog.setNameFilter("Layout Properties files (*.lyp)")
         laypFileName = fileDialog.getOpenFileName(
             self, caption="Select LayoutProperties file.", dir=str(pathlib.Path.cwd()),
-        filter="Layout Properties files (*.lyp)")[0]
+            filter="Layout Properties files (*.lyp)")[0]
         if laypFileName:
             self.laypFileEdit.setText(laypFileName)
+
 
 class klayoutLaytImportDialogue(QDialog):
     def __init__(self, parent):
@@ -867,9 +864,10 @@ class klayoutLaytImportDialogue(QDialog):
         fileDialog.setNameFilter("Layout Properties files (*.lyt)")
         laytFileName = fileDialog.getOpenFileName(
             self, caption="Select LayoutProperties file.", dir=str(pathlib.Path.cwd()),
-        filter="Layout Properties files (*.lyt)")[0]
+            filter="Layout Properties files (*.lyt)")[0]
         if laytFileName:
             self.laytFileEdit.setText(laytFileName)
+
 
 class xschemSymIimportDialogue(QDialog):
     def __init__(self, parent, model):

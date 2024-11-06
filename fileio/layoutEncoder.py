@@ -25,7 +25,13 @@
 
 import json
 import inspect
-import pdk.layoutLayers as laylyr
+import os
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.layoutLayers as laylyr
+else:
+    import defaultPDK.layoutLayers as laylyr
+
 import revedaEditor.common.layoutShapes as lshp
 
 
@@ -132,9 +138,7 @@ class layoutEncoder(json.JSONEncoder):
             case _:  # now check super class types:
                 match item.__class__.__bases__[0]:
                     case baseCell:
-                        init_args = inspect.signature(
-                            item.__class__.__init__
-                        ).parameters
+                        init_args = inspect.signature(item.__class__.__init__).parameters
                         args_used = [param for param in init_args if (param != "self")]
 
                         argDict = {arg: getattr(item, arg) for arg in args_used}

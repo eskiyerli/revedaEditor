@@ -29,9 +29,11 @@ import os
 
 from PySide6.QtCore import (Qt, )
 from PySide6.QtGui import (QStandardItem, QFontDatabase, QDoubleValidator, QValidator, )
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                               QHBoxLayout,
                                QLabel, QLineEdit, QVBoxLayout, QRadioButton, QButtonGroup,
-                               QGroupBox, QWidget, QCheckBox, QTableWidget, QTableWidgetItem, )
+                               QGroupBox, QWidget, QCheckBox, QTableWidget,
+                               QTableWidgetItem, )
 from dotenv import load_dotenv
 
 import revedaEditor.common.layoutShapes as lshp
@@ -206,6 +208,7 @@ class layoutPathPropertiesDialog(createPathDialogue):
         self.formLayout.addRow(edf.boldLabel("P2 Point Y:"), self.p2PointEditY)
         self.formLayout.addRow(edf.boldLabel("Path Angle:"), self.angleEdit)
 
+
 class createLayoutPinDialog(QDialog):
     def __init__(self, parent) -> None:
         super().__init__(parent)
@@ -213,7 +216,7 @@ class createLayoutPinDialog(QDialog):
         self.setMinimumWidth(300)
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
         fixedFamilies = [family for family in fontFamilies if
-            QFontDatabase.isFixedPitch(family)]
+                         QFontDatabase.isFixedPitch(family)]
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.mainLayout = QVBoxLayout()
         self.pinPropGroupBox = QGroupBox("Pin Properties")
@@ -255,7 +258,7 @@ class createLayoutPinDialog(QDialog):
         labelPropLayout.addRow(edf.boldLabel("Font Style"), self.fontStyleCB)
         self.labelHeightCB = QComboBox()
         self.fontSizes = [str(size) for size in
-            QFontDatabase.pointSizes(fixedFamilies[0], self.fontStyles[0])]
+                          QFontDatabase.pointSizes(fixedFamilies[0], self.fontStyles[0])]
         self.labelHeightCB.addItems(self.fontSizes)
         labelPropLayout.addRow(edf.boldLabel("Label Height"), self.labelHeightCB)
         self.labelAlignCB = QComboBox()
@@ -282,7 +285,7 @@ class createLayoutPinDialog(QDialog):
         selectedFamily = self.familyCB.currentText()
         selectedStyle = self.fontStyleCB.currentText()
         self.fontSizes = [str(size) for size in
-            QFontDatabase.pointSizes(selectedFamily, selectedStyle)]
+                          QFontDatabase.pointSizes(selectedFamily, selectedStyle)]
         self.labelHeightCB.addItems(self.fontSizes)
 
 
@@ -337,7 +340,7 @@ class createLayoutLabelDialog(QDialog):
         self.setMinimumWidth(300)
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
         fixedFamilies = [family for family in fontFamilies if
-            QFontDatabase.isFixedPitch(family)]
+                         QFontDatabase.isFixedPitch(family)]
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         self.mainLayout = QVBoxLayout()
         labelPropBox = QGroupBox("Label Properties")
@@ -360,7 +363,7 @@ class createLayoutLabelDialog(QDialog):
         self.labelPropLayout.addRow(edf.boldLabel("Font Style"), self.fontStyleCB)
         self.labelHeightCB = QComboBox()
         self.fontSizes = [str(size) for size in
-            QFontDatabase.pointSizes(fixedFamilies[0], self.fontStyles[0])]
+                          QFontDatabase.pointSizes(fixedFamilies[0], self.fontStyles[0])]
         self.labelHeightCB.addItems(self.fontSizes)
         self.labelPropLayout.addRow(edf.boldLabel("Label Height"), self.labelHeightCB)
         self.labelAlignCB = QComboBox()
@@ -386,7 +389,7 @@ class createLayoutLabelDialog(QDialog):
         selectedFamily = self.familyCB.currentText()
         selectedStyle = self.fontStyleCB.currentText()
         self.fontSizes = [str(size) for size in
-            QFontDatabase.pointSizes(selectedFamily, selectedStyle)]
+                          QFontDatabase.pointSizes(selectedFamily, selectedStyle)]
         self.labelHeightCB.clear()
         self.labelHeightCB.addItems(self.fontSizes)
 
@@ -506,37 +509,37 @@ class createLayoutViaDialog(QDialog):
     def singleViaWidthChanged(self):
         text = self.singleViaWidthEdit.text()
         viaDefTuple = [item for item in fabproc.processVias if
-            item.name == self.singleViaNamesCB.currentText()][0]
+                       item.name == self.singleViaNamesCB.currentText()][0]
         self.validateValue(text, self.singleViaWidthEdit, viaDefTuple.minWidth,
-            viaDefTuple.maxWidth)
+                           viaDefTuple.maxWidth)
 
     def singleViaHeightChanged(self):
         text = self.singleViaHeightEdit.text()
         viaDefTuple = [item for item in fabproc.processVias if
-            item.name == self.singleViaNamesCB.currentText()][0]
+                       item.name == self.singleViaNamesCB.currentText()][0]
         self.validateValue(text, self.singleViaHeightEdit, viaDefTuple.minHeight,
-            viaDefTuple.maxHeight)
+                           viaDefTuple.maxHeight)
 
     def arrayViaWidthChanged(self):
         text = self.arrayViaWidthEdit.text()
         viaDefTuple = [item for item in fabproc.processVias if
-            item.name == self.arrayViaNamesCB.currentText()][0]
+                       item.name == self.arrayViaNamesCB.currentText()][0]
         self.validateValue(text, self.arrayViaWidthEdit, viaDefTuple.minWidth,
-            viaDefTuple.maxWidth)
+                           viaDefTuple.maxWidth)
 
     def arrayViaHeightChanged(self):
         text = self.arrayViaHeightEdit.text()
         viaDefTuple = [item for item in fabproc.processVias if
-            item.name == self.arrayViaNamesCB.currentText()][0]
+                       item.name == self.arrayViaNamesCB.currentText()][0]
         self.validateValue(text, self.arrayViaHeightEdit, viaDefTuple.minHeight,
-            viaDefTuple.maxHeight)
+                           viaDefTuple.maxHeight)
 
     def arrayViaSpacingChanged(self):
         text = self.arrayViaSpacingEdit.text()
         viaDefTuple = [item for item in fabproc.processVias if
-            item.name == self.arrayViaNamesCB.currentText()][0]
+                       item.name == self.arrayViaNamesCB.currentText()][0]
         self.validateValue(text, self.arrayViaSpacingEdit, viaDefTuple.minSpacing,
-            viaDefTuple.maxSpacing, )
+                           viaDefTuple.maxSpacing, )
 
     def validateValue(self, text, lineEdit: QLineEdit, min: str, max: str):
         validator = QDoubleValidator()
@@ -654,7 +657,8 @@ class layoutPolygonProperties(QDialog):
         self.tableWidget.setItem(row, 2, QTableWidgetItem(""))
 
     def handleCellChange(self, row, column):
-        if (row == self.tableWidget.rowCount() - 1):  # Check if last row and tuple text column
+        if (
+                row == self.tableWidget.rowCount() - 1):  # Check if last row and tuple text column
             if self.tableWidget.item(row, 2) is not None:
                 text1 = self.tableWidget.item(row, 1).text()
                 text2 = self.tableWidget.item(row, 2).text()
@@ -666,7 +670,6 @@ class layoutPolygonProperties(QDialog):
         print("delete")
         if state == 2:  # Checked state
             self.tableWidget.removeRow(row)
-
 
 
 class formDictionary:

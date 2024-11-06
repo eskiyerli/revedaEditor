@@ -45,8 +45,16 @@ from PySide6.QtWidgets import (
 from dotenv import load_dotenv
 from methodtools import lru_cache
 
-import pdk.pcells
-import pdk.process as fabproc
+
+if os.environ.get("REVEDA_PDK_PATH"):
+    import pdk.pcells as pcells
+    import pdk.process as fabproc
+else:
+    import defaultPDK.pcells as pcells
+    import defaultPDK.process as fabproc
+
+
+
 import revedaEditor.common.labels as lbl
 import revedaEditor.common.layoutShapes as lshp
 import revedaEditor.common.net as net
@@ -247,7 +255,7 @@ class schematicItems:
                         item["to"],
                     )
         text.flipTuple = item.get('fl', (1,1))
-        
+
         return text
 
     def _createPin(self, item):
@@ -264,7 +272,7 @@ class schematicItems:
         pinItem.angle = item.get('ang', 0)
         pinItem.flipTuple = item.get('fl', (1,1))
         return pinItem
-    
+
     def _createNet(self, item):
         start = QPoint(item["st"][0], item["st"][1])
         end = QPoint(item["end"][0], item["end"][1])

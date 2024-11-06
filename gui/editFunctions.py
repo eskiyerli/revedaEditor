@@ -49,6 +49,7 @@ class boldLabel(QLabel):
 
 class longLineEdit(QLineEdit):
     cursorPlaced = Signal()
+
     def __init__(self, value: str = ""):
         super().__init__(None)
         self.setMaximumWidth(500)

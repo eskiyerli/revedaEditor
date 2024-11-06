@@ -149,4 +149,3 @@ class aboutDialog(QDialog):
         layout.addWidget(close_button)
 
         self.setLayout(layout)
-

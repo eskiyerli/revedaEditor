@@ -216,9 +216,9 @@ class symbolScene(editorScene):
             elif self.editModes.drawCircle:
                 self.editorWindow.messageLine.setText("Extend Circle")
                 radius = (
-                    (self.mouseMoveLoc.x() - self.mousePressLoc.x()) ** 2
-                    + (self.mouseMoveLoc.y() - self.mousePressLoc.y()) ** 2
-                ) ** 0.5
+                                 (self.mouseMoveLoc.x() - self.mousePressLoc.x()) ** 2
+                                 + (self.mouseMoveLoc.y() - self.mousePressLoc.y()) ** 2
+                         ) ** 0.5
                 self.newCircle.radius = radius
             elif self.editModes.drawArc:
                 self.editorWindow.messageLine.setText("Extend Arc")
@@ -229,9 +229,9 @@ class symbolScene(editorScene):
                 )
         else:
             if (
-                self.editModes.drawPolygon
-                and self.newPolygon is not None
-                and self.polygonGuideLine
+                    self.editModes.drawPolygon
+                    and self.newPolygon is not None
+                    and self.polygonGuideLine
             ):
                 self.polygonGuideLine.setLine(
                     QLineF(self.newPolygon.points[-1], self.mouseMoveLoc)
@@ -329,14 +329,14 @@ class symbolScene(editorScene):
         return pin
 
     def labelDraw(
-        self,
-        current,
-        labelDefinition,
-        labelType,
-        labelHeight,
-        labelAlignment,
-        labelOrient,
-        labelUse,
+            self,
+            current,
+            labelDefinition,
+            labelType,
+            labelHeight,
+            labelAlignment,
+            labelOrient,
+            labelUse,
     ):
         label = lbl.symbolLabel(
             current,
@@ -479,17 +479,17 @@ class symbolScene(editorScene):
         self.queryDlg.endYLine.setText(str(sceneLineEndPoint.y()))
         if self.queryDlg.exec() == QDialog.Accepted:
             startX = self.snapToBase(
-                        float(self.queryDlg.startXLine.text()), self.snapTuple[0]
-                    )
+                float(self.queryDlg.startXLine.text()), self.snapTuple[0]
+            )
             startY = self.snapToBase(
-                        float(self.queryDlg.startYLine.text()), self.snapTuple[1]
-                    )
+                float(self.queryDlg.startYLine.text()), self.snapTuple[1]
+            )
             endX = self.snapToBase(
-                        float(self.queryDlg.endXLine.text()), self.snapTuple[0]
-                    )
+                float(self.queryDlg.endXLine.text()), self.snapTuple[0]
+            )
             endY = self.snapToBase(
-                        float(self.queryDlg.endYLine.text()), self.snapTuple[1]
-                    )
+                float(self.queryDlg.endYLine.text()), self.snapTuple[1]
+            )
             newLine = shp.symbolLine(QPoint(startX, startY), QPoint(endX, endY))
             self.undoStack.push(us.addDeleteShapeUndo(self, newLine, item))
 
@@ -554,17 +554,17 @@ class symbolScene(editorScene):
             elif self.queryDlg.pyLType.isChecked():
                 labelType = lbl.symbolLabel.labelTypes[2]
             newLabel = lbl.symbolLabel(
-                        start,
-                        labelDefinition,
-                        labelType,
-                        labelHeight,
-                        labelAlign,
-                        labelOrient,
-                        labelUse,
-                    )
+                start,
+                labelDefinition,
+                labelType,
+                labelHeight,
+                labelAlign,
+                labelOrient,
+                labelUse,
+            )
             newLabel.labelVisible = (
-                        self.queryDlg.labelVisiCombo.currentText() == "Yes"
-                    )
+                    self.queryDlg.labelVisiCombo.currentText() == "Yes"
+            )
             newLabel.labelDefs()
             newLabel.setOpacity(1)
             self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item))
@@ -581,8 +581,8 @@ class symbolScene(editorScene):
             sceneStartX = int(float(self.queryDlg.pinXLine.text()))
             sceneStartY = int(float(self.queryDlg.pinYLine.text()))
             start = self.snapToGrid(
-                        QPoint(sceneStartX, sceneStartY), self.snapTuple
-                    )
+                QPoint(sceneStartX, sceneStartY), self.snapTuple
+            )
             pinName = self.queryDlg.pinName.text()
             pinType = self.queryDlg.pinType.currentText()
             pinDir = self.queryDlg.pinDir.currentText()
@@ -592,8 +592,8 @@ class symbolScene(editorScene):
     def updateSymbolPolygon(self, item):
         pointsTupleList = [(point.x(), point.y()) for point in item.points]
         self.queryDlg = pdlg.symbolPolygonProperties(
-                    self.editorWindow, pointsTupleList
-                )
+            self.editorWindow, pointsTupleList
+        )
         if self.queryDlg.exec() == QDialog.Accepted:
             tempPoints = []
             for i in range(self.queryDlg.tableWidget.rowCount()):

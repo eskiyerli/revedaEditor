@@ -174,13 +174,12 @@ class linePropertyDialog(QDialog):
         self.show()
 
 
-
 class pointsTableWidget(QTableWidget):
-    def __init__(self,parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setColumnCount(3)
         self.setHorizontalHeaderLabels(["Del.", 'X', "Y"])
-        self.setColumnWidth(0,8)
+        self.setColumnWidth(0, 8)
         self.setShowGrid(True)
         self.setGridStyle(Qt.SolidLine)
 
@@ -238,9 +237,9 @@ class symbolPolygonProperties(QDialog):
 
     def handleCellChange(self, row, column):
         if (
-            row == self.tableWidget.rowCount() - 1
+                row == self.tableWidget.rowCount() - 1
         ):  # Check if last row and tuple text column
-            if self.tableWidget.item(row,2) is not None:
+            if self.tableWidget.item(row, 2) is not None:
                 text1 = self.tableWidget.item(row, 1).text()
                 text2 = self.tableWidget.item(row, 2).text()
                 if text1 != "" and text2 != "":
@@ -251,8 +250,6 @@ class symbolPolygonProperties(QDialog):
         print("delete")
         if state == 2:  # Checked state
             self.tableWidget.removeRow(row)
-
-
 
 
 class createPinDialog(QDialog):

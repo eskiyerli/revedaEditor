@@ -26,12 +26,8 @@ import pathlib
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import (
-    Qt,
-)
-from PySide6.QtGui import (
-    QStandardItem,
-)
+from PySide6.QtCore import (Qt, )
+from PySide6.QtGui import (QStandardItem, )
 from PySide6.QtWidgets import QMessageBox, QWidget
 from typing import Union
 
@@ -50,8 +46,7 @@ class libraryItem(QStandardItem):
 
     def __str__(self):
         return (
-            f"library item path: {self.libraryPath}, library item name: {self.libraryName}"
-        )
+            f"library item path: {self.libraryPath}, library item name: {self.libraryName}")
 
     def __repr__(self):
         return f"{type(self).__name__}({self.libraryPath})"
@@ -205,11 +200,8 @@ def createCellView(parent: QWidget, viewName: str, cellItem: cellItem) -> viewIt
     viewPath = cellItem.data(Qt.UserRole + 2).joinpath(f"{viewName}.json")
     if viewPath.exists():
         parent.logger.warning("Replacing the cell view.")
-        oldView = [
-            cellItem.child(row)
-            for row in range(cellItem.rowCount())
-            if cellItem.child(row).viewName == viewName
-        ][0]
+        oldView = [cellItem.child(row) for row in range(cellItem.rowCount()) if
+            cellItem.child(row).viewName == viewName][0]
         oldView.delete()
     newViewItem = viewItem(viewPath)
     viewPath.touch()  # create empty cell view path
@@ -260,19 +252,15 @@ def copyCell(parent, model, origCellItem: cellItem, copyName, selectedLibPath) -
         assert cellPath.exists()
         shutil.copytree(cellPath, copyPath)  # copied the cell
         libraryItem = model.findItems(selectedLibPath.name, flags=Qt.MatchExactly)[
-            0
-        ]  # find the library item
+            0]  # find the library item
         # create new cell item
         newCellItem = cellItem(copyPath)
         newCellItem.setEditable(False)
         newCellItem.setData("cell", Qt.UserRole + 1)
         newCellItem.setData(copyPath, Qt.UserRole + 2)
         # go through view list and add to cell item
-        addedViewList = [
-            viewItem(viewPath)
-            for viewPath in copyPath.iterdir()
-            if viewPath.suffix == ".json"
-        ]
+        addedViewList = [viewItem(viewPath) for viewPath in copyPath.iterdir() if
+            viewPath.suffix == ".json"]
         [addedView.setEditable(False) for addedView in addedViewList]
 
         newCellItem.appendRows(addedViewList)

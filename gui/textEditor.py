@@ -24,29 +24,12 @@
 #
 
 import sys
-from PySide6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QTextEdit,
-    QFileDialog,
-    QToolBar,
-    QFontDialog,
-    QInputDialog,
-    QMessageBox,
-    QLabel,
-)
-from PySide6.QtGui import (
-    QTextCharFormat,
-    QColor,
-    QFont,
-    QSyntaxHighlighter,
-    QAction,
-    QIcon,
-)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QFileDialog, QToolBar,
+                               QFontDialog, QInputDialog, QMessageBox, QLabel, )
+from PySide6.QtGui import (QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QAction,
+                           QIcon, )
 
-from PySide6.QtCore import (
-    Signal,
-)
+from PySide6.QtCore import (Signal, )
 import re
 import revedaEditor.resources.resources
 import revedaEditor.backend.dataDefinitions as ddef
@@ -70,6 +53,7 @@ class BaseHighlighter(QSyntaxHighlighter):
     def highlightComments(self, text):
         pass
 
+
 class JsonHighlighter(BaseHighlighter):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -82,7 +66,8 @@ class JsonHighlighter(BaseHighlighter):
         # Number format (blue)
         numberFormat = QTextCharFormat()
         numberFormat.setForeground(QColor("#0000FF"))
-        self.highlightingRules.append((r'\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b', numberFormat))
+        self.highlightingRules.append(
+            (r'\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b', numberFormat))
 
         # Boolean format (purple)
         booleanFormat = QTextCharFormat()
@@ -107,7 +92,6 @@ class JsonHighlighter(BaseHighlighter):
         self.highlightingRules.append((r'[{}\[\]]', bracesFormat))
 
 
-
 class VerilogAHighlighter(BaseHighlighter):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -115,26 +99,18 @@ class VerilogAHighlighter(BaseHighlighter):
         keywordFormat.setForeground(QColor("#0000FF"))
         keywordFormat.setFontWeight(QFont.Bold)
 
-        keywords = [
-            "module", "endmodule", "input", "output", "inout", "parameter",
-            "analog", "real", "electrical", "discipline", "nature"
-        ]
-        self.highlightingRules.append((
-            r'\b(' + '|'.join(keywords) + r')\b', keywordFormat
-        ))
+        keywords = ["module", "endmodule", "input", "output", "inout", "parameter",
+                    "analog", "real", "electrical", "discipline", "nature"]
+        self.highlightingRules.append((r'\b(' + '|'.join(keywords) + r')\b', keywordFormat))
 
         functionFormat = QTextCharFormat()
         functionFormat.setForeground(QColor("#00FF00"))
         functionFormat.setFontWeight(QFont.Bold)
 
-        functions = [
-            "cos", "sin", "ln", "log", "min", "pow", "sinh", "sqrt",
-            "tan", "tanh", "exp", "cosh", "ddt", "ddx", "idt",
-            "laplace_nd", "laplace_zd"
-        ]
-        self.highlightingRules.append((
-            r'\b(' + '|'.join(functions) + r')\b', functionFormat
-        ))
+        functions = ["cos", "sin", "ln", "log", "min", "pow", "sinh", "sqrt", "tan", "tanh",
+                     "exp", "cosh", "ddt", "ddx", "idt", "laplace_nd", "laplace_zd"]
+        self.highlightingRules.append(
+            (r'\b(' + '|'.join(functions) + r')\b', functionFormat))
 
     def highlightComments(self, text):
         self.highlightSingleLineComments(text, '//')
@@ -170,29 +146,23 @@ class XyceHighlighter(BaseHighlighter):
         keywordFormat.setForeground(QColor("#0000FF"))
         keywordFormat.setFontWeight(QFont.Bold)
 
-        keywords = [".print", ".plot", ".include",
-            ".subckt", ".end", ".ends", ".param", ".model", ".lib", ".sweep"
-        ]
-        self.highlightingRules.append((
-            r'\b(' + '|'.join(keywords) + r')\b', keywordFormat
-        ))
+        keywords = [".print", ".plot", ".include", ".subckt", ".end", ".ends", ".param",
+                    ".model", ".lib", ".sweep"]
+        self.highlightingRules.append((r'\b(' + '|'.join(keywords) + r')\b', keywordFormat))
 
         analysisFormat = QTextCharFormat()
         analysisFormat.setForeground(QColor("#00FF0F"))
         analysisFormat.setFontWeight(QFont.Bold)
 
         analyses = [".ac", ".dc", ".tran", ".hb", ".noise", ".op"]
-        self.highlightingRules.append((
-            r'\b(' + '|'.join(analyses) + r')\b', analysisFormat
-        ))
+        self.highlightingRules.append(
+            (r'\b(' + '|'.join(analyses) + r')\b', analysisFormat))
 
         componentFormat = QTextCharFormat()
         componentFormat.setForeground(QColor("#FF0000"))
 
         components = "RCLVIQMDJBEFGHKTSWZUOPXx"
-        self.highlightingRules.append((
-            r'^[' + components + r']', componentFormat
-        ))
+        self.highlightingRules.append((r'^[' + components + r']', componentFormat))
 
     def highlightComments(self, text):
         self.highlightSingleLineComments(text, r'\*')
@@ -203,10 +173,11 @@ class XyceHighlighter(BaseHighlighter):
             start, end = match.span()
             self.setFormat(start, end - start, self.commentFormat)
 
+
 class textEditor(QMainWindow):
     closedSignal = Signal(ddef.viewTuple, str)
 
-    def __init__(self, parent, fileName:str=""):
+    def __init__(self, parent, fileName: str = ""):
         super().__init__(parent=parent)
         self._cellViewTuple = ddef.viewTuple("", "", "")
         self.parent = parent
@@ -320,6 +291,29 @@ class textEditor(QMainWindow):
         toolbar.addAction(self.findAction)
         toolbar.addAction(self.replaceAction)
 
+    def openFile(self):
+        (self.fileName, _) = QFileDialog.getOpenFileName(self, "Open File", "",
+                                                         "JSON Files (*.json);;All Files (*)")
+        if self.fileName:
+            with open(self.fileName, "r") as file:
+                text = file.read()
+                self.textEdit.setPlainText(text)
+
+    def saveFile(self):
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
+        else:
+            self.saveAsFile()
+
+    def saveAsFile(self):
+        (self.fileName, _) = QFileDialog.getSaveFileName(self, "Save File", "",
+                                                         "JSON Files (*.json);;All Files (*)")
+        if self.fileName:
+            with open(self.fileName, "w") as file:
+                text = self.textEdit.toPlainText()
+                file.write(text)
 
     def changeFont(self):
         ok, font = QFontDialog.getFont(self.textEdit.font(), self)
@@ -339,9 +333,8 @@ class textEditor(QMainWindow):
     def replaceText(self):
         findText, ok1 = QInputDialog.getText(self, "Replace", "Enter text to find:")
         if ok1:
-            replace_text, ok2 = QInputDialog.getText(
-                self, "Replace", "Enter replacement text:"
-            )
+            replace_text, ok2 = QInputDialog.getText(self, "Replace",
+                                                     "Enter replacement text:")
             if ok2:
                 document = self.textEdit.document()
                 cursor = document.find(findText)
@@ -358,13 +351,8 @@ class textEditor(QMainWindow):
 
     def closeEvent(self, event):
         if self.textEdit.toPlainText():
-            reply = QMessageBox.question(
-                self,
-                "Save File",
-                "Do you want to save the file?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
+            reply = QMessageBox.question(self, "Save File", "Do you want to save the file?",
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No, )
             if reply == QMessageBox.Yes:
                 self.saveFile()
         self.closedSignal.emit(self.cellViewTuple, self.fileName)
@@ -379,8 +367,9 @@ class textEditor(QMainWindow):
         if isinstance(viewTuple, ddef.viewTuple):
             self._cellViewTuple = viewTuple
 
+
 class jsonEditor(textEditor):
-    def __init__(self,parent, fileName=""):
+    def __init__(self, parent, fileName=""):
         super().__init__(parent, fileName)
         self.initEditor()
         self.setWindowTitle("JSON Editor")
@@ -389,34 +378,9 @@ class jsonEditor(textEditor):
         self.highlighter = JsonHighlighter(self.textEdit.document())
         super().initEditor()
 
-    def openFile(self):
-        (self.fileName, _) = QFileDialog.getOpenFileName(
-            self, "Open File", "", "JSON Files (*.json);;All Files (*)")
-        if self.fileName:
-            with open(self.fileName, "r") as file:
-                text = file.read()
-                self.textEdit.setPlainText(text)
-
-    def saveFile(self):
-        if self.fileName:
-            with open(self.fileName, "w") as file:
-                text = self.textEdit.toPlainText()
-                file.write(text)
-        else:
-            self.saveAsFile()
-
-    def saveAsFile(self):
-        (self.fileName, _) = QFileDialog.getSaveFileName(
-            self, "Save File", "", "JSON Files (*.json);;All Files (*)"
-        )
-        if self.fileName:
-            with open(self.fileName, "w") as file:
-                text = self.textEdit.toPlainText()
-                file.write(text)
-
 
 class verilogaEditor(textEditor):
-    def __init__(self,parent, fileName=""):
+    def __init__(self, parent, fileName=""):
         super().__init__(parent, fileName)
         self.initEditor()
         self.setWindowTitle("Verilog-A Editor")
@@ -426,9 +390,8 @@ class verilogaEditor(textEditor):
         super().initEditor()
 
     def openFile(self):
-        (self.fileName, _) = QFileDialog.getOpenFileName(
-            self, "Open File", "", "Verilog-A Files (*.va);;All Files (*)"
-        )
+        (self.fileName, _) = QFileDialog.getOpenFileName(self, "Open File", "",
+                                                         "Verilog-A Files (*.va);;All Files (*)")
         if self.fileName:
             with open(self.fileName, "r") as file:
                 text = file.read()
@@ -443,9 +406,8 @@ class verilogaEditor(textEditor):
             self.saveAsFile()
 
     def saveAsFile(self):
-        (self.fileName, _) = QFileDialog.getSaveFileName(
-            self, "Save File", "", "Verilog-A Files (*.va);;All Files (*)"
-        )
+        (self.fileName, _) = QFileDialog.getSaveFileName(self, "Save File", "",
+                                                         "Verilog-A Files (*.va);;All Files (*)")
         if self.fileName:
             with open(self.fileName, "w") as file:
                 text = self.textEdit.toPlainText()
@@ -453,29 +415,26 @@ class verilogaEditor(textEditor):
 
 
 class xyceEditor(textEditor):
-    def __init__(self,parent, fileName=""):
+    def __init__(self, parent, fileName=""):
         super().__init__(parent, fileName)
         self.initEditor()
         self.setWindowTitle("Xyce/SPICE Editor")
-
 
     def initEditor(self):
         self.highlighter = XyceHighlighter(self.textEdit.document())
         super().initEditor()
 
     def openFile(self):
-        (self.fileName, _) = QFileDialog.getOpenFileName(
-            self, "Open File", "", "Xyce Files (*.sp);;All Files (*)"
-        )
+        (self.fileName, _) = QFileDialog.getOpenFileName(self, "Open File", "",
+                                                         "Xyce Files (*.sp);;All Files (*)")
         if self.fileName:
             with open(self.fileName, "r") as file:
                 text = file.read()
                 self.textEdit.setPlainText(text)
 
     def saveAsFile(self):
-        (self.fileName, _) = QFileDialog.getSaveFileName(
-            self, "Save File", "", "Xyce Files (*.sp);;All Files (*)"
-        )
+        (self.fileName, _) = QFileDialog.getSaveFileName(self, "Save File", "",
+                                                         "Xyce Files (*.sp);;All Files (*)")
         if self.fileName:
             with open(self.fileName, "w") as file:
                 text = self.textEdit.toPlainText()
@@ -484,7 +443,7 @@ class xyceEditor(textEditor):
 
 def main():
     app = QApplication(sys.argv)
-    editor = verilogaEditor(None,'')
+    editor = verilogaEditor(None, '')
     editor.show()
     sys.exit(app.exec())
 

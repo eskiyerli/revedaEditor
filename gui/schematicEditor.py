@@ -64,8 +64,9 @@ import revedaEditor.gui.propertyDialogues as pdlg
 import revedaEditor.gui.schematicScene as schscn
 import revedaEditor.resources.resources
 from revedaEditor.gui.startThread import startThread
-from typing import List
+from typing import List, Union
 import importlib
+
 
 class schematicEditor(edw.editorWindow):
     def __init__(self, viewItem: libb.viewItem, libraryDict: dict, libraryView) -> None:
@@ -99,7 +100,6 @@ class schematicEditor(edw.editorWindow):
         self.renumberInstanceAction.setToolTip("Renumber Instances")
         simulationIcon = QIcon("icons/application-run.png")
         self.simulateAction = QAction(simulationIcon, "Revolution EDA SAE...", self)
-
 
     def _addActions(self):
         super()._addActions()
@@ -143,7 +143,6 @@ class schematicEditor(edw.editorWindow):
         # self.menuHelp = self.editorMenuBar.addMenu("&Help")
         if self._app.revedasim_path:
             self.simulationMenu.addAction(self.simulateAction)
-
 
     def _createTriggers(self):
         super()._createTriggers()
@@ -263,13 +262,62 @@ class schematicEditor(edw.editorWindow):
 
     def startSimClick(self, s):
         try:
-            simdlg=importlib.import_module("revedasim.dialogueWindows", str(self._app.revedasim_path))
-            revsimdlg = simdlg.createOpenRevBenchDialogue(self,
-                                                          self.libraryView.libraryModel,
-                                                          self.cellItem)
-            revsimdlg.show()
-        except (ImportError or NameError):
-            self.logger.error('Reveda SAE is not installed.')
+            simdlg = importlib.import_module(
+                "revedasim.dialogueWindows", str(self._app.revedasim_pathObj)
+            )
+            revbenchdlg = simdlg.createRevbenchDialogue(
+                self, self.libraryView.libraryModel, self.cellItem
+            )
+            revbenchdlg.libNamesCB.setCurrentText(self.libName)
+            revbenchdlg.cellCB.setCurrentText(self.cellName)
+            revbenchdlg.viewCB.setCurrentText(self.viewName)
+            # now first create the revbenchview item and populate it
+            if revbenchdlg.exec() == QDialog.Accepted:
+                try:
+                    libItem = libm.getLibItem(
+                        self.libraryView.libraryModel, revbenchdlg.libNamesCB.currentText()
+                    )
+                    cellItem = libm.getCellItem(libItem, revbenchdlg.cellCB.currentText())
+                    revbenchName = revbenchdlg.benchCB.currentText()
+                    if not (libItem and cellItem):
+                        raise ValueError(
+                            f"library={libItem} or cell={cellItem} is not found"
+                        )
+                    revbenchItem = libm.findViewItem(
+                        self.libraryView.libraryModel,
+                        libItem.libraryName,
+                        cellItem.cellName,
+                        revbenchName,
+                    )
+                    if not revbenchItem:  # if not found, create a new one
+                        revbenchItem = libb.createCellView(
+                            self, revbenchdlg.benchCB.currentText(), cellItem
+                        )
+                        items = []
+                        libraryName = self.libItem.data(Qt.UserRole + 2).name
+                        cellName = self.cellItem.data(Qt.UserRole + 2).name
+                        items.append({"viewType": "revbench"})
+                        items.append({"libraryName": libraryName})
+                        items.append({"cellName": cellName})
+                        items.append({"designName": revbenchdlg.viewCB.currentText()})
+                        items.append({"settings": []})
+                        with revbenchItem.data(Qt.UserRole + 2).open(mode="w") as benchFile:
+                            json.dump(items, benchFile, indent=4)
+                except Exception as e:
+                    self.logger.error(f"Error during simulation setup: {e}")
+                try:
+                    simmwModule = importlib.import_module(
+                        "revedasim.simMainWindow", str(self._app.revedasim_pathObj)
+                    )
+                    simmw = simmwModule.SimMainWindow(
+                        revbenchItem, self.libraryView.libraryModel, self.libraryView
+                    )
+                    simmw.show()
+                except (ImportError, NameError):
+                    self.logger.error("Reveda SAE is not installed.")
+
+        except ImportError or NameError:
+            self.logger.error("Reveda SAE is not installed.")
 
     def renumberInstanceClick(self, s):
         self.centralW.scene.renumberInstances()
@@ -283,19 +331,14 @@ class schematicEditor(edw.editorWindow):
         self.centralW.scene.saveSchematic(self.file)
 
     def loadSchematic(self):
-        # with open(self.file) as tempFile:
-        #     items = json.load(tempFile)
-        # self.centralW.scene.loadSchematicItems(items)
         self.centralW.scene.loadSchematic(self.file)
 
-        # because we do not save dot points, it is necessary to recreate them.
-
     def createConfigView(
-        self,
-        configItem: libb.viewItem,
-        configDict: dict,
-        newConfigDict: dict,
-        processedCells: set,
+            self,
+            configItem: libb.viewItem,
+            configDict: dict,
+            newConfigDict: dict,
+            processedCells: set,
     ):
         sceneSymbolSet = self.centralW.scene.findSceneSymbolSet()
         for item in sceneSymbolSet:
@@ -665,12 +708,14 @@ class schematicContainer(QWidget):
         gLayout.setColumnStretch(0, 5)
         gLayout.setRowStretch(0, 6)
         self.setLayout(gLayout)
+
+
 class xyceNetlist:
     def __init__(
-        self,
-        schematic: schematicEditor,
-        filePathObj: pathlib.Path,
-        useConfig: bool = False,
+            self,
+            schematic: schematicEditor,
+            filePathObj: pathlib.Path,
+            useConfig: bool = False,
     ):
         self.filePathObj = filePathObj
         self.schematic = schematic
@@ -692,13 +737,15 @@ class xyceNetlist:
         self.vamodelLines = set()  # keeps track of vamodel lines.
         self.vahdlLines = set()  # keeps track of *.HDL lines.
 
+    def __repr__(self):
+        return f"xyceNetlist(filePathObj={self.filePathObj}, schematic={self.schematic}, useConfig={self._use_config})"
 
     @property
     def switchViewList(self) -> List[str]:
         return self._switchViewList
 
     @switchViewList.setter
-    def switchViewList(self, value:List[str]):
+    def switchViewList(self, value: List[str]):
         self._switchViewList = value
 
     @property
@@ -706,7 +753,7 @@ class xyceNetlist:
         return self._stopViewList
 
     @stopViewList.setter
-    def stopViewList(self, value:List[str]):
+    def stopViewList(self, value: List[str]):
         self._stopViewList = value
 
     def writeNetlist(self):
@@ -725,7 +772,6 @@ class xyceNetlist:
                         80 * "*",
                         "\n",
                         ".GLOBAL gnd!\n\n",
-
                     ]
                 )
             )
@@ -771,9 +817,11 @@ class xyceNetlist:
     @lru_cache(maxsize=16)
     def processElementSymbol(self, elementSymbol, schematic, cirFile):
         if elementSymbol.symattrs.get("XyceNetlistPass") != "1" and (
-            not elementSymbol.netlistIgnore):
-            libItem = libm.getLibItem(schematic.libraryView.libraryModel,
-                                      elementSymbol.libraryName)
+                not elementSymbol.netlistIgnore
+        ):
+            libItem = libm.getLibItem(
+                schematic.libraryView.libraryModel, elementSymbol.libraryName
+            )
             cellItem = libm.getCellItem(libItem, elementSymbol.cellName)
             netlistView = self.determineNetlistView(elementSymbol, cellItem)
 
@@ -782,7 +830,9 @@ class xyceNetlist:
         elif elementSymbol.netlistIgnore:
             cirFile.write(f"*{elementSymbol.instanceName} is marked to be ignored\n")
         elif not elementSymbol.symattrs.get("XyceNetlistPass", False):
-            cirFile.write(f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n")
+            cirFile.write(
+                f"*{elementSymbol.instanceName} has no XyceNetlistLine attribute\n"
+            )
 
     def determineNetlistView(self, elementSymbol, cellItem):
         viewItems = [cellItem.child(row) for row in range(cellItem.rowCount())]
@@ -797,11 +847,11 @@ class xyceNetlist:
             return "symbol"
 
     def createItemLine(
-        self,
-        cirFile,
-        elementSymbol: shp.schematicSymbol,
-        cellItem: libb.cellItem,
-        netlistView: str,
+            self,
+            cirFile,
+            elementSymbol: shp.schematicSymbol,
+            cellItem: libb.cellItem,
+            netlistView: str,
     ):
         if "schematic" in netlistView:
             # First write subckt call in the netlist.
@@ -820,9 +870,7 @@ class xyceNetlist:
 
                 if viewTuple not in self.netlistedViewsSet:
                     self.netlistedViewsSet.add(viewTuple)
-                    pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(
-                        ",", " "
-                    )
+                    pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(",", " ")
                     cirFile.write(f".SUBCKT {schematicObj.cellName} {pinList}\n")
                     self.recursiveNetlisting(schematicObj, cirFile)
                     cirFile.write(".ENDS\n")
@@ -838,9 +886,7 @@ class xyceNetlist:
         Create a netlist line from a nlp device format line.
         """
         try:
-            xyceNetlistFormatLine = elementSymbol.symattrs[
-                "XyceSymbolNetlistLine"
-            ].strip()
+            xyceNetlistFormatLine = elementSymbol.symattrs["XyceSymbolNetlistLine"].strip()
             for labelItem in elementSymbol.labels.values():
                 if labelItem.labelName in xyceNetlistFormatLine:
                     xyceNetlistFormatLine = xyceNetlistFormatLine.replace(
@@ -855,7 +901,7 @@ class xyceNetlist:
 
             pinList = " ".join(elementSymbol.pinNetMap.values())
             xyceNetlistFormatLine = (
-                xyceNetlistFormatLine.replace("@pinList", pinList) + "\n"
+                    xyceNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             return xyceNetlistFormatLine
         except Exception as e:
@@ -864,16 +910,16 @@ class xyceNetlist:
                 f"Netlist line is not defined for {elementSymbol.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
-            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            return (
+                f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            )
 
     def createSpiceLine(self, elementSymbol: shp.schematicSymbol):
         """
         Create a netlist line from a nlp device format line.
         """
         try:
-            spiceNetlistFormatLine = elementSymbol.symattrs[
-                "XyceSpiceNetlistLine"
-            ].strip()
+            spiceNetlistFormatLine = elementSymbol.symattrs["XyceSpiceNetlistLine"].strip()
             for labelItem in elementSymbol.labels.values():
                 if labelItem.labelName in spiceNetlistFormatLine:
                     spiceNetlistFormatLine = spiceNetlistFormatLine.replace(
@@ -887,7 +933,7 @@ class xyceNetlist:
                     )
             pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(",", " ")
             spiceNetlistFormatLine = (
-                spiceNetlistFormatLine.replace("@pinList", pinList) + "\n"
+                    spiceNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             self.includeLines.add(
                 elementSymbol.symattrs.get(
@@ -901,7 +947,9 @@ class xyceNetlist:
                 f"Netlist line is not defined for {elementSymbol.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
-            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            return (
+                f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            )
 
     def createVerilogaLine(self, elementSymbol):
         """
@@ -924,7 +972,7 @@ class xyceNetlist:
                     )
             pinList = " ".join(elementSymbol.pinNetMap.values())
             verilogaNetlistFormatLine = (
-                verilogaNetlistFormatLine.replace("@pinList", pinList) + "\n"
+                    verilogaNetlistFormatLine.replace("@pinList", pinList) + "\n"
             )
             self.vamodelLines.add(
                 elementSymbol.symattrs.get(
@@ -943,4 +991,6 @@ class xyceNetlist:
                 f"Netlist line is not defined for {elementSymbol.instanceName}"
             )
             # if there is no NLPDeviceFormat line, create a warning line
-            return f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            return (
+                f"*Netlist line is not defined for symbol of {elementSymbol.instanceName}\n"
+            )

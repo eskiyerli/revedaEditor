@@ -27,26 +27,11 @@
 import pathlib
 
 # import numpy as np
-from PySide6.QtCore import (
-    Qt, QSize,
-)
-from PySide6.QtGui import (
-    QAction,
-    QIcon,
-    QImage,
-    QKeySequence,
-)
+from PySide6.QtCore import (Qt, QSize, )
+from PySide6.QtGui import (QAction, QIcon, QImage, QKeySequence, )
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
-from PySide6.QtWidgets import (
-    QApplication,
-    QDialog,
-    QFileDialog,
-    QLabel,
-    QMainWindow,
-    QMenu,
-    QToolBar,
-)
-
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLabel, QMainWindow,
+                               QMenu, QToolBar, )
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryModelView as lmview
@@ -62,27 +47,21 @@ class editorWindow(QMainWindow):
     Base class for editor windows.
     """
 
-    def __init__(
-        self,
-        viewItem: libb.viewItem,
-        libraryDict: dict,
-        libraryView: lmview.designLibrariesView,
-    ):  # file is a pathlib.Path object
+    def __init__(self, viewItem: libb.viewItem, libraryDict: dict,
+                 libraryView: lmview.designLibrariesView, ):  # file is a pathlib.Path object
         super().__init__()
         self.centralW = None
         self.viewItem = viewItem
-        self.file: pathlib.Path = self.viewItem.data(
-            Qt.UserRole + 2
-        )  # pathlib Path object
+        self.file: pathlib.Path = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
         self.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
-        self.libName:str = self.libItem.libraryName
-        self.viewName:str = self.viewItem.viewName
+        self.libName: str = self.libItem.libraryName
+        self.viewName: str = self.viewItem.viewName
         self.libraryDict = libraryDict
         self.libraryView = libraryView
         self.parentEditor = None  # type: editorWindow
-        self.parentObj = None # type symbol or layoutInstance
+        self.parentObj = None  # type symbol or layoutInstance
         self._app = QApplication.instance()  # main application pointer
         self.appMainW = self.libraryView.parent.parent.appMainW
         self.logger = self.appMainW.logger
@@ -105,7 +84,6 @@ class editorWindow(QMainWindow):
         self._addActions()
         self._createTriggers()
         self._createShortcuts()
-        
 
     def _createMenuBar(self):
         """
@@ -192,7 +170,8 @@ class editorWindow(QMainWindow):
 
         alignVerticalIcon = QIcon(":/icons/layers-alignment-center.png")
         self.alignVerticalAction = QAction(alignVerticalIcon, "Vertical Align", self)
-        self.alignVerticalAction.setToolTip("Align selected objects vertically at the centre")
+        self.alignVerticalAction.setToolTip(
+            "Align selected objects vertically at the centre")
 
         alignRightIcon = QIcon(":/icons/layers-alignment-center.png")
         self.alignRightAction = QAction(alignRightIcon, "Right Align", self)
@@ -212,9 +191,7 @@ class editorWindow(QMainWindow):
         self.selectConfigAction.setToolTip("Configure the selection options")
 
         panZoomConfigIcon = QIcon(":/icons/selection-resize.png")
-        self.panZoomConfigAction = QAction(
-            panZoomConfigIcon, "Pan/Zoom Config...", self
-        )
+        self.panZoomConfigAction = QAction(panZoomConfigIcon, "Pan/Zoom Config...", self)
         self.panZoomConfigAction.setToolTip("Configure the pan/zoom options")
 
         undoIcon = QIcon(":/icons/arrow-circle-315-left.png")
@@ -388,9 +365,8 @@ class editorWindow(QMainWindow):
         self.selectPinAction.setToolTip("Select Pins Only")
 
         removeSelectFilterIcon = QIcon(":icons/eraser.png")
-        self.removeSelectFilterAction = QAction(
-            removeSelectFilterIcon, "Remove Select Filters", self
-        )
+        self.removeSelectFilterAction = QAction(removeSelectFilterIcon,
+                                                "Remove Select Filters", self)
         self.removeSelectFilterAction.setToolTip("Remove Selection Filters")
 
         ignoreIcon = QIcon(":/icons/minus-circle.png")
@@ -596,9 +572,7 @@ class editorWindow(QMainWindow):
             printer = dlg.printer()
             printRunner = startThread(self.centralW.view.printView(printer))
             self.appMainW.threadPool.start(printRunner)
-            self.logger.info(
-                "Printing started"
-            )  # self.centralW.view.printView(printer)
+            self.logger.info("Printing started")  # self.centralW.view.printView(printer)
 
     def printPreviewClick(self):
         printer = QPrinter(QPrinter.ScreenResolution)
@@ -608,9 +582,8 @@ class editorWindow(QMainWindow):
         ppdlg.exec()
 
     def imageExportClick(self):
-        image = QImage(
-            self.centralW.view.viewport().size(), QImage.Format_ARGB32_Premultiplied
-        )
+        image = QImage(self.centralW.view.viewport().size(),
+                       QImage.Format_ARGB32_Premultiplied)
         self.centralW.view.printView(image)
         fdlg = QFileDialog(self, caption="Select or create an image file")
         fdlg.setDefaultSuffix("png")
@@ -676,13 +649,13 @@ class editorWindow(QMainWindow):
 
     def zoomIn(self):
         self.centralW.view.scale(1.25, 1.25)
-        self.centralW.view.viewRect = self.centralW.view.mapToScene(self.rect()).boundingRect(
-        ).toRect()
+        self.centralW.view.viewRect = self.centralW.view.mapToScene(
+            self.rect()).boundingRect().toRect()
 
     def zoomOut(self):
         self.centralW.view.scale(0.8, 0.8)
-        self.centralW.view.viewRect = self.centralW.view.mapToScene(self.rect()).boundingRect(
-        ).toRect()
+        self.centralW.view.viewRect = self.centralW.view.mapToScene(
+            self.rect()).boundingRect().toRect()
 
     def closeWindow(self):
         self.close()

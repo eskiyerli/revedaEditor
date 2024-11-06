@@ -29,7 +29,8 @@ from typing import List, Sequence
 # import numpy as np
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, Signal)
 from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
-from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem, QDialog,
+from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
+                               QDialog,
                                QCompleter)
 from dotenv import load_dotenv
 
@@ -47,7 +48,7 @@ else:
 
 class editorScene(QGraphicsScene):
 
-    def __init__(self, parent ):
+    def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.editorWindow = self.parent.parent
@@ -59,7 +60,8 @@ class editorScene(QGraphicsScene):
         self.mouseReleaseLoc = None
         # common edit modes
         self.editModes = ddef.editModes(selectItem=True, deleteItem=False, moveItem=False,
-                                        copyItem=False, rotateItem=False, changeOrigin=False,
+                                        copyItem=False, rotateItem=False,
+                                        changeOrigin=False,
                                         panView=False, stretchItem=False, )
         self.readOnly = False  # if the scene is not editable
         self.undoStack = us.undoStack()
@@ -83,13 +85,15 @@ class editorScene(QGraphicsScene):
         super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             self.mousePressLoc = event.scenePos().toPoint()
-            self._items = [item for item in self.selectedItems() if item.parentItem() is None]
+            self._items = [item for item in self.selectedItems() if
+                           item.parentItem() is None]
             if self.editModes.selectItem:
                 if not self.selectedItems():
                     # Start a new selection rectangle
                     self._startNewSelectionRectangle()
             elif self.editModes.moveItem:
-                self._itemsOffset = [item.scenePos().toPoint() - self.mousePressLoc for item in
+                self._itemsOffset = [item.scenePos().toPoint() - self.mousePressLoc for item
+                                     in
                                      self._items]
             elif self.editModes.panView:
                 self.centerViewOnPoint(self.mousePressLoc)
@@ -103,7 +107,8 @@ class editorScene(QGraphicsScene):
 
             if self.editModes.moveItem and self._items:
                 if self.mouseReleaseLoc != self.mousePressLoc:
-                    self.moveShapesUndoStack(self._items, self._itemsOffset, self.mousePressLoc,
+                    self.moveShapesUndoStack(self._items, self._itemsOffset,
+                                             self.mousePressLoc,
                                              self.mouseReleaseLoc)
             elif self.editModes.selectItem:
                 self._handleSelection(modifiers)
@@ -173,7 +178,8 @@ class editorScene(QGraphicsScene):
             item.setSelected(True)
 
     def _getClickedItems(self):
-        return [item for item in self.items(self.mouseReleaseLoc) if item.parentItem() is None]
+        return [item for item in self.items(self.mouseReleaseLoc) if
+                item.parentItem() is None]
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)

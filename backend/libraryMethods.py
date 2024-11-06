@@ -25,9 +25,10 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QStandardItemModel
 
 import revedaEditor.backend.libBackEnd as scb
+from typing import Union
 
 
-def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryItem:
+def getLibItem(libraryModel: QStandardItemModel, libName: str) -> Union[scb.libraryItem, None]:
     libItem = [
         item
         for item in libraryModel.findItems(libName)
@@ -37,7 +38,7 @@ def getLibItem(libraryModel: QStandardItemModel, libName: str) -> scb.libraryIte
         return libItem
 
 
-def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> scb.cellItem:
+def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> Union[scb.cellItem, None]:
     cellItems = [
         libItem.child(i)
         for i in range(libItem.rowCount())
@@ -47,7 +48,7 @@ def getCellItem(libItem: scb.libraryItem, cellNameInp: str) -> scb.cellItem:
         return cellItems[0]
 
 
-def getViewItem(cellItem: scb.cellItem, viewNameInp: str) -> scb.viewItem:
+def getViewItem(cellItem: scb.cellItem, viewNameInp: str) -> Union[scb.viewItem, None]:
     if cellItem is not None:
         viewItems = [
             cellItem.child(i)

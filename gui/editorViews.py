@@ -131,7 +131,6 @@ class editorView(QGraphicsView):
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
         # self.zoomFactorChanged.emit(self.zoomFactor)
 
-
     def drawBackground(self, painter, rect):
         """
         Draws the background of the painter within the given rectangle.
@@ -329,7 +328,6 @@ class schematicView(editorView):
                 self.scene.addUndoMacroStack(undoCommandList, "Stretch Wires")
                 # undoCommandList.append(us.addShapesUndo(self.scene, lines))
             self.scene.removeItem(snapLine)
-
 
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)
