@@ -667,31 +667,6 @@ class schematicScene(editorScene):
 
         return connectedSet, otherNetsSet
 
-    # def traverseNets(
-    #         self, connectedSet: set[net.schematicNet], otherNetsSet: set[net.schematicNet]
-    # ) -> tuple[set[net.schematicNet], set[net.schematicNet]]:
-    #     """
-    #     Start from a net and traverse the schematic to find all connected nets.
-    #     If the connected net search
-    #     is exhausted, remove those nets from the scene nets set and start again
-    #     in another net until all
-    #     the nets in the scene are exhausted.
-    #     """
-    #     newFoundConnectedSet = set()
-    #     for netItem in connectedSet:
-    #         for netItem2 in otherNetsSet:
-    #             if self.checkNetConnect(netItem, netItem2):
-    #                 netItem2.inherit(netItem)
-    #                 if netItem2.nameConflict:
-    #                     continue
-    #                 else:
-    #                     newFoundConnectedSet.add(netItem2)
-    #     if len(newFoundConnectedSet) > 0:
-    #         connectedSet.update(newFoundConnectedSet)
-    #         otherNetsSet -= newFoundConnectedSet
-    #         self.traverseNets(connectedSet, otherNetsSet)
-    #     return connectedSet, otherNetsSet
-
     # Main method
     def groupAllNets(self, sceneNetsSet: set[net.schematicNet]) -> None:
         """
@@ -1298,6 +1273,7 @@ class schematicScene(editorScene):
             ]
 
     def renumberInstances(self):
+
         symbolList = [
             item for item in self.items() if isinstance(item, shp.schematicSymbol)
         ]
