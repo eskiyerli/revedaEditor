@@ -49,7 +49,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# import pdk.symLayers as symlyr
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.libraryModelView as lmview
@@ -200,6 +199,7 @@ class schematicEditor(edw.editorWindow):
         self.createNetAction.setShortcut(Qt.Key_W)
         self.createPinAction.setShortcut(Qt.Key_P)
         self.goDownAction.setShortcut("Shift+E")
+
 
     def createNetClick(self, s):
         self.centralW.scene.editModes.setMode("drawWire")
