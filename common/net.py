@@ -94,12 +94,49 @@ class netNameStrengthEnum(customIntEnum):
     SET = 3
 
 class schematicNetLine(QGraphicsLineItem):
-    def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
+    def __init__(self, start: QPoint, end: QPoint, parent, mode: int = 0,):
         super().__init__(start, end)
+        self.parent = parent
+        self.setParentItem(parent)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemIsFocusable, True)
+        # self.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setAcceptHoverEvents(True)
+        self._mode = 0
+        self._stretch = False
+        self._nameConflict: bool = False
+        self._nameStrength: netNameStrengthEnum = netNameStrengthEnum.NONAME
+        self._highlighted = False
+        self._flightLinesSet: Set["schematicNet"] = set()
+        self._connectedNetsSet: Set["schematicNet"] = set()
+        self._netSnapLines: dict = {}
+        self._draftLine = QLineF(start, end)
+        self._transformOriginPoint = self._draftLine.p1()
+        self._angle = self.parent.angle
+        self._flip = (1,1)
+        match self._mode:
+            case 0:
+                self._angle = 90 * math.floor(
+                    ((self._draftLine.angle() + 45) % 360) / 90
+                )
+            case 1:
+                self._angle = 45 * math.floor(
+                    ((self._draftLine.angle() + 22.5) % 360) / 45
+                )
+            case 2:
+                self._angle = self._draftLine.angle()
+        self._draftLine.setAngle(0)
+        self.setTransformOriginPoint(self._transformOriginPoint)
+        self._shapeRect = QRectF(self._draftLine.p1(), self._draftLine.p2()).adjusted(
+            -2, -2, 2, 2
+        )
+        self._boundingRect = self._shapeRect.adjusted(-8, -8, 8, 8)
+        self.setRotation(-self._angle)
         
 
 class schematicNet(QGraphicsItem):
-    # _netSnapLines: dict
 
     def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
         super().__init__()
@@ -121,7 +158,6 @@ class schematicNet(QGraphicsItem):
         self._transformOriginPoint = self._draftLine.p1()
         self._angle = None
         self._flip = (1,1)
-        self.parallelNetsSet = set()
         match self._mode:
             case 0:
                 self._angle = 90 * math.floor(
@@ -227,19 +263,19 @@ class schematicNet(QGraphicsItem):
                     eventPos - self._draftLine.p1().toPoint()
                 ).manhattanLength() <= self.scene().snapDistance:
                     self.setCursor(Qt.SizeHorCursor)
-                    self._stretchSide = "p1"
+                    self.scene().stretchNet.emit(self, 'p1')
                 elif (
                     eventPos - self._draftLine.p2().toPoint()
                 ).manhattanLength() <= self.scene().snapDistance:
                     self.setCursor(Qt.SizeHorCursor)
-                    self._stretchSide = "p2"
-                self.scene().stretchNet(self, self._stretchSide)
+                    self.scene().stretchNet.emit(self, 'p2')
+
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.setSelected(False)
         if self.scene().editModes.moveItem:
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
-            self.scene().mergeSplitNets(self)
+            self.scene().wireEditFinished.emit(self)
         super().mouseReleaseEvent(event)
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
@@ -478,7 +514,6 @@ class netName(QGraphicsSimpleTextItem):
             self.setVisible(True)
         else:
             self.setVisible(False)
-
 
 
 class netFlightLine(QGraphicsPathItem):

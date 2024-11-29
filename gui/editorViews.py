@@ -26,39 +26,14 @@
 from collections import Counter
 
 # import numpy as np
-from PySide6.QtCore import (
-    QPoint,
-    QRect,
-    Qt,
-    Signal,
-)
-from PySide6.QtGui import (
-    QColor,
-    QKeyEvent,
-    QPainter,
-    QWheelEvent,
-)
-from PySide6.QtWidgets import (
-    QGraphicsView,
-)
+from PySide6.QtCore import (QPoint, QRect, Qt, Signal, )
+from PySide6.QtGui import (QColor, QKeyEvent, QPainter, QWheelEvent, )
+from PySide6.QtWidgets import (QGraphicsView, )
+from revedaEditor.backend.pdkPaths import importPDKModule
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-if os.environ.get("REVEDA_PDK_PATH"):
-    import pdk.schLayers as schlyr
-else:
-    import defaultPDK.schLayers as schlyr
-
+schlyr = importPDKModule('schLayers')
 import revedaEditor.common.net as net
 import revedaEditor.backend.undoStack as us
-
-
-# import os
-# if os.environ.get('REVEDASIM_PATH'):
-#     import revedasim.simMainWindow as smw
 
 
 class editorView(QGraphicsView):
@@ -128,8 +103,8 @@ class editorView(QGraphicsView):
         # Calculate the delta and adjust the scene position
         delta = newPos - oldPos
         self.translate(delta.x(), delta.y())
-        self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
-        # self.zoomFactorChanged.emit(self.zoomFactor)
+        self.viewRect = self.mapToScene(
+            self.rect()).boundingRect().toRect()  # self.zoomFactorChanged.emit(self.zoomFactor)
 
     def drawBackground(self, painter, rect):
         """
@@ -141,7 +116,6 @@ class editorView(QGraphicsView):
         """
 
         # Fill the rectangle with black color
-        painter.fillRect(rect, QColor("black"))
 
         # Calculate the coordinates of the left, top, bottom, and right edges of the rectangle
         self._left = int(rect.left()) - (int(rect.left()) % self.majorGrid)
@@ -150,6 +124,7 @@ class editorView(QGraphicsView):
         self._right = int(rect.right())
 
         if self.gridbackg:
+            painter.fillRect(rect, QColor("black"))
             # Set the pen color to gray
             painter.setPen(QColor("white"))
 
@@ -161,6 +136,7 @@ class editorView(QGraphicsView):
                     painter.drawPoint(x_coord, y_coord)
 
         elif self.linebackg:
+            painter.fillRect(rect, QColor("black"))
             # Set the pen color to gray
             painter.setPen(QColor("gray"))
 
@@ -232,6 +208,13 @@ class editorView(QGraphicsView):
                 if self.scene._selectionRectItem:
                     self.scene.removeItem(self.scene._selectionRectItem)
                     self.scene._selectionRectItem = None
+                if self.scene.editModes.moveItem and self._items:
+
+                    self.moveShapesUndoStack(self._items, self._itemsOffset,
+                                                 self.scene.mousePressLoc,
+                                                 self.scene.mouseMoveLoc)
+                    self._items = []
+                    self._itemsOffset = []
             case _:
                 super().keyPressEvent(event)
 
@@ -243,24 +226,29 @@ class editorView(QGraphicsView):
             printer (QPrinter): The printer object to use for printing.
 
         This method prints the current view using the provided printer. It first creates a QPainter object
-        using the printer. Then, it toggles the gridbackg and linebackg attributes. After that, it calls
-        the revedaPrint method to render the view onto the painter. Finally, it toggles the gridbackg
-        and linebackg attributes back to their original state.
+        using the printer. Then, it stores the original states of gridbackg and linebackg attributes.
+        After that, it calls the revedaPrint method to render the view onto the painter. Finally, it
+        restores the gridbackg and linebackg attributes to their original state.
         """
         painter = QPainter(printer)
 
-        # Toggle gridbackg attribute
-        if self.gridbackg:
-            self.gridbackg = False
-        else:
-            self.linebackg = False
+        # Store original states
+        original_gridbackg = self.gridbackg
+        original_linebackg = self.linebackg
+
+        # Set both to False for printing
+        self.gridbackg = False
+        self.linebackg = False
 
         # Render the view onto the painter
         self.revedaPrint(painter)
 
-        # Toggle gridbackg and linebackg attributes back to their original state
-        self.gridbackg = not self.gridbackg
-        self.linebackg = not self.linebackg
+        # Restore original states
+        self.gridbackg = original_gridbackg
+        self.linebackg = original_linebackg
+
+        # End painting
+        painter.end()
 
     def revedaPrint(self, painter):
         viewport_geom = self.viewport().geometry()
@@ -296,20 +284,15 @@ class schematicView(editorView):
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
-        viewSnapLinesSet = {
-            guideLineItem
-            for guideLineItem in self.scene.items(self.viewRect)
-            if isinstance(guideLineItem, net.guideLine)
-        }
+        viewSnapLinesSet = {guideLineItem for guideLineItem in
+            self.scene.items(self.viewRect) if isinstance(guideLineItem, net.guideLine)}
         self.removeSnapLines(viewSnapLinesSet)
-        # self.mergeSplitViewNets()
+
+
 
     def mergeSplitViewNets(self):
-        netsInView = [
-            netItem
-            for netItem in self.scene.items(self.viewRect)
-            if isinstance(netItem, net.schematicNet)
-        ]
+        netsInView = [netItem for netItem in self.scene.items(self.viewRect) if
+            isinstance(netItem, net.schematicNet)]
         for netItem in netsInView:
             if netItem.scene():
                 self.scene.mergeSplitNets(netItem)
@@ -317,35 +300,29 @@ class schematicView(editorView):
     def removeSnapLines(self, viewSnapLinesSet):
         undoCommandList = []
         for snapLine in viewSnapLinesSet:
-            lines = self.scene.addStretchWires(
-                snapLine.sceneEndPoints[0], snapLine.sceneEndPoints[1]
-            )
+            lines = self.scene.addStretchWires(snapLine.sceneEndPoints[0],
+                snapLine.sceneEndPoints[1])
 
             if lines != []:
                 for line in lines:
                     line.inheritGuideLine(snapLine)
                     undoCommandList.append(us.addShapeUndo(self.scene, line))
-                self.scene.addUndoMacroStack(undoCommandList, "Stretch Wires")
-                # undoCommandList.append(us.addShapesUndo(self.scene, lines))
+                self.scene.addUndoMacroStack(undoCommandList,
+                                             "Stretch Wires")  # undoCommandList.append(us.addShapesUndo(self.scene, lines))
             self.scene.removeItem(snapLine)
 
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)
         xextend = self._right - self._left
         yextend = self._bottom - self._top
-        netsInView = [
-            netItem
-            for netItem in self.scene.items(rect)
-            if isinstance(netItem, net.schematicNet)
-        ]
+        netsInView = [netItem for netItem in self.scene.items(rect) if
+            isinstance(netItem, net.schematicNet)]
         if xextend <= 1000 or yextend <= 1000:
             netEndPoints = []
             for netItem in netsInView:
                 netEndPoints.extend(netItem.sceneEndPoints)
             pointCountsDict = Counter(netEndPoints)
-            dotPoints = [
-                point for point, count in pointCountsDict.items() if count >= 3
-            ]
+            dotPoints = [point for point, count in pointCountsDict.items() if count >= 3]
             painter.setPen(schlyr.wirePen)
             painter.setBrush(schlyr.wireBrush)
             for dotPoint in dotPoints:
@@ -361,16 +338,21 @@ class schematicView(editorView):
         """
         if event.key() == Qt.Key_Escape:
             # Esc key pressed, remove snap rect and reset states
-            self.scene.removeSnapRect()
+            self.scene._snapPointRect.setVisible(False)
             if self.scene._newNet is not None:
-                # New net creation mode, cancel creation
-                self.scene.wireFinished.emit(self.scene._newNet)
+                self.scene.wireEditFinished.emit(self.scene._newNet)
                 self.scene._newNet = None
             elif self.scene._stretchNet is not None:
                 # Stretch net mode, cancel stretch
                 self.scene._stretchNet.setSelected(False)
                 self.scene._stretchNet.stretch = False
-                self.scene.checkNewNet(self.scene._stretchNet)
+                self.scene.mergeSplitNets(self.scene._stretchNet)
+            elif self.scene._newInstance is not None:
+                # New instance creation mode, cancel creation
+                self.scene.newInstance = None
+            elif self.scene._newPin is not None:
+                # New pin creation mode, cancel creation
+                self.scene._newPin = None
             # Set the edit mode to select item
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)

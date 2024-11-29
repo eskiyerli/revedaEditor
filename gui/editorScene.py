@@ -27,7 +27,7 @@ import os
 from typing import List, Sequence
 
 # import numpy as np
-from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, Signal)
+from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt)
 from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
                                QDialog,
@@ -92,9 +92,14 @@ class editorScene(QGraphicsScene):
                     # Start a new selection rectangle
                     self._startNewSelectionRectangle()
             elif self.editModes.moveItem:
-                self._itemsOffset = [item.scenePos().toPoint() - self.mousePressLoc for item
-                                     in
-                                     self._items]
+                self._itemsOffset = []
+                for item in self._items:
+                    self._itemsOffset.append(
+                        item.scenePos().toPoint() - self.mousePressLoc)
+                    print(self._itemsOffset)
+                # pass
+                # self._itemsOffset = [
+                #     item.scenePos().toPoint() - self.mousePressLoc for item in self._items]
             elif self.editModes.panView:
                 self.centerViewOnPoint(self.mousePressLoc)
                 self.messageLine.setText("Pan View at mouse press position")
@@ -106,10 +111,13 @@ class editorScene(QGraphicsScene):
             modifiers = QGuiApplication.keyboardModifiers()
 
             if self.editModes.moveItem and self._items:
-                if self.mouseReleaseLoc != self.mousePressLoc:
-                    self.moveShapesUndoStack(self._items, self._itemsOffset,
-                                             self.mousePressLoc,
-                                             self.mouseReleaseLoc)
+                pass
+                # if self.mouseReleaseLoc != self.mousePressLoc:
+                #     self.moveShapesUndoStack(self._items, self._itemsOffset,
+                #                              self.mousePressLoc,
+                #                              self.mouseReleaseLoc)
+                # self._items = []
+                # self._itemsOffset = []
             elif self.editModes.selectItem:
                 self._handleSelection(modifiers)
 
@@ -140,7 +148,8 @@ class editorScene(QGraphicsScene):
             self._startNewSelectionRectangle()
 
     def _processExistingSelectionRectangle(self):
-        selectionMode = Qt.ItemSelectionMode.IntersectsItemShape if self.partialSelection else Qt.ItemSelectionMode.ContainsItemShape
+        selectionMode = (Qt.ItemSelectionMode.IntersectsItemShape if
+                         self.partialSelection else Qt.ItemSelectionMode.ContainsItemShape)
         selectionPath = QPainterPath()
         selectionPath.addRect(self._selectionRectItem.sceneBoundingRect())
         self.setSelectionArea(selectionPath, mode=selectionMode)
@@ -186,10 +195,12 @@ class editorScene(QGraphicsScene):
         if event.buttons() == Qt.MouseButton.LeftButton:
             currentPos = event.scenePos().toPoint()
             if self.editModes.moveItem and self._items:
-                for item, offset in zip(self._items, self._itemsOffset):
-                    item.setPos(currentPos + offset)
+                pass
+                # for item, offset in zip(self._items, self._itemsOffset):
+                #     item.setPos(currentPos + offset)
             elif self.editModes.selectItem and self._selectionRectItem:
                 self._updateSelectionRectangle(currentPos)
+
 
     def snapToBase(self, number, base):
         """

@@ -1430,7 +1430,6 @@ class schematicSymbol(symbolShape):
         self._instanceName = value
         if self.labels.get("instanceName", None):
             self.labels["instanceName"].labelValue = value
-            # self.labels["instanceName"].labelValueSet = True
             self.labels["instanceName"].update()
 
     @property
@@ -1450,8 +1449,8 @@ class schematicSymbol(symbolShape):
     def angle(self, value: float):
         self.setRotation(value)
         self._angle = value
-        for label in self.labels.values():
-            label.angle = -value
+        # for label in self.labels.values():
+        #     label.angle = -value
 
     @property
     def labels(self):
