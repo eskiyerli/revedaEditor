@@ -558,7 +558,6 @@ class libraryBrowser(QMainWindow):
                     )
                     self.appMainW.openViews[openCellViewTuple] = configWindow
                 case "revbench":
-                    print(str(self._app.revedasim_pathObj))
                     if self._app.revedasim_pathObj:
                         try:
                             simmwModule = importlib.import_module(

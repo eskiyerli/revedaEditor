@@ -204,7 +204,7 @@ class editorView(QGraphicsView):
                 self.scene.editModes.setMode("selectItem")
                 self.editor.messageLine.setText("Select Item")
                 self.scene.deselectAll()
-                self.scene._items = None
+                self.scene._selectedItems = None
                 if self.scene._selectionRectItem:
                     self.scene.removeItem(self.scene._selectionRectItem)
                     self.scene._selectionRectItem = None

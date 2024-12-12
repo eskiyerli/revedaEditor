@@ -247,7 +247,6 @@ class symbolPolygonProperties(QDialog):
                     self.addEmptyRow(row + 1)
 
     def deleteRow(self, row, state):
-        print("delete")
         if state == 2:  # Checked state
             self.tableWidget.removeRow(row)
 

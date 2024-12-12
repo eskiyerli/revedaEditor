@@ -26,7 +26,6 @@
 # from hashlib import new
 import inspect
 import json
-import os
 # from hashlib import new
 import pathlib
 import time
@@ -38,7 +37,6 @@ from PySide6.QtGui import (QColor, QGuiApplication, QTransform, QPen, QFontDatab
                            QFont, )
 from PySide6.QtWidgets import (QDialog, QFormLayout, QGraphicsSceneMouseEvent,
                                QGraphicsLineItem, QCompleter, )
-from dotenv import load_dotenv
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
@@ -52,17 +50,6 @@ import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.propertyDialogues as pdlg
 from revedaEditor.gui.editorScene import editorScene
-
-# load_dotenv()
-
-# if os.environ.get("REVEDA_PDK_PATH"):
-#     import pdk.layoutLayers as laylyr
-#     import pdk.process as fabproc
-#     import pdk.pcells as pcells
-# else:
-#     import defaultPDK.layoutLayers as laylyr
-#     import defaultPDK.process as fabproc
-#     import defaultPDK.pcells as pcells
 
 from revedaEditor.backend.pdkPaths import importPDKModule
 fabproc = importPDKModule('process')
@@ -186,7 +173,7 @@ class layoutScene(editorScene):
         # Call the parent class's mouseMoveEvent method
         super().mouseMoveEvent(mouse_event)
         # Get the keyboard modifiers
-        modifiers = QGuiApplication.keyboardModifiers()
+        # modifiers = QGuiApplication.keyboardModifiers()
 
         # Handle drawing path mode
         if self.editModes.drawPath and self._newPath is not None:
@@ -228,7 +215,7 @@ class layoutScene(editorScene):
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
         self.mouseReleaseLoc = mouse_event.scenePos().toPoint()
-        modifiers = QGuiApplication.keyboardModifiers()
+        # modifiers = QGuiApplication.keyboardModifiers()
         try:
             if mouse_event.button() == Qt.LeftButton:
                 if self.editModes.drawPath:
@@ -490,7 +477,6 @@ class layoutScene(editorScene):
             endTime = time.perf_counter()
 
             self.logger.info(f"Load time: {endTime - startTime:.4f} seconds")
-            print(f"Load time: {endTime - startTime:.4f} seconds")
         except Exception as e:
             self.logger.error(f"Cannot load layout: {e}")
 
@@ -904,6 +890,32 @@ class layoutScene(editorScene):
                     f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}")
                 self.editModes.setMode("selectItem")
 
+
+    def copySelectedItems(self):
+        selectedItems = [
+            item for item in self.selectedItems() if item.parentItem() is None
+        ]
+        if selectedItems is not None:
+            for item in selectedItems:
+                selectedItemJson = json.dumps(item, cls=layenc.layoutEncoder)
+                itemCopyDict = json.loads(selectedItemJson)
+                shape = lj.layoutItems(self).create(itemCopyDict)
+                if shape is not None:
+                    item.setSelected(False)
+                    self.addUndoStack(shape)
+                    shape.setSelected(True)
+                    # shift position by four grid units to right and down
+                    shape.setPos(
+                        QPoint(
+                            item.pos().x() +  self.snapTuple[0]*fabproc.dbu,
+                            item.pos().y() +  self.snapTuple[1]*fabproc.dbu,
+                        )
+                    )
+                    if isinstance(shape, lshp.layoutInstance) or isinstance(shape,lshp.layoutPcell):
+                        self.itemCounter += 1
+                        shape.counter = self.itemCounter
+                        shape.instanceName = f"I{shape.counter}"
+
     def deleteAllRulers(self):
         for ruler in self.rulersSet:
             undoCommand = us.deleteShapeUndo(self, ruler)
@@ -993,6 +1005,7 @@ class layoutScene(editorScene):
 
     def setRulerFont(self, target_size: int = 16) -> QFont:
         fontDatabase = QFontDatabase()
+        fixedFamilies = None
         if fontDatabase:
             fixedFamilies = [family for family in fontDatabase.families(QFontDatabase.Latin)
                              if
@@ -1001,22 +1014,22 @@ class layoutScene(editorScene):
         if not fixedFamilies:
             self.logger.warning("No fixed-pitch fonts found. Using default font.")
             return QFont()
+        else:
+            for family in fixedFamilies:
+                styles = fontDatabase.styles(family)
+                if not styles:
+                    continue
 
-        for family in fixedFamilies:
-            styles = fontDatabase.styles(family)
-            if not styles:
-                continue
+                style = styles[0]  # Use the first available style
+                sizes = fontDatabase.pointSizes(family, style)
 
-            style = styles[0]  # Use the first available style
-            sizes = fontDatabase.pointSizes(family, style)
-
-            if sizes:
-                closest_size = self.findClosestFontSize(sizes, target_size)
-                font = QFont(family)
-                font.setStyleName(style)
-                font.setPointSize(closest_size)
-                font.setKerning(False)
-                return font
+                if sizes:
+                    closest_size = self.findClosestFontSize(sizes, target_size)
+                    font = QFont(family)
+                    font.setStyleName(style)
+                    font.setPointSize(closest_size)
+                    font.setKerning(False)
+                    return font
 
         self.scene().logger.warning("No suitable font found. Using default font.")
         return QFont()

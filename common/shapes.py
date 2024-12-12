@@ -24,7 +24,6 @@
 #
 
 import math
-import os
 from functools import cached_property
 from typing import (List, Tuple, NamedTuple, Union, Dict, Set)
 
@@ -63,7 +62,6 @@ class symbolShape(QGraphicsItem):
         self._pen = symlyr.defaultPen
         self._draft: bool = False
         self._brush: QBrush = schlyr.draftBrush
-        self._offset = QPoint(0, 0)
         self._flipTuple = (1, 1)
 
     def __repr__(self):
@@ -112,13 +110,6 @@ class symbolShape(QGraphicsItem):
         for item in self.childItems():
             item.draft = True
 
-    @property
-    def offset(self):
-        return self._offset
-
-    @offset.setter
-    def offset(self, value: Union[QPoint | QPointF]):
-        self._offset = value
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.setSelected(True)
@@ -1292,6 +1283,7 @@ class schematicSymbol(symbolShape):
         return super().itemChange(change, value)
 
     def _handlePositionChange(self, newPos: QPointF) -> QPointF:
+
         if self._snapLines is None:
             self._initializeSnapLines()
         else:
@@ -1300,22 +1292,55 @@ class schematicSymbol(symbolShape):
 
     def _initializeSnapLines(self):
         self._snapLines: Dict[QGraphicsItem, Set[net.guideLine]] = {}
-        self.findPinNetIndexTuples()
-        for item in self._pinNetIndexTupleSet:
-            if item.pin not in self._snapLines:
-                self._snapLines[item.pin] = set()
+        pin_net_tuples = self.findPinNetIndexTuples()
 
-            start_point = item.pin.mapToScene(item.pin.start).toPoint()
-            end_point = item.net.sceneEndPoints[item.netEndIndex - 1]
+        if not pin_net_tuples:
+            return None
 
-            # Check if a line is necessary
-            if start_point != end_point:
-                snapLine = net.guideLine(start_point, end_point)
-                snapLine.inherit(item.net)
-                self.scene().addItem(snapLine)
-                self._snapLines[item.pin].add(snapLine)
+        scene = self.scene()  # Cache scene reference
 
-            self.scene().removeItem(item.net)
+        # Pre-allocate sets for all pins
+        uniquePins = {item.pin for item in pin_net_tuples}
+        self._snapLines.update({pin: set() for pin in uniquePins})
+
+        # Batch process all items
+        for item in pin_net_tuples:
+            startPoint = item.pin.mapToScene(item.pin.start).toPoint()
+            endPoint = item.net.sceneEndPoints[item.netEndIndex - 1]
+
+            if startPoint == endPoint:
+                scene.removeItem(item.net)
+                continue
+
+            # Create and configure snap line
+            snapLine = net.guideLine(startPoint, endPoint)
+            snapLine.inherit(item.net)
+
+            # Batch scene operations
+            scene.addItem(snapLine)
+            scene.removeItem(item.net)
+
+            # Add to existing set
+            self._snapLines[item.pin].add(snapLine)
+
+    # def _initializeSnapLines(self):
+    #     self._snapLines: Dict[QGraphicsItem, Set[net.guideLine]] = {}
+    #     self._pinNetIndexTupleSet = self.findPinNetIndexTuples()
+    #     if self._pinNetIndexTupleSet:
+    #         for item in self._pinNetIndexTupleSet:
+    #             if item.pin not in self._snapLines:
+    #                 self._snapLines[item.pin] = set()
+    #
+    #             start_point = item.pin.mapToScene(item.pin.start).toPoint()
+    #             end_point = item.net.sceneEndPoints[item.netEndIndex - 1]
+    #
+    #             # Check if a line is necessary
+    #             if start_point != end_point:
+    #                 snapLine = net.guideLine(start_point, end_point)
+    #                 snapLine.inherit(item.net)
+    #                 self.scene().addItem(snapLine)
+    #                 self._snapLines[item.pin].add(snapLine)
+    #             self.scene().removeItem(item.net)
 
     def _updateSnapLines(self):
         if self._snapLines is None:
@@ -1358,25 +1383,60 @@ class schematicSymbol(symbolShape):
     def boundingRect(self):
         return self.childrenBoundingRect()
 
-    # def shape(self):
-    #     path = QPainterPath()
-    #     path.addRect(self._shapeRectF.toRect())
-    #     return path
-
     def findPinNetIndexTuples(self):
-        # Create an empty set to store pin-net-index tuples
-        self._pinNetIndexTupleSet = set()
-        # Iterate over each pin in the collection
-        for pinItem in self._pins.values():
-            # Find all the net items connected to the pin
-            for netItem in self.scene().items(pinItem.sceneBoundingRect()):
-                if isinstance(netItem, net.schematicNet):
-                    connectList = list(
-                        map(pinItem.sceneBoundingRect().contains, netItem.sceneEndPoints))
-                    endIndex = connectList.index(True)
-                    if any(connectList):
-                        self._pinNetIndexTupleSet.add(
-                            pinNetIndexTuple(pinItem, netItem, endIndex))
+        """
+        Find all pin-net-index tuples in the schematic.
+
+        Returns:
+            set: A set of pinNetIndexTuple objects representing pin-net connections.
+        """
+
+        def findConnectionIndex(pinRect, netEndpoints):
+            """Helper function to find the connection index between a pin and net endpoints."""
+            for index, endpoint in enumerate(netEndpoints):
+                if pinRect.contains(endpoint):
+                    return index
+            return None
+
+        pinNetTuples = set()
+        scene = self.scene()
+
+        for pin in self._pins.values():
+            pinRect = pin.sceneBoundingRect()
+
+            # Get all schematic nets in pin's area
+            netItems = [item for item in scene.items(pinRect)
+                        if isinstance(item, net.schematicNet)]
+
+            # Process each net
+            for netItem in netItems:
+                connectionIndex = findConnectionIndex(pinRect, netItem.sceneEndPoints)
+
+                if connectionIndex is not None:
+                    pinNetTuples.add(
+                        pinNetIndexTuple(pin, netItem, connectionIndex)
+                    )
+
+        return pinNetTuples
+
+    # def findPinNetIndexTuples(self):
+    #     # Create an empty set to store pin-net-index tuples
+    #     pinNetIndexTupleSet = set()
+    #     # Iterate over each pin in the collection
+    #     for pinItem in self._pins.values():
+    #         # Find all the net items connected to the pin
+    #         for netItem in self.scene().items(pinItem.sceneBoundingRect()):
+    #             if isinstance(netItem, net.schematicNet):
+    #                 connectList = list(
+    #                     map(pinItem.sceneBoundingRect().contains, netItem.sceneEndPoints))
+    #                 try:
+    #                     endIndex = connectList.index(True)
+    #                     if any(connectList):
+    #                         self._pinNetIndexTupleSet.add(
+    #                             pinNetIndexTuple(pinItem, netItem, endIndex))
+    #                 except ValueError:
+    #                     pass
+    #     return pinNetIndexTupleSet
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         # Check if the click is on any of the pins
