@@ -32,18 +32,10 @@ from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
                                QDialog,
                                QCompleter)
-# from dotenv import load_dotenv
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.undoStack as us
 import revedaEditor.gui.propertyDialogues as pdlg
-
-# load_dotenv()
-
-# if os.environ.get("REVEDA_PDK_PATH"):
-#     pass
-# else:
-#     pass
 
 
 class editorScene(QGraphicsScene):

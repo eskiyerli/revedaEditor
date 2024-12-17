@@ -153,12 +153,10 @@ class addDeleteNetUndo(QUndoCommand):
     def undo(self):
         self._scene.removeItem(self._addNet)
         self._scene.addItem(self._deleteNet)
-        self._scene.findConnectedNetSet(self._deleteNet)
 
     def redo(self):
         self._scene.addItem(self._addNet)
         self._scene.removeItem(self._deleteNet)
-        self._scene.findConnectedNetSet(self._addNet)
 
 class updateSymUndo(QUndoCommand):
     def __init__(self, item: QGraphicsItem, oldItemList: list, newItemList: list):

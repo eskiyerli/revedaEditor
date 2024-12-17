@@ -46,7 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from revedaEditor.backend.pdkPaths import importPDKModule
-from typing import List
+from typing import List, Tuple
 
 schlyr = importPDKModule('schLayers')
 
@@ -61,28 +61,7 @@ class NetMode(IntEnum):
     FREE = 2
 
 
-class customIntEnum(IntEnum):
-    @classmethod
-    def _missing_(cls, value):
-        # Handle out-of-range values
-        return cls(max(min(value, max(cls)), min(cls)))
-
-    def increment(self):
-        """Increment the enum value, wrapping around if necessary."""
-        try:
-            return self.__class__(self.value + 1)
-        except ValueError:
-            return self.__class__(min(self.__class__))
-
-    def decrement(self):
-        """Decrement the enum value, wrapping around if necessary."""
-        try:
-            return self.__class__(self.value - 1)
-        except ValueError:
-            return self.__class__(max(self.__class__))
-
-
-class netNameStrengthEnum(customIntEnum):
+class netNameStrengthEnum(IntEnum):
     NONAME = 0
     WEAK = 1
     INHERIT = 2
@@ -265,7 +244,7 @@ class schematicNet(QGraphicsItem):
     def notParallel(self, otherNet: "schematicNet") -> bool:
         return not self.isParallel(otherNet)
 
-    def findOverlapNets(self) -> set["schematicNet"]:
+    def findOverlapNets(self) -> Set["schematicNet"]:
         """
         Find all netItems in the scene that overlap with self.sceneShapeRect.
 
@@ -281,20 +260,67 @@ class schematicNet(QGraphicsItem):
         Weaker net inherits the net name of the stronger net and is set to INHERIT nameStrength.
         Good for connections without merging.
         """
-        if self.nameStrength.value < otherNet.nameStrength.value and otherNet.nameStrength.value > 0:
-            self.name = otherNet.name
-            self.nameStrength = netNameStrengthEnum.INHERIT
-            return True
-        elif self.nameStrength.value > otherNet.nameStrength.value and self.nameStrength.value > 0:
-            otherNet.name = self.name
-            otherNet.nameStrength = netNameStrengthEnum.INHERIT
-            return True
-        elif self.nameStrength == otherNet.nameStrength:
-            if self.name != otherNet.name:
-                self.nameConflict = True
-                otherNet.nameConflict = True
+        match self.nameStrength.value:
+            case 3: # SET
+                match otherNet.nameStrength.value:
+                    case 0:
+                        otherNet.name = self.name
+                        otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                        return True
+                    case 2:
+                        otherNet.name = self.name
+                        return True
+                    case 3:
+                        if self.name != otherNet.name:
+                            self.nameConflict = True
+                            otherNet.nameConflict = True
+                            return False
+                        return True
+            case 2: # INHERIT
+                match otherNet.nameStrength.value:
+                    case 0:
+                        otherNet.name = self.name
+                        otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                        return True
+                    case 2:
+                        if self.name != otherNet.name:
+                            self.nameConflict = True
+                            otherNet.nameConflict = True
+                            return False
+                        return True
+                    case 3:
+                        self.name = otherNet.name
+                        self.nameStrength = netNameStrengthEnum.INHERIT
+                        return True
+            case 0: # NONAME
+                match otherNet.nameStrength.value:
+                    case 0:
+                        return True
+                    case 2:
+                        self.name = otherNet.name
+                        self.nameStrength = netNameStrengthEnum.INHERIT
+                        return True
+                    case 3:
+                        self.name = otherNet.name
+                        self.nameStrength = netNameStrengthEnum.INHERIT
+                        return True
+            case _:
                 return False
-            return True
+        
+        # if self.nameStrength.value < otherNet.nameStrength.value and otherNet.nameStrength.value > 0:
+        #     self.name = otherNet.name
+        #     self.nameStrength = netNameStrengthEnum.INHERIT
+        #     return True
+        # elif self.nameStrength.value > otherNet.nameStrength.value and self.nameStrength.value > 0:
+        #     otherNet.name = self.name
+        #     otherNet.nameStrength = netNameStrengthEnum.INHERIT
+        #     return True
+        # elif self.nameStrength == otherNet.nameStrength:
+        #     if self.name != otherNet.name:
+        #         self.nameConflict = True
+        #         otherNet.nameConflict = True
+        #         return False
+        #     return True
         return True
 
     def mergeNetNames(self, otherNet: Type["schematicNet"]) -> bool:
@@ -361,7 +387,6 @@ class schematicNet(QGraphicsItem):
         ]
 
     @sceneEndPoints.setter
-
     def sceneEndPoints(self, points: List[QPoint]):
         self.prepareGeometryChange()
         self.draftLine = QLineF(points[0], points[1])
@@ -434,6 +459,15 @@ class schematicNet(QGraphicsItem):
     def mode(self) -> int:
         return self._mode
 
+    def __hash__(self):
+        return hash(self.draftLine.length())
+
+    def __eq__(self, other):
+        if isinstance(other, schematicNet):
+            self_points = {(point.x(), point.y()) for point in self.sceneEndPoints}
+            other_points = {(point.x(), point.y()) for point in other.sceneEndPoints}
+            return self_points == other_points
+        return False
 
 class netName(QGraphicsSimpleTextItem):
     def __init__(self, name: str, parent: schematicNet):
