@@ -450,7 +450,9 @@ class libraryBrowser(QMainWindow):
         configWindow.centralWidget.stopViewsEdit.setText(
             ", ".join(self.appMainW.stopViewList)
         )
+
         configWindow.show()
+        configWindow.updateClick()
         return configWindow
 
     def selectCellView(self, libModel) -> libb.viewItem:

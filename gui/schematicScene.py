@@ -111,17 +111,19 @@ class schematicScene(editorScene):
         self.fixedFont.setKerning(False)
         self.wireEditFinished.connect(self._handleWireFinished)
         self.stretchNet.connect(self._handleStretchNet)
+        self._symbolCache = {}
+
 
     @property
     def drawMode(self):
         return any(
             (self.editModes.drawPin, self.editModes.drawWire, self.editModes.drawText))
 
-    def mousePressEvent(self, mouseEvent: QGraphicsSceneMouseEvent) -> None:
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         # self.selectionChangedHandler()
-        super().mousePressEvent(mouseEvent)
+        super().mousePressEvent(event)
         try:
-            self.mousePressLoc = mouseEvent.scenePos().toPoint()
+            self.mousePressLoc = event.scenePos().toPoint()
 
         except Exception as e:
             self.logger.error(f"Mouse press error: {e}")
@@ -149,6 +151,7 @@ class schematicScene(editorScene):
         self.mouseMoveLoc = mouseEvent.scenePos().toPoint()
         self._handleMouseMove(self.mouseMoveLoc)
         cursorPosition = self.snapToGrid(self.mouseMoveLoc - self.origin, self.snapTuple)
+
         # Show the cursor position in the status line
         self.statusLine.showMessage(
             f"Cursor Position: ({cursorPosition.x()}, {cursorPosition.y()})")
@@ -263,21 +266,16 @@ class schematicScene(editorScene):
         check if the new net is valid. If it has zero length, remove it. Otherwise process it.
 
         """
-        if newNet.draftLine.isNull():
+        if newNet.draftLine.length()< self.snapDistance * 0.5:
             self.removeItem(newNet)
             self.undoStack.removeLastCommand()
-        else:
-            self.mergeSplitNets(newNet)
+        # else:
+        #     self.mergeSplitNets(newNet)
 
     def mergeSplitNets(self, inputNet: net.schematicNet):
-
         merged, mergedNet, parallelNetsSet = self.mergeNets(inputNet)
         if merged:
             inputNet.mergeNetNames(mergedNet)
-            # self.addItem(mergedNet)
-            # for netItem in parallelNetsSet:
-            #     self.removeItem(netItem)
-            # self.removeItem(inputNet)
             self.findNetsToSplit(mergedNet)
             splitSuccess, splitNetsSet = self.splitInputNet(mergedNet)  # input net is split
             parallelNetsSet.add(inputNet)  # original nets in the scene.
@@ -287,15 +285,13 @@ class schematicScene(editorScene):
                     netItem.inheritNetName(mergedNet)
                 for netItem in parallelNetsSet-splitNetsSet:
                     self.removeItem(netItem)
-                # self.addListUndoStack(list(splitNetsSet))
-                # self.removeItem(mergedNet)
+
             else: # input net is not split only merged
                 mergedNet.highlighted = True
                 for netItem in parallelNetsSet:
                     self.removeItem(netItem)
                 self.addItem(mergedNet)
-        else: # did not merge any other nets. Now just check if it splits other nets
-            # or split my other nets or pins
+        else:
             self.findNetsToSplit(inputNet)
             splitSuccess, splitNetsSet = self.splitInputNet(inputNet)  # input net is split
             if splitSuccess:
@@ -303,83 +299,193 @@ class schematicScene(editorScene):
                     self.addItem(netItem)
                     netItem.inheritNetName(inputNet)
                 self.removeItem(inputNet)
-                # list(splitNetsSet)[0].nameStrength = inputNet.nameStrength
-
 
     def findNetsToSplit(self, inputNet: net.schematicNet):
-        '''
-        input net splits orthogonal nets
-        :param inputNet: net splitting other orthogonal nets
-        :return:
-        '''
-        newSplitNets = []
-        inheritResult = True
-        orthoNets = {netItem for netItem in self.items(inputNet.sceneShapeRect) if
-                     isinstance(netItem, net.schematicNet) and inputNet.isOrthogonal(
-                         netItem)}
-        for netEnd in inputNet.sceneEndPoints:
-            for netItem in orthoNets:
-                if (netItem.sceneShapeRect.contains(netEnd)) and (
-                        netEnd not in netItem.sceneEndPoints):
-                    inheritResult = inputNet.inheritNetName(netItem)
-                    if not inheritResult:
-                        inputNet.nameConflict = True
-                        netItem.nameConflict = True
-                        break
-                    newSplitNets.append(net.schematicNet(netItem.sceneEndPoints[0], netEnd))
-                    newSplitNets.append(net.schematicNet(netEnd, netItem.sceneEndPoints[1]))
+        """
+        Split orthogonal nets intersecting with input net.
+        Args:
+            inputNet: net splitting other orthogonal nets
+        """
+        # Cache frequently accessed properties
+        scene_shape_rect = inputNet.sceneShapeRect
+        scene_items = self.items(scene_shape_rect)
+        input_end_points = inputNet.sceneEndPoints
 
-                    self.removeItem(netItem)
-        if inheritResult and newSplitNets:  # no name conflicts
-            self.addListUndoStack(newSplitNets)
-            [netItem.inheritNetName(inputNet) for netItem in newSplitNets]
+        # Pre-filter orthogonal nets
+        ortho_nets = [
+            netItem for netItem in scene_items
+            if isinstance(netItem, net.schematicNet)
+               and inputNet.isOrthogonal(netItem)
+        ]
 
+        if not ortho_nets:
+            return
+
+        new_split_nets = []
+        nets_to_remove = set()
+
+        # Process each orthogonal net
+        for netItem in ortho_nets:
+            netItem_endpoints = netItem.sceneEndPoints
+            netItem_rect = netItem.sceneShapeRect
+
+            for netEnd in input_end_points:
+                if not (netItem_rect.contains(netEnd) and netEnd not in netItem_endpoints):
+                    continue
+
+                if not inputNet.inheritNetName(netItem):
+                    inputNet.nameConflict = True
+                    netItem.nameConflict = True
+                    return
+
+                new_split_nets.extend([
+                    net.schematicNet(netItem_endpoints[0], netEnd),
+                    net.schematicNet(netEnd, netItem_endpoints[1])
+                ])
+                nets_to_remove.add(netItem)
+
+        if not new_split_nets:
+            return
+
+        # Batch remove items
+        for netItem in nets_to_remove:
+            self.removeItem(netItem)
+
+        # Add to undo stack and set properties
+        self.addListUndoStack(new_split_nets)
+        for netItem in new_split_nets:
+            netItem.inheritNetName(inputNet)
+
+    # def findNetsToSplit(self, inputNet: net.schematicNet):
+    #     '''
+    #     input net splits orthogonal nets
+    #     :param inputNet: net splitting other orthogonal nets
+    #     :return:
+    #     '''
+    #     newSplitNets = []
+    #     inheritResult = True
+    #     orthoNets = {netItem for netItem in self.items(inputNet.sceneShapeRect) if
+    #                  isinstance(netItem, net.schematicNet) and inputNet.isOrthogonal(
+    #                      netItem)}
+    #     for netEnd in inputNet.sceneEndPoints:
+    #         for netItem in orthoNets:
+    #             if (netItem.sceneShapeRect.contains(netEnd)) and (
+    #                     netEnd not in netItem.sceneEndPoints):
+    #                 inheritResult = inputNet.inheritNetName(netItem)
+    #                 if not inheritResult:
+    #                     inputNet.nameConflict = True
+    #                     netItem.nameConflict = True
+    #                     break
+    #                 newSplitNets.append(net.schematicNet(netItem.sceneEndPoints[0], netEnd))
+    #                 newSplitNets.append(net.schematicNet(netEnd, netItem.sceneEndPoints[1]))
+    #
+    #                 self.removeItem(netItem)
+    #     if inheritResult and newSplitNets:  # no name conflicts
+    #         self.addListUndoStack(newSplitNets)
+    #         [netItem.inheritNetName(inputNet) for netItem in newSplitNets]
+
+    #
+    # def splitInputNet(self, inputNet) -> tuple[bool, Set[net.schematicNet]]:
+    #     splitPointsSet = set()
+    #     orthoNets = [netItem for netItem in self.items(inputNet.sceneShapeRect) if
+    #                  isinstance(netItem, net.schematicNet) and inputNet.isOrthogonal(
+    #                      netItem)]
+    #     if orthoNets:
+    #         for netItem in orthoNets:
+    #             for netItemEnd in netItem.sceneEndPoints:
+    #                 if inputNet.sceneShapeRect.contains(netItemEnd):
+    #                     inheritResult = inputNet.inheritNetName(netItem)
+    #                     if not inheritResult:
+    #                         inputNet.nameConflict = True
+    #                         netItem.nameConflict = True
+    #                         break
+    #                     splitPointsSet.add(netItemEnd)
+    #     symbolPinsPointSet = {item.mapToScene(item.start).toPoint() for item in
+    #                           self.items(inputNet.sceneShapeRect) if
+    #                           isinstance(item, shp.symbolPin)}
+    #     splitPointsSet.update(symbolPinsPointSet)
+    #     schematicPinsPointSet = {item.mapToScene(item.start).toPoint() for item in
+    #                              self.items(inputNet.sceneShapeRect) if
+    #                              isinstance(item, shp.schematicPin)}
+    #     splitPointsSet.update(schematicPinsPointSet)
+    #     if splitPointsSet:
+    #         splitPointsList = list(splitPointsSet)
+    #         splitPointsList.insert(0, inputNet.sceneEndPoints[0])
+    #         splitPointsList.append(inputNet.sceneEndPoints[1])
+    #         orderedPoints = list(Counter(self.orderPoints(splitPointsList)).keys())
+    #         splitNetSet = set()
+    #         for i in range(len(orderedPoints) - 1):
+    #             splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
+    #             if not splitNet.draftLine.isNull():
+    #                 splitNet.inheritNetName(inputNet)
+    #                 splitNetSet.add(splitNet)
+    #
+    #         for netItem in splitNetSet:
+    #             if inputNet.isSelected():
+    #                 netItem.setSelected(True)
+    #                 netItem.inheritNetName(inputNet)
+    #             if orthoNets:
+    #                 netItem.name = inputNet.name
+    #                 netItem.nameStrength = inputNet.nameStrength
+    #         return True, splitNetSet
+    #     else:
+    #         return False, set()
 
     def splitInputNet(self, inputNet) -> tuple[bool, Set[net.schematicNet]]:
+        # Cache frequently accessed properties
+        sceneShapeRect = inputNet.sceneShapeRect
+        sceneItems = self.items(sceneShapeRect)
+
+        # Combine all point collection operations into a single pass
         splitPointsSet = set()
-        orthoNets = [netItem for netItem in self.items(inputNet.sceneShapeRect) if
-                     isinstance(netItem, net.schematicNet) and inputNet.isOrthogonal(
-                         netItem)]
+        orthoNets = []
+
+        # Single iteration through scene items to collect all relevant points
+        for item in sceneItems:
+            if isinstance(item, net.schematicNet) and inputNet.isOrthogonal(item):
+                orthoNets.append(item)
+            elif isinstance(item, (shp.symbolPin, shp.schematicPin)):
+                splitPointsSet.add(item.mapToScene(item.start).toPoint())
+
+        # Process orthogonal nets
         if orthoNets:
             for netItem in orthoNets:
                 for netItemEnd in netItem.sceneEndPoints:
-                    if inputNet.sceneShapeRect.contains(netItemEnd):
-                        inheritResult = inputNet.inheritNetName(netItem)
-                        if not inheritResult:
+                    if sceneShapeRect.contains(netItemEnd):
+                        if not inputNet.inheritNetName(netItem):
                             inputNet.nameConflict = True
                             netItem.nameConflict = True
                             break
                         splitPointsSet.add(netItemEnd)
-        symbolPinsPointSet = {item.mapToScene(item.start).toPoint() for item in
-                              self.items(inputNet.sceneShapeRect) if
-                              isinstance(item, shp.symbolPin)}
-        splitPointsSet.update(symbolPinsPointSet)
-        schematicPinsPointSet = {item.mapToScene(item.start).toPoint() for item in
-                                 self.items(inputNet.sceneShapeRect) if
-                                 isinstance(item, shp.schematicPin)}
-        splitPointsSet.update(schematicPinsPointSet)
-        if splitPointsSet:
-            splitPointsList = list(splitPointsSet)
-            splitPointsList.insert(0, inputNet.sceneEndPoints[0])
-            splitPointsList.append(inputNet.sceneEndPoints[1])
-            orderedPoints = list(Counter(self.orderPoints(splitPointsList)).keys())
-            splitNetSet = set()
-            for i in range(len(orderedPoints) - 1):
-                splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
-                if not splitNet.draftLine.isNull():
-                    splitNet.inheritNetName(inputNet)
-                    splitNetSet.add(splitNet)
 
-            for netItem in splitNetSet:
-                if inputNet.isSelected():
-                    netItem.setSelected(True)
-                    netItem.inheritNetName(inputNet)
-                if orthoNets:
-                    netItem.name = inputNet.name
-                    netItem.nameStrength = inputNet.nameStrength
-            return True, splitNetSet
-        else:
+        if not splitPointsSet:
             return False, set()
+
+        # Create and process split points
+        splitPointsList = [inputNet.sceneEndPoints[0], *splitPointsSet,
+                           inputNet.sceneEndPoints[1]]
+        orderedPoints = list(Counter(self.orderPoints(splitPointsList)).keys())
+
+        # Create split nets
+        splitNetSet = set()
+        is_selected = inputNet.isSelected()
+
+        # Pre-cache input net properties
+        inputName = inputNet.name
+        inputStrength = inputNet.nameStrength
+
+        for i in range(len(orderedPoints) - 1):
+            splitNet = net.schematicNet(orderedPoints[i], orderedPoints[i + 1])
+            if not splitNet.draftLine.isNull():
+                splitNet.inheritNetName(inputNet)
+                if is_selected:
+                    splitNet.setSelected(True)
+                if orthoNets:
+                    splitNet.name = inputName
+                    splitNet.nameStrength = inputStrength
+                splitNetSet.add(splitNet)
+
+        return True, splitNetSet
 
     def mergeNets(self, inputNet: net.schematicNet) -> Tuple[
         bool, net.schematicNet, set[net.schematicNet]]:
@@ -391,8 +497,10 @@ class schematicScene(editorScene):
         """
         # Find other nets that overlap with self
         otherNets = inputNet.findOverlapNets()
-        parallelNets = {netItem for netItem in otherNets if
-                        inputNet.isParallel(netItem)} - {self}
+        parallelNets = set()
+        if otherNets:
+            parallelNets = {netItem for netItem in otherNets if
+                            inputNet.isParallel(netItem)} - {self}
         points = inputNet.sceneEndPoints
         nameConflict = False
         # If there are parallel nets
@@ -641,47 +749,116 @@ class schematicScene(editorScene):
             self.noteFontSize, self.noteAlign, self.noteOrient, )
         self.addUndoStack(text)
         return text
-
+    #
+    # def drawInstance(self, pos: QPoint):
+    #     """
+    #     Add an instance of a symbol to the scene.
+    #     """
+    #     self.deselectAll()
+    #     instance = self.instSymbol(pos)
+    #     self.instanceCounter += 1
+    #     self.addUndoStack(instance)
+    #     # self.instanceSymbolTuple = None
+    #     return instance
+    #
+    # def instSymbol(self, pos: QPoint):
+    #     itemShapes = []
+    #     itemAttributes = {}
+    #     try:
+    #         with open(self.instanceSymbolTuple.viewItem.viewPath, "r") as temp:
+    #             items = json.load(temp)
+    #             if items[0]["cellView"] != "symbol":
+    #                 self.logger.error("Not a symbol!")
+    #                 return
+    #
+    #             for item in items[2:]:
+    #                 if item["type"] == "attr":
+    #                     itemAttributes[item["nam"]] = item["def"]
+    #                 else:
+    #                     itemShapes.append(lj.symbolItems(self).create(item))
+    #             symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes)
+    #
+    #             symbolInstance.setPos(pos)
+    #             symbolInstance.counter = self.instanceCounter
+    #             symbolInstance.instanceName = f"I{symbolInstance.counter}"
+    #             symbolInstance.libraryName = (
+    #                 self.instanceSymbolTuple.libraryItem.libraryName)
+    #             symbolInstance.cellName = self.instanceSymbolTuple.cellItem.cellName
+    #             symbolInstance.viewName = self.instanceSymbolTuple.viewItem.viewName
+    #             for labelItem in symbolInstance.labels.values():
+    #                 labelItem.labelDefs()
+    #
+    #             return symbolInstance
+    #     except Exception as e:
+    #         self.logger.warning(f"instantiation error: {e}")
     def drawInstance(self, pos: QPoint):
         """
         Add an instance of a symbol to the scene.
         """
         instance = self.instSymbol(pos)
-        self.instanceCounter += 1
-        self.addUndoStack(instance)
-        # self.instanceSymbolTuple = None
+        if instance:  # Add check for None
+            self.instanceCounter += 1
+            self.addUndoStack(instance)
         return instance
 
     def instSymbol(self, pos: QPoint):
-        itemShapes = []
-        itemAttributes = {}
+        view_path = self.instanceSymbolTuple.viewItem.viewPath
+
         try:
-            with open(self.instanceSymbolTuple.viewItem.viewPath, "r") as temp:
-                items = json.load(temp)
-                if items[0]["cellView"] != "symbol":
-                    self.logger.error("Not a symbol!")
-                    return
+            # Try to get items from cache first
+            items = self._symbolCache.get(view_path)
+            if items is None:
+                with open(view_path, "r") as temp:
+                    items = json.load(temp)
+                    self._symbolCache[view_path] = items
 
-                for item in items[2:]:
-                    if item["type"] == "attr":
-                        itemAttributes[item["nam"]] = item["def"]
-                    else:
-                        itemShapes.append(lj.symbolItems(self).create(item))
-                symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes)
+            if items[0]["cellView"] != "symbol":
+                self.logger.error("Not a symbol!")
+                return None
 
-                symbolInstance.setPos(pos)
-                symbolInstance.counter = self.instanceCounter
-                symbolInstance.instanceName = f"I{symbolInstance.counter}"
-                symbolInstance.libraryName = (
-                    self.instanceSymbolTuple.libraryItem.libraryName)
-                symbolInstance.cellName = self.instanceSymbolTuple.cellItem.cellName
-                symbolInstance.viewName = self.instanceSymbolTuple.viewItem.viewName
-                for labelItem in symbolInstance.labels.values():
-                    labelItem.labelDefs()
+            # Use comprehensions for better performance
+            itemAttributes = {
+                item["nam"]: item["def"]
+                for item in items[2:]
+                if item["type"] == "attr"
+            }
 
-                return symbolInstance
+            itemShapes = [
+                lj.symbolItems(self).create(item)
+                for item in items[2:]
+                if item["type"] != "attr"
+            ]
+
+            symbolInstance = shp.schematicSymbol(itemShapes, itemAttributes)
+
+            # Batch property assignments
+            instance_properties = {
+                "pos": pos,
+                "counter": self.instanceCounter,
+                "instanceName": f"I{self.instanceCounter}",
+                "libraryName": self.instanceSymbolTuple.libraryItem.libraryName,
+                "cellName": self.instanceSymbolTuple.cellItem.cellName,
+                "viewName": self.instanceSymbolTuple.viewItem.viewName
+            }
+
+            for prop, value in instance_properties.items():
+                setattr(symbolInstance, prop, value)
+
+            # Process labels
+            for labelItem in symbolInstance.labels.values():
+                labelItem.labelDefs()
+
+            return symbolInstance
+
+        except FileNotFoundError:
+            self.logger.error(f"Symbol file not found: {view_path}")
+            return None
+        except json.JSONDecodeError:
+            self.logger.error(f"Invalid JSON in symbol file: {view_path}")
+            return None
         except Exception as e:
             self.logger.warning(f"instantiation error: {e}")
+            return None
 
     def copySelectedItems(self):
         selectedItems = [item for item in self.selectedItems() if item.parentItem() is None]
@@ -1229,4 +1406,3 @@ class schematicScene(editorScene):
     #     Determine if a pin is connected to a net.
     #     """
     #     return bool(pinItem.sceneBoundingRect().intersects(netItem.sceneBoundingRect()))
-

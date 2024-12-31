@@ -260,62 +260,67 @@ class schematicNet(QGraphicsItem):
         Weaker net inherits the net name of the stronger net and is set to INHERIT nameStrength.
         Good for connections without merging.
         """
-        match self.nameStrength.value:
-            case 3: # SET
-                match otherNet.nameStrength.value:
-                    case 0:
-                        otherNet.name = self.name
-                        otherNet.nameStrength = netNameStrengthEnum.INHERIT
-                        return True
-                    case 2:
-                        otherNet.name = self.name
-                        return True
-                    case 3:
-                        if self.name != otherNet.name:
-                            self.nameConflict = True
-                            otherNet.nameConflict = True
-                            return False
-                        return True
-            case 2: # INHERIT
-                match otherNet.nameStrength.value:
-                    case 0:
-                        otherNet.name = self.name
-                        otherNet.nameStrength = netNameStrengthEnum.INHERIT
-                        return True
-                    case 2:
-                        if self.name != otherNet.name:
-                            self.nameConflict = True
-                            otherNet.nameConflict = True
-                            return False
-                        return True
-                    case 3:
-                        self.name = otherNet.name
-                        self.nameStrength = netNameStrengthEnum.INHERIT
-                        return True
-            case 0: # NONAME
-                match otherNet.nameStrength.value:
-                    case 0:
-                        return True
-                    case 2:
-                        self.name = otherNet.name
-                        self.nameStrength = netNameStrengthEnum.INHERIT
-                        return True
-                    case 3:
-                        self.name = otherNet.name
-                        self.nameStrength = netNameStrengthEnum.INHERIT
-                        return True
-            case _:
-                return False
-        
-        # if self.nameStrength.value < otherNet.nameStrength.value and otherNet.nameStrength.value > 0:
-        #     self.name = otherNet.name
-        #     self.nameStrength = netNameStrengthEnum.INHERIT
-        #     return True
-        # elif self.nameStrength.value > otherNet.nameStrength.value and self.nameStrength.value > 0:
-        #     otherNet.name = self.name
-        #     otherNet.nameStrength = netNameStrengthEnum.INHERIT
-        #     return True
-        # elif self.nameStrength == otherNet.nameStrength:
+        if self.nameStrength.value == 3:  # SET
+            if otherNet.nameStrength.value == 0:
+                otherNet.name = self.name
+                otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+            elif otherNet.nameStrength.value == 2:
+                otherNet.name = self.name
+                return True
+            elif otherNet.nameStrength.value == 3:
+                if self.name != otherNet.name:
+                    self.nameConflict = True
+                    otherNet.nameConflict = True
+                    return False
+                return True
+        elif self.nameStrength.value == 2:  # INHERIT
+            if otherNet.nameStrength.value == 0:
+                otherNet.name = self.name
+                otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+            elif otherNet.nameStrength.value == 2:
+                if self.name != otherNet.name:
+                    self.nameConflict = True
+                    otherNet.nameConflict = True
+                    return False
+                return True
+            elif otherNet.nameStrength.value == 3:
+                self.name = otherNet.name
+                self.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+        elif self.nameStrength.value == 1:  # WEAK
+            if otherNet.nameStrength.value == 0:
+                otherNet.name = self.name
+                otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+            elif otherNet.nameStrength.value == 1:
+                if self.name != otherNet.name:
+                    self.nameConflict = True
+                    otherNet.nameConflict = True
+                    return False
+                return True
+            elif otherNet.nameStrength.value == 2:
+                self.name = otherNet.name
+                self.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+            elif otherNet.nameStrength.value == 3:
+                self.name = otherNet.name
+                self.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+        elif self.nameStrength.value == 0:  # NONAME
+            if otherNet.nameStrength.value == 0:
+                return True
+            elif otherNet.nameStrength.value == 2:
+                self.name = otherNet.name
+                self.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+            elif otherNet.nameStrength.value == 3:
+                self.name = otherNet.name
+                self.nameStrength = netNameStrengthEnum.INHERIT
+                return True
+        else:
+            return False
         #     if self.name != otherNet.name:
         #         self.nameConflict = True
         #         otherNet.nameConflict = True

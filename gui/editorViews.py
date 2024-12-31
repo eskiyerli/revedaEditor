@@ -276,14 +276,16 @@ class symbolView(editorView):
 
 class schematicView(editorView):
     def __init__(self, scene, parent):
-        self.scene = scene
         self.parent = parent
+        self.scene = scene
         super().__init__(self.scene, self.parent)
         self._dotRadius = 2
+        self.scene.wireEditFinished.connect(self.mergeSplitViewNets)
+    
 
     def mousePressEvent(self, event):
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
-        self.mergeSplitViewNets()
+
         super().mousePressEvent(event)
         
     def mouseReleaseEvent(self, event):
@@ -291,11 +293,13 @@ class schematicView(editorView):
         viewSnapLinesSet = {guideLineItem for guideLineItem in
             self.scene.items(self.viewRect) if isinstance(guideLineItem, net.guideLine)}
         self.removeSnapLines(viewSnapLinesSet)
+        self.mergeSplitViewNets()
         super().mouseReleaseEvent(event)
 
+
     def mergeSplitViewNets(self):
-        netsInView = [netItem for netItem in self.scene.items(self.viewRect) if
-            isinstance(netItem, net.schematicNet)]
+        netsInView = (netItem for netItem in self.scene.items(self.viewRect) if
+            isinstance(netItem, net.schematicNet))
         for netItem in netsInView:
             if netItem.scene():
                 self.scene.mergeSplitNets(netItem)

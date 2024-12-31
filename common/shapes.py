@@ -1244,7 +1244,7 @@ class schematicSymbol(symbolShape):
         self._instanceName = ""
         self._netlistLine = ""
         self._labels: Dict[str, symbolLabel] = dict()  # dict of labels
-        self._pins: Dictct[str, symbolPin] = dict()  # dict of pins
+        self._pins: Dict[str, symbolPin] = dict()  # dict of pins
         self._netlistIgnore: bool = False
         self._draft: bool = False
         self._pinLocations: dict[str, Union[QRect, QRectF]] = dict()  # pinName: pinRect
