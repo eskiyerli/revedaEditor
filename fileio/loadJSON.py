@@ -404,7 +404,7 @@ class PCellCache:
     @classmethod
     @lru_cache(maxsize=100)
     def getPCellClass(cls, pcell_class_name: str) -> Any:
-        return pdk.pcells.pcells.get(pcell_class_name)
+        return pcells.pcells.get(pcell_class_name)
 
     @classmethod
     def getLayoutFileContents(cls, file_path: str) -> List:
@@ -487,7 +487,7 @@ class layoutItems:
             return None
 
         pcellClassName = pcellDef[1].get("reference")
-        pcellClass = pdk.pcells.pcells.get(pcellClassName)
+        pcellClass = pcells.pcells.get(pcellClassName)
         if not pcellClass:
             self.scene.logger.error(f"Unknown PCell class: {pcellClassName}")
             return None
@@ -552,7 +552,6 @@ class layoutItems:
         layoutInstance.angle = item.get("ang", 0)
         layoutInstance.flipTuple = item.get('fl', (1,1))
         layoutInstance.viewName = viewName
-
         return layoutInstance
 
     def createRectShape(self, item):

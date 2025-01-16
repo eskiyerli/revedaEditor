@@ -321,11 +321,6 @@ class schematicNet(QGraphicsItem):
                 return True
         else:
             return False
-        #     if self.name != otherNet.name:
-        #         self.nameConflict = True
-        #         otherNet.nameConflict = True
-        #         return False
-        #     return True
         return True
 
     def mergeNetNames(self, otherNet: Type["schematicNet"]) -> bool:
@@ -582,7 +577,6 @@ class guideLine(QGraphicsLineItem):
         super().__init__(QLineF(self._start, self._end))
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setPen(schlyr.guideLinePen)
-        self.pen().setCosmetic(True)
         self._name: str = ""
         self._nameStrength: netNameStrengthEnum = netNameStrengthEnum.NONAME
 

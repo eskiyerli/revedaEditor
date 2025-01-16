@@ -23,10 +23,9 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 
-# from hashlib import new
+
 import inspect
 import json
-# from hashlib import new
 import pathlib
 import time
 from typing import List, Dict, Any, Union
@@ -35,8 +34,8 @@ from typing import List, Dict, Any, Union
 from PySide6.QtCore import (QPoint, QPointF, QRect, QRectF, Qt, QLineF, )
 from PySide6.QtGui import (QColor, QGuiApplication, QTransform, QPen, QFontDatabase,
                            QFont, )
-from PySide6.QtWidgets import (QDialog, QFormLayout, QGraphicsSceneMouseEvent,
-                               QGraphicsLineItem, QCompleter, )
+from PySide6.QtWidgets import (QDialog, QGraphicsSceneMouseEvent, QGraphicsLineItem,
+                               QCompleter, QGraphicsRectItem)
 
 import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
@@ -49,31 +48,29 @@ import revedaEditor.gui.editFunctions as edf
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.propertyDialogues as pdlg
+from revedaEditor.backend.pdkPaths import importPDKModule
 from revedaEditor.gui.editorScene import editorScene
 
-from revedaEditor.backend.pdkPaths import importPDKModule
 fabproc = importPDKModule('process')
 laylyr = importPDKModule('layoutLayers')
+schlyr = importPDKModule('schLayers')
 pcells = importPDKModule('pcells')
+
 
 class layoutScene(editorScene):
     def __init__(self, parent):
         super().__init__(parent)
         self.selectEdLayer = laylyr.pdkAllLayers[0]
         self.layoutShapes = ["Inst", "Rect", "Path", "Label", "Via", "Pin", "Polygon",
-                             "Pcell",
-                             "Ruler", ]
+                             "Pcell", "Ruler", ]
         # draw modes
         self.editModes = ddef.layoutModes(selectItem=False, deleteItem=False,
-                                          moveItem=False,
-                                          copyItem=False, rotateItem=False,
-                                          changeOrigin=False,
-                                          panView=False, drawPath=False, drawPin=False,
-                                          drawArc=False, drawPolygon=False, addLabel=False,
-                                          addVia=False, drawRect=False, drawLine=False,
-                                          drawCircle=False, drawRuler=False,
-                                          stretchItem=False,
-                                          addInstance=False, )
+                                          moveItem=False, copyItem=False, rotateItem=False,
+                                          changeOrigin=False, panView=False, drawPath=False,
+                                          drawPin=False, drawArc=False, drawPolygon=False,
+                                          addLabel=False, addVia=False, drawRect=False,
+                                          drawLine=False, drawCircle=False, drawRuler=False,
+                                          stretchItem=False, addInstance=False, )
         self.editModes.setMode("selectItem")
         self.selectModes = ddef.layoutSelectModes(selectAll=True, selectPath=False,
                                                   selectInstance=False, selectVia=False,
@@ -126,13 +123,18 @@ class layoutScene(editorScene):
     # 9. rotate item/s
 
     @staticmethod
-    def toLayoutCoord(point: Union[QPoint | QPointF]) -> QPoint | QPointF:
+    def toLayoutCoord(point: QPoint) -> QPointF:
         """
         Converts a point in scene coordinates to layout coordinates by dividing it to
         fabproc.dbu.
         """
-        point /= fabproc.dbu
-        return point
+        if isinstance(point, QPointF):
+            returnPoint = point / fabproc.dbu
+        elif isinstance(point, QPoint):
+            returnPoint = point.toPointF() / fabproc.dbu
+        else:
+            returnPoint = QPointF(0.0, 0.0)
+        return returnPoint
 
     @staticmethod
     def toSceneCoord(point: Union[QPoint | QPointF]) -> QPoint | QPointF:
@@ -143,20 +145,24 @@ class layoutScene(editorScene):
         point *= fabproc.dbu
         return point
 
-    def mousePressEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
-        """
-        Handle the mouse press event.
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
 
-        Args:
-            mouse_event: The mouse event object.
-
-        Returns:
-            None
-        """
-        # Store the mouse press location
-        self.mousePressLoc = mouse_event.scenePos().toPoint()
-        # Call the base class mouse press event
-        super().mousePressEvent(mouse_event)
+        super().mousePressEvent(event)
+        modifiers = QGuiApplication.keyboardModifiers()
+        if event.button() != Qt.LeftButton:
+            return
+        try:
+            self.mousePressLoc = event.scenePos().toPoint()
+            if self.editModes.selectItem:
+                if (
+                        modifiers == Qt.KeyboardModifier.ShiftModifier or modifiers == Qt.KeyboardModifier.ControlModifier):
+                    self._selectionRectItem = QGraphicsRectItem()
+                    self._selectionRectItem.setRect(
+                        QRectF(self.mousePressLoc.x(), self.mousePressLoc.y(), 0, 0))
+                    self._selectionRectItem.setPen(schlyr.draftPen)
+                    self.addItem(self._selectionRectItem)
+        except Exception as e:
+            self.logger.error(f"Mouse press error: {e}")
 
     def mouseMoveEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         """
@@ -210,7 +216,7 @@ class layoutScene(editorScene):
 
         # Show the cursor position in the status line
         self.statusLine.showMessage(
-            f"Cursor Position: ({cursorPosition.x()}, {cursorPosition.y()})")
+            f"Cursor Position: ({cursorPosition.x():.3f}, {cursorPosition.y():.3f})")
 
     def mouseReleaseEvent(self, mouse_event: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(mouse_event)
@@ -263,9 +269,8 @@ class layoutScene(editorScene):
                 self.undoStack.removeLastCommand()
             self._newRuler = None
         self._newRuler = lshp.layoutRuler(
-            QLineF(self.mouseReleaseLoc, self.mouseReleaseLoc),
-            width=self.rulerWidth, tickGap=self.rulerTickGap,
-            tickLength=self.rulerTickLength,
+            QLineF(self.mouseReleaseLoc, self.mouseReleaseLoc), width=self.rulerWidth,
+            tickGap=self.rulerTickGap, tickLength=self.rulerTickLength,
             tickFont=self.rulerFont, )
         self.addUndoStack(self._newRuler)
 
@@ -273,8 +278,7 @@ class layoutScene(editorScene):
         if self._newPolygon is None:
             # Create a new polygon
             self._newPolygon = lshp.layoutPolygon(
-                [self.mouseReleaseLoc, self.mouseReleaseLoc],
-                self.selectEdLayer, )
+                [self.mouseReleaseLoc, self.mouseReleaseLoc], self.selectEdLayer, )
             self.addUndoStack(self._newPolygon)
             # Create a guide line for the polygon
             self._polygonGuideLine = QGraphicsLineItem(
@@ -366,8 +370,7 @@ class layoutScene(editorScene):
         return newInstance
 
     def instLayout(self, layoutInstanceTuple: ddef.viewItemTuple) -> Union[
-        lshp.layoutInstance,
-        lshp.layoutPcell]:
+        lshp.layoutInstance, lshp.layoutPcell]:
         """
         Read a layout file and create layoutShape objects from it.
         """
@@ -376,7 +379,7 @@ class layoutScene(editorScene):
                 with layoutInstanceTuple.viewItem.viewPath.open("r") as temp:
                     try:
                         decodedData = json.load(temp)
-                        if decodedData[0]["cellView"] != "layout":
+                        if decodedData[0]["viewType"] != "layout":
                             self.logger.error("Not a layout cell")
                         else:
                             instanceShapes = [lj.layoutItems(self).create(item) for item in
@@ -409,10 +412,8 @@ class layoutScene(editorScene):
 
                             pcellInstance.libraryName = (
                                 layoutInstanceTuple.libraryItem.libraryName)
-                            pcellInstance.cellName = (
-                                layoutInstanceTuple.cellItem.cellName)
-                            pcellInstance.viewName = (
-                                layoutInstanceTuple.viewItem.viewName)
+                            pcellInstance.cellName = (layoutInstanceTuple.cellItem.cellName)
+                            pcellInstance.viewName = (layoutInstanceTuple.viewItem.viewName)
                             self.itemCounter += 1
                             pcellInstance.counter = self.itemCounter
                             # This needs to become more sophisticated.
@@ -466,7 +467,7 @@ class layoutScene(editorScene):
                 decodedData = json.load(file)
 
             # Unpack grid settings
-            viewType, gridSettings, *itemData = decodedData
+            _, gridSettings, *itemData = decodedData
             snapGrid = gridSettings.get("snapGrid", [1, 1])
             self.majorGrid, self.snapGrid = snapGrid
             self.snapTuple = (self.snapGrid, self.snapGrid)
@@ -496,7 +497,6 @@ class layoutScene(editorScene):
         validTypes = frozenset(self.layoutShapes)
         loadedLayoutItems = [lj.layoutItems(self).create(item) for item in decodedData if
                              item.get("type") in validTypes]
-
         if loadedLayoutItems:
             undoCommand = us.loadShapesUndo(self, loadedLayoutItems)
             self.undoStack.push(undoCommand)
@@ -545,7 +545,6 @@ class layoutScene(editorScene):
                         case lshp.layoutInstance:
                             self.layoutInstanceProperties(item, False)
                         case _:
-
                             if item.__class__.__bases__[0] == pcells.baseCell:
                                 self.layoutInstanceProperties(item, True)
 
@@ -557,7 +556,7 @@ class layoutScene(editorScene):
         dlg = ldlg.layoutPolygonProperties(self.editorWindow, pointsTupleList)
         dlg.polygonLayerCB.addItems(
             [f"{item.name} [{item.purpose}]" for item in laylyr.pdkAllLayers])
-        dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} [" f"{item.layer.purpose}]")
+        dlg.polygonLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
 
         if dlg.exec() == QDialog.Accepted:
             newLayer = laylyr.pdkAllLayers[dlg.polygonLayerCB.currentIndex()]
@@ -632,15 +631,13 @@ class layoutScene(editorScene):
                     dlg.arrayViaHeightEdit.text().strip()) * fabproc.dbu, )
                 arrayViaTuple = ddef.arrayViaTuple(singleViaTuple, float(
                     dlg.arrayViaSpacingEdit.text().strip()) * fabproc.dbu, float(
-                    dlg.arrayViaSpacingEdit.text().strip()) * fabproc.dbu,
-                                                   int(float(
-                                                       dlg.arrayXNumEdit.text().strip())),
-                                                   int(float(
-                                                       dlg.arrayYNumEdit.text().strip())), )
+                    dlg.arrayViaSpacingEdit.text().strip()) * fabproc.dbu, int(float(
+                    dlg.arrayXNumEdit.text().strip())), int(float(
+                    dlg.arrayYNumEdit.text().strip())), )
             singleVia = lshp.layoutVia(QPoint(0, 0), *arrayViaTuple.singleViaTuple, )
             arrayVia = lshp.layoutViaArray(start, singleVia, arrayViaTuple.xs,
-                                           arrayViaTuple.ys,
-                                           arrayViaTuple.xnum, arrayViaTuple.ynum, )
+                                           arrayViaTuple.ys, arrayViaTuple.xnum,
+                                           arrayViaTuple.ynum, )
             self.undoStack.push(us.addDeleteShapeUndo(self, arrayVia, item))
 
     def layoutPathProperties(self, item):
@@ -697,25 +694,37 @@ class layoutScene(editorScene):
         dlg.labelLayerCB.setCurrentText(f"{item.layer.name} [{item.layer.purpose}]")
         dlg.familyCB.setCurrentText(item.fontFamily)
         dlg.fontStyleCB.setCurrentText(item.fontStyle)
-        dlg.labelHeightCB.setCurrentText(str(int(item.fontHeight)))
+        dlg.labelHeightCB.setCurrentText(str(int(float(item.fontHeight))))
         dlg.labelAlignCB.setCurrentText(item.labelAlign)
         dlg.labelOrientCB.setCurrentText(item.labelOrient)
-        dlg.labelTopLeftX.setText(str(item.mapToScene(item.start).x() / fabproc.dbu))
-        dlg.labelTopLeftY.setText(str(item.mapToScene(item.start).y() / fabproc.dbu))
+        start = item.mapToScene(item.start)
+        dlg.labelTopLeftX.setText(str(start.x() / fabproc.dbu))
+        dlg.labelTopLeftY.setText(str(start.y() / fabproc.dbu))
+
         if dlg.exec() == QDialog.Accepted:
-            labelText = dlg.labelName.text()
-            layer = laylyr.pdkTextLayers[dlg.labelLayerCB.currentIndex()]
+            labelName = dlg.labelName.text()
+            labelLayerName = dlg.labelLayerCB.currentText().split()[0]
+            labelLayer = [
+                item for item in laylyr.pdkTextLayers if item.name == labelLayerName
+            ][0]
             fontFamily = dlg.familyCB.currentText()
             fontStyle = dlg.fontStyleCB.currentText()
-            fontHeight = dlg.labelHeightCB.currentText()
+            fontHeight = int(float(dlg.labelHeightCB.currentText()))
             labelAlign = dlg.labelAlignCB.currentText()
             labelOrient = dlg.labelOrientCB.currentText()
-            start = self.snapToGrid(self.toSceneCoord(
-                QPointF(float(dlg.labelTopLeftX.text()),
-                        float(dlg.labelTopLeftY.text()), )),
-                self.snapTuple, )
-            newLabel = lshp.layoutLabel(start, labelText, fontFamily, fontStyle, fontHeight,
-                                        labelAlign, labelOrient, layer)
+            newLabelTuple = ddef.layoutLabelTuple(
+                labelName,
+                fontFamily,
+                fontStyle,
+                fontHeight,
+                labelAlign,
+                labelOrient,
+                labelLayer,
+            )
+
+            start = self.toSceneCoord(
+                QPointF(float(dlg.labelTopLeftX.text()), float(dlg.labelTopLeftY.text())))
+            newLabel = lshp.layoutLabel(start, *newLabelTuple)
             self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item))
 
     def layoutPinProperties(self, item):
@@ -738,8 +747,7 @@ class layoutScene(editorScene):
             labelText = dlg.pinName.text()
             start = self.snapToGrid(self.toSceneCoord(
                 QPointF(float(dlg.pinBottomLeftX.text()),
-                        float(dlg.pinBottomLeftY.text()), )),
-                self.snapTuple, )
+                        float(dlg.pinBottomLeftY.text()), )), self.snapTuple, )
             end = self.snapToGrid(self.toSceneCoord(
                 QPointF(float(dlg.pinTopRightX.text()), float(dlg.pinTopRightY.text()), )),
                 self.snapTuple, )
@@ -753,11 +761,8 @@ class layoutScene(editorScene):
 
             undoCommandsList = [us.addDeleteShapeUndo(self, newPin, item),
                                 us.addDeleteShapeUndo(self, newLabel, item.label)]
-            self.addUndoMacroStack(undoCommandsList, 'pin/label edit')
-            # self.undoStack.beginMacro('pin/label edit')
-            # self.undoStack.push(us.addDeleteShapeUndo(self, newPin, item))
-            # self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item.label))
-            # self.undoStack.endMacro()
+            self.addUndoMacroStack(undoCommandsList,
+                                   'pin/label edit')  # self.undoStack.beginMacro('pin/label edit')  # self.undoStack.push(us.addDeleteShapeUndo(self, newPin, item))  # self.undoStack.push(us.addDeleteShapeUndo(self, newLabel, item.label))  # self.undoStack.endMacro()
 
     def layoutInstanceProperties(self, item: Union[lshp.layoutInstance, lshp.layoutPcell],
                                  pcell: bool = False):
@@ -890,28 +895,24 @@ class layoutScene(editorScene):
                     f"Moved items by {dlg.xEdit.text()} and {dlg.yEdit.text()}")
                 self.editModes.setMode("selectItem")
 
-
     def copySelectedItems(self):
-        selectedItems = [
-            item for item in self.selectedItems() if item.parentItem() is None
-        ]
-        if selectedItems is not None:
+        selectedItems = [item for item in self.selectedItems() if item.parentItem() is None]
+
+        if selectedItems:
             for item in selectedItems:
                 selectedItemJson = json.dumps(item, cls=layenc.layoutEncoder)
                 itemCopyDict = json.loads(selectedItemJson)
                 shape = lj.layoutItems(self).create(itemCopyDict)
                 if shape is not None:
                     item.setSelected(False)
-                    self.addUndoStack(shape)
+                    self.undoStack.push(us.addShapeUndo(self, shape))
                     shape.setSelected(True)
                     # shift position by four grid units to right and down
-                    shape.setPos(
-                        QPoint(
-                            item.pos().x() +  self.snapTuple[0]*fabproc.dbu,
-                            item.pos().y() +  self.snapTuple[1]*fabproc.dbu,
-                        )
-                    )
-                    if isinstance(shape, lshp.layoutInstance) or isinstance(shape,lshp.layoutPcell):
+                    shape.setPos(QPoint(item.scenePos().x() + self.snapTuple[0] * 4,
+                                        item.scenePos().y() + self.snapTuple[1] * 4))
+                    print(shape.pos())
+                    if isinstance(shape, lshp.layoutInstance) or isinstance(shape,
+                                                                            lshp.layoutPcell):
                         self.itemCounter += 1
                         shape.counter = self.itemCounter
                         shape.instanceName = f"I{shape.counter}"
@@ -936,8 +937,7 @@ class layoutScene(editorScene):
                     dlg.viewListCB.addItems(viewNames)
                     if dlg.exec() == QDialog.Accepted:
                         libItem = libm.getLibItem(
-                            self.editorWindow.libraryView.libraryModel,
-                            item.libraryName)
+                            self.editorWindow.libraryView.libraryModel, item.libraryName)
                         cellItem = libm.getCellItem(libItem, item.cellName)
                         viewItem = libm.getViewItem(cellItem, dlg.viewListCB.currentText())
                         openViewT = (
@@ -958,47 +958,18 @@ class layoutScene(editorScene):
                 self._stretchPath = lshp.layoutPath(
                     QLineF(pathItem.sceneEndPoints[0], pathItem.sceneEndPoints[1]),
                     pathItem.layer, pathItem.width, pathItem.startExtend,
-                    pathItem.endExtend,
-                    pathItem.mode, )
+                    pathItem.endExtend, pathItem.mode, )
             case "p1":
                 self._stretchPath = lshp.layoutPath(
                     QLineF(pathItem.sceneEndPoints[1], pathItem.sceneEndPoints[0]),
                     pathItem.layer, pathItem.width, pathItem.startExtend,
-                    pathItem.endExtend,
-                    pathItem.mode, )
+                    pathItem.endExtend, pathItem.mode, )
         self._stretchPath.stretch = True
         self._stretchPath.name = pathItem.name
 
         addDeleteStretchNetCommand = us.addDeleteShapeUndo(self, self._stretchPath,
                                                            pathItem)
         self.undoStack.push(addDeleteStretchNetCommand)
-
-    #
-    # @staticmethod
-    # def rotateVector(mouseLoc: QPoint, vector: layp.layoutPath, transform: QTransform):
-    #     """
-    #     Rotate the vector based on the mouse location and transform.
-    #
-    #     Args:
-    #         mouseLoc (QPoint): The current mouse location.
-    #         vector (layp.layoutPath): The vector to rotate.
-    #         transform (QTransform): The transform to apply to the vector.
-    #     """
-    # start = vector.start
-    # xmove = mouseLoc.x() - start.x()
-    # ymove = mouseLoc.y() - start.y()
-
-    #     # Determine the new end point of the vector based on the mouse movement
-    #     if xmove >= 0 and ymove >= 0:
-    #         vector.end = QPoint(start.x(), start.y() + ymove)
-    #     elif xmove >= 0 and ymove < 0:
-    #         vector.end = QPoint(start.x() + xmove, start.y())
-    #     elif xmove < 0 and ymove < 0:
-    #         vector.end = QPoint(start.x(), start.y() + ymove)
-    #     elif xmove < 0 and ymove >= 0:
-    #         vector.end = QPoint(start.x() + xmove, start.y())
-    #
-    #     vector.setTransform(transform)
 
     def findClosestFontSize(self, sizes: List[int], target: int = 16) -> int:
         return min(sizes, key=lambda x: abs(x - target))
@@ -1008,8 +979,7 @@ class layoutScene(editorScene):
         fixedFamilies = None
         if fontDatabase:
             fixedFamilies = [family for family in fontDatabase.families(QFontDatabase.Latin)
-                             if
-                             fontDatabase.isFixedPitch(family)]
+                             if fontDatabase.isFixedPitch(family)]
 
         if not fixedFamilies:
             self.logger.warning("No fixed-pitch fonts found. Using default font.")

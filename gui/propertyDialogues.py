@@ -135,8 +135,6 @@ class arcPropertyDialog(QDialog):
         self.fLayout.addRow(edf.boldLabel("Width:"), self.widthEdit)
         self.heightEdit = edf.shortLineEdit()
         self.fLayout.addRow(edf.boldLabel("Height:"), self.heightEdit)
-        self.arcTypeCombo = QComboBox()
-        self.fLayout.addRow(edf.boldLabel('Arc Type:'), self.arcTypeCombo)
         self.mainLayout.addLayout(self.fLayout)
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)

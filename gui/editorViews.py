@@ -26,9 +26,10 @@
 from collections import Counter
 
 # import numpy as np
-from PySide6.QtCore import (QPoint, QRect, Qt, Signal, )
-from PySide6.QtGui import (QColor, QKeyEvent, QPainter, QWheelEvent, )
+from PySide6.QtCore import (QPoint, QRect, Qt, Signal, QLine,)
+from PySide6.QtGui import (QColor, QKeyEvent, QPainter, QWheelEvent, QPolygon, )
 from PySide6.QtWidgets import (QGraphicsView, )
+from PySide6.QtPrintSupport import (QPrinter,)
 from revedaEditor.backend.pdkPaths import importPDKModule
 
 schlyr = importPDKModule('schLayers')
@@ -54,11 +55,12 @@ class editorView(QGraphicsView):
         self.snapTuple = self.editor.snapTuple
         self.gridbackg = True
         self.linebackg = False
-        self._left: QPoint = QPoint(0, 0)
-        self._right: QPoint = QPoint(0, 0)
-        self._top: QPoint = QPoint(0, 0)
-        self._bottom: QPoint = QPoint(0, 0)
-        self.viewRect = QRect(0, 0, 0, 0)
+        self._transparent = False
+        self._left: QPoint = QPoint()
+        self._right: QPoint = QPoint()
+        self._top: QPoint = QPoint()
+        self._bottom: QPoint = QPoint()
+        self.viewRect = QRect()
         self.zoomFactor = 1.0
         self.init_UI()
 
@@ -106,6 +108,53 @@ class editorView(QGraphicsView):
         self.viewRect = self.mapToScene(
             self.rect()).boundingRect().toRect()  # self.zoomFactorChanged.emit(self.zoomFactor)
 
+    # def drawBackground(self, painter, rect):
+    #     """
+    #     Draws the background of the painter within the given rectangle.
+    #
+    #     Args:
+    #         painter (QPainter): The painter object to draw on.
+    #         rect (QRect): The rectangle to draw the background within.
+    #     """
+    #
+    #     # Fill the rectangle with black color
+    #
+    #     # Calculate the coordinates of the left, top, bottom, and right edges of the rectangle
+    #     self._left = int(rect.left()) - (int(rect.left()) % self.majorGrid)
+    #     self._top = int(rect.top()) - (int(rect.top()) % self.majorGrid)
+    #     self._bottom = int(rect.bottom())
+    #     self._right = int(rect.right())
+    #     painter.fillRect(rect, QColor("black"))
+    #     if self.gridbackg:
+    #
+    #         # Set the pen color to gray
+    #         painter.setPen(QColor("white"))
+    #
+    #         # Create a range of x and y coordinates for drawing the grids
+    #         x_coords, y_coords = self.findCoords()
+    #
+    #         for x_coord in x_coords:
+    #             for y_coord in y_coords:
+    #                 painter.drawPoint(x_coord, y_coord)
+    #     elif self.linebackg:
+    #         # Set the pen color to gray
+    #         painter.setPen(QColor("gray"))
+    #
+    #         # Create a range of x and y coordinates for drawing the lines
+    #         x_coords, y_coords = self.findCoords()
+    #
+    #         # Draw vertical lines
+    #         for x in x_coords:
+    #             painter.drawLine(x, self._top, x, self._bottom)
+    #
+    #         # Draw horizontal lines
+    #         for y in y_coords:
+    #             painter.drawLine(self._left, y, self._right, y)
+    #
+    #     else:
+    #         # Call the base class method to draw the background
+    #         super().drawBackground(painter, rect)
+
     def drawBackground(self, painter, rect):
         """
         Draws the background of the painter within the given rectangle.
@@ -114,45 +163,59 @@ class editorView(QGraphicsView):
             painter (QPainter): The painter object to draw on.
             rect (QRect): The rectangle to draw the background within.
         """
+        # Cache rect values to avoid multiple calls
+        left = int(rect.left())
+        top = int(rect.top())
 
-        # Fill the rectangle with black color
-
-        # Calculate the coordinates of the left, top, bottom, and right edges of the rectangle
-        self._left = int(rect.left()) - (int(rect.left()) % self.majorGrid)
-        self._top = int(rect.top()) - (int(rect.top()) % self.majorGrid)
+        # Calculate coordinates once
+        self._left = left - (left % self.majorGrid)
+        self._top = top - (top % self.majorGrid)
         self._bottom = int(rect.bottom())
         self._right = int(rect.right())
 
-        if self.gridbackg:
+        if self.gridbackg or self.linebackg:
+            # Fill rectangle with black color
             painter.fillRect(rect, QColor("black"))
-            # Set the pen color to gray
-            painter.setPen(QColor("white"))
-
-            # Create a range of x and y coordinates for drawing the grids
             x_coords, y_coords = self.findCoords()
 
-            for x_coord in x_coords:
-                for y_coord in y_coords:
-                    painter.drawPoint(x_coord, y_coord)
+            if self.gridbackg:
+                painter.setPen(QColor("white"))
 
-        elif self.linebackg:
-            painter.fillRect(rect, QColor("black"))
-            # Set the pen color to gray
-            painter.setPen(QColor("gray"))
+                # Pre-allocate the polygon for better performance
+                points = QPolygon()
+                num_points = len(x_coords) * len(y_coords)
+                points.reserve(num_points)
 
-            # Create a range of x and y coordinates for drawing the lines
-            x_coords, y_coords = self.findCoords()
+                # Fill the polygon with points
+                for x in x_coords:
+                    for y in y_coords:
+                        points.append(QPoint(int(x), int(y)))
 
-            # Draw vertical lines
-            for x in x_coords:
-                painter.drawLine(x, self._top, x, self._bottom)
+                # Draw all points in a single call
+                painter.drawPoints(points)
 
-            # Draw horizontal lines
-            for y in y_coords:
-                painter.drawLine(self._left, y, self._right, y)
+            else:  # self.linebackg
 
+                painter.setPen(QColor("gray"))
+
+                # Create vertical and horizontal lines
+                vertical_lines = [
+                    QLine(int(x), self._top, int(x), self._bottom)
+                    for x in x_coords
+                ]
+
+                horizontal_lines = [
+                    QLine(self._left, int(y), self._right, int(y))
+                    for y in y_coords
+                ]
+
+                # Draw all lines with minimal calls
+                painter.drawLines(vertical_lines)
+                painter.drawLines(horizontal_lines)
+        elif self._transparent:
+            self.viewport().setAttribute(Qt.WA_TranslucentBackground)
         else:
-            # Call the base class method to draw the background
+            painter.fillRect(rect, QColor("black"))
             super().drawBackground(painter, rect)
 
     def findCoords(self):
@@ -230,8 +293,6 @@ class editorView(QGraphicsView):
         After that, it calls the revedaPrint method to render the view onto the painter. Finally, it
         restores the gridbackg and linebackg attributes to their original state.
         """
-        painter = QPainter(printer)
-
         # Store original states
         original_gridbackg = self.gridbackg
         original_linebackg = self.linebackg
@@ -239,24 +300,16 @@ class editorView(QGraphicsView):
         # Set both to False for printing
         self.gridbackg = False
         self.linebackg = False
-
-        # Render the view onto the painter
-        self.revedaPrint(painter)
-
+        self._transparent = True
+        painter = QPainter()
+        painter.begin(printer)
+        self.render(painter)
         # Restore original states
         self.gridbackg = original_gridbackg
         self.linebackg = original_linebackg
-
+        self._transparent = False
         # End painting
         painter.end()
-
-    def revedaPrint(self, painter):
-        viewport_geom = self.viewport().geometry()
-        self.drawBackground(painter, viewport_geom)
-        painter.drawText(viewport_geom, "Revolution EDA")
-        self.render(painter)
-        painter.end()
-
 
 class symbolView(editorView):
     def __init__(self, scene, parent):
@@ -268,10 +321,15 @@ class symbolView(editorView):
         super().keyPressEvent(event)
         match event.key():
             case Qt.Key_Escape:
-                if self.scene.polygonGuideLine is not None:
-                    self.scene.removeItem(self.scene.polygonGuideLine)
-                    self.scene.polygonGuideLine = None
-                    self.scene.newPolygon = None
+                if self.scene._polygonGuideLine:
+                    self.scene.finishPolygon()
+                self.scene._newLine = None
+                self.scene._newCircle = None
+                self.scene._newPin = None
+                self.scene._newRect = None
+                self.scene._newArc = None
+                self.scene._newLabel = None
+                self.scene.editModes.setMode('selectItem')
 
 
 class schematicView(editorView):
@@ -281,13 +339,13 @@ class schematicView(editorView):
         super().__init__(self.scene, self.parent)
         self._dotRadius = 2
         self.scene.wireEditFinished.connect(self.mergeSplitViewNets)
-    
+
 
     def mousePressEvent(self, event):
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
 
         super().mousePressEvent(event)
-        
+
     def mouseReleaseEvent(self, event):
         self.viewRect = self.mapToScene(self.rect()).boundingRect().toRect()
         viewSnapLinesSet = {guideLineItem for guideLineItem in
@@ -354,12 +412,9 @@ class schematicView(editorView):
                 self.scene._stretchNet.setSelected(False)
                 self.scene._stretchNet.stretch = False
                 self.scene.mergeSplitNets(self.scene._stretchNet)
-            elif self.scene._newInstance is not None:
-                # New instance creation mode, cancel creation
-                self.scene.newInstance = None
-            elif self.scene._newPin is not None:
-                # New pin creation mode, cancel creation
-                self.scene._newPin = None
+            self.scene.newInstance = None
+            self.scene._newPin = None
+            self.scene._newText = None
             # Set the edit mode to select item
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)
@@ -391,6 +446,9 @@ class layoutView(editorView):
             elif self.scene.editModes.addInstance:
                 self.scene.newInstance = None
                 self.scene.layoutInstanceTuple = None
+            elif self.scene.editModes.addLabel:
+                self.scene._newLabel = None
+                self.scene._newLabelTuple = None
 
             self.scene.editModes.setMode("selectItem")
         super().keyPressEvent(event)

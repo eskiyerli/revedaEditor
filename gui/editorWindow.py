@@ -553,12 +553,6 @@ class editorWindow(QMainWindow):
             self.centralW.scene.partialSelection = scd.partialSelection.isChecked()
             self.centralW.scene._snapDistance = int(float(scd.snapDistanceEntry.text()))
 
-    # def checkSaveCell(self):
-    #     pass
-    #
-    # def saveCell(self):
-    #     pass
-
     def readOnlyCellClick(self):
         self.centralW.scene.readOnly = self.readOnlyCellAction.isChecked()
 

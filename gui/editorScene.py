@@ -21,11 +21,8 @@
 #    Software: Revolution EDA
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
-#
 
-import os
 from typing import List, Sequence
-
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt)
 from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
@@ -59,7 +56,7 @@ class editorScene(QGraphicsScene):
         self.undoStack.setUndoLimit(99)
         self.origin = QPoint(0, 0)
         self.cellName = self.editorWindow.file.parent.stem
-        self.partialSelection = True
+        self.partialSelection = True # TODO: add option to GUI
         self._selectionRectItem = None
         self._selectedItems = []
         self._selectedItemGroup = None
@@ -86,104 +83,23 @@ class editorScene(QGraphicsScene):
             elif self.editModes.panView:
                 self.centerViewOnPoint(self.mousePressLoc)
                 self.messageLine.setText("Pan View at mouse press position")
-            if self.editModes.selectItem:
-                if self._groupItems:
-                    for item in self._groupItems:
-                        item.setSelected(False)
-                    self._groupItems.clear()
-                    self.messageLine.setText('Unselected item(s)')
-                self._handleSelection(modifiers, self.mousePressLoc)
-
-    def mouseMoveEvent(self, event):
-        super().mouseMoveEvent(event)
-        modifiers = QGuiApplication.keyboardModifiers()
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            currentPos = event.scenePos().toPoint()
-            if self.editModes.selectItem and modifiers == Qt.KeyboardModifier.ShiftModifier:
-                self._updateSelectionRectangle(currentPos)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             self.mouseReleaseLoc = event.scenePos().toPoint()
-            modifiers = QGuiApplication.keyboardModifiers()
+            # modifiers = QGuiApplication.keyboardModifiers()
             if self.editModes.moveItem and self._selectedItemGroup:
                 self._groupItems = self._selectedItemGroup.childItems()
                 self.destroyItemGroup(self._selectedItemGroup)
                 self._selectedItemGroup = None
-            elif self.editModes.selectItem and self._selectionRectItem:
-                self._processExistingSelectionRectangle()
-                self._cleanupAfterMouseRelease(modifiers)
 
-    def _handleSelection(self, modifiers: Qt.KeyboardModifier, currentPos: QPoint):
-        if modifiers == Qt.KeyboardModifier.ShiftModifier:
-            self._handleShiftSelection(currentPos)
-        elif modifiers == Qt.KeyboardModifier.ControlModifier:
-            self._handleControlSelection(currentPos)
-        elif modifiers == Qt.KeyboardModifier.AltModifier:
-            self._handleAltSelection(currentPos)
-        else:
-            self._handleDefaultSelection(currentPos)
-
-    def _handleShiftSelection(self, currentPos: QPoint):
-        self._startNewSelectionRectangle(currentPos)
-
-    def _processExistingSelectionRectangle(self):
-        selectionMode = (Qt.ItemSelectionMode.IntersectsItemShape if
-                         self.partialSelection else Qt.ItemSelectionMode.ContainsItemShape)
-        selectionPath = QPainterPath()
-        selectionPath.addRect(self._selectionRectItem.sceneBoundingRect())
-        self.setSelectionArea(selectionPath, mode=selectionMode)
-
-        self.removeItem(self._selectionRectItem)
-        self._selectionRectItem = None
-        self.messageLine.setText("Selection complete")
-
-    def _startNewSelectionRectangle(self, currentPos: QPoint):
-        self._selectionRectItem = QGraphicsRectItem(
-            QRectF(currentPos, currentPos))
-        selectionRectPen = QPen(QColor("yellow"), 2, Qt.PenStyle.DashLine)
-        selectionRectPen.setCosmetic(False)
-        self._selectionRectItem.setPen(selectionRectPen)
-        self.addItem(self._selectionRectItem)
-
-    def _updateSelectionRectangle(self, currentPos):
-        if self._selectionRectItem:
-            rect = QRectF(self.mousePressLoc, currentPos).normalized()
-            self._selectionRectItem.setRect(rect)
-
-    def _handleControlSelection(self, currentPos: QPoint):
-        for item in self._getClickedItems(currentPos):
-            item.setSelected(not item.isSelected())
-
-    def _handleAltSelection(self, currentPos: QPoint):
-        self.clearSelection()
-        clicked_items = self._getClickedItems(currentPos)
-        if clicked_items:
-            clicked_items[0].setSelected(True)
-
-    def _handleDefaultSelection(self, currentPos: QPoint):
-        self.clearSelection()
-        for item in self._getClickedItems(currentPos):
-            item.setSelected(True)
-
-    def _cleanupAfterMouseRelease(self, modifiers):
-        if self._selectionRectItem and modifiers != Qt.KeyboardModifier.ShiftModifier:
-            self.removeItem(self._selectionRectItem)
-            self._selectionRectItem = None
-
-        self._selectedItems = self.selectedItems()
-        self.messageLine.setText("Item selected" if self._selectedItems else "Nothing selected")
-
-    def _getClickedItems(self, currentPos: QPoint):
-        return [item for item in self.items(currentPos) if
-                item.parentItem() is None]
 
     def snapToBase(self, number, base):
         """
         Restrict a number to the multiples of base
         """
-        return int(round(number / base)) * base
+        return int(round(float(number) / base)) * base
 
     def snapToGrid(self, point: QPoint, snapTuple: tuple[int, int]):
         """
