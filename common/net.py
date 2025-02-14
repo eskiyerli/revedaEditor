@@ -119,7 +119,7 @@ class schematicNet(QGraphicsItem):
         self._shapeRect = (
             QRectF(self._draftLine.p1(), self._draftLine.p2())
             .normalized()
-            .adjusted(-2, -2, 2, 2)
+            .adjusted(-3, -3, 3, 3)
         )
         self._boundingRect = self._shapeRect.adjusted(-8, -8, 8, 8)
         self.setRotation(-self._angle)
@@ -151,7 +151,6 @@ class schematicNet(QGraphicsItem):
 
     def __repr__(self):
         return f"schematicNet({self.sceneEndPoints})"
-
 
     def itemChange(self, change, value):
         if self.scene():
@@ -204,14 +203,12 @@ class schematicNet(QGraphicsItem):
         # Check if highlightNets flag is set in the scene
         if self.scene().highlightNets:
             self._highlighted = True
-            self._connectedNetsSet = self.scene().findConnectedNetSet(self)
+            sceneNetsSet = self.scene().findSceneNetsSet() - {self}
+            self._connectedNetsSet = self.scene().findConnectedNetSet(self, sceneNetsSet)
 
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
                 netItem.highlight()
-
-            # Create flight lines and add them to the scene
-            for netItem in self._connectedNetsSet:
                 flightLine = netFlightLine(
                     self.mapToScene(self._draftLine.center()),
                     netItem.mapToScene(netItem.draftLine.center()),
@@ -255,73 +252,46 @@ class schematicNet(QGraphicsItem):
             overlapNets = {netItem for netItem in self.collidingItems() if isinstance(netItem, schematicNet)}
             return overlapNets - {self}
 
-    def inheritNetName(self, otherNet: Type["schematicNet"]) -> bool:
+    def inheritNetName(self, otherNet: "schematicNet") -> bool:
         """
-        Weaker net inherits the net name of the stronger net and is set to INHERIT nameStrength.
-        Good for connections without merging.
+        Inherit or resolve net names based on name strength and handle conflicts.
         """
+
+        def resolve_name(weakNet: "schematicNet", strongNet: "schematicNet"):
+            weakNet.name = strongNet.name
+            weakNet.nameStrength = netNameStrengthEnum.INHERIT
+
         if self.nameStrength.value == 3:  # SET
-            if otherNet.nameStrength.value == 0:
-                otherNet.name = self.name
-                otherNet.nameStrength = netNameStrengthEnum.INHERIT
-                return True
-            elif otherNet.nameStrength.value == 2:
-                otherNet.name = self.name
+            if otherNet.nameStrength.value in (0, 1, 2):
+                resolve_name(otherNet, self)
                 return True
             elif otherNet.nameStrength.value == 3:
                 if self.name != otherNet.name:
-                    self.nameConflict = True
-                    otherNet.nameConflict = True
+                    self.nameConflict = otherNet.nameConflict = True
                     return False
                 return True
         elif self.nameStrength.value == 2:  # INHERIT
-            if otherNet.nameStrength.value == 0:
-                otherNet.name = self.name
-                otherNet.nameStrength = netNameStrengthEnum.INHERIT
+            if otherNet.nameStrength.value in (0, 1):
+                resolve_name(otherNet, self)
                 return True
-            elif otherNet.nameStrength.value == 2:
-                if self.name != otherNet.name:
-                    self.nameConflict = True
-                    otherNet.nameConflict = True
-                    return False
-                return True
-            elif otherNet.nameStrength.value == 3:
-                self.name = otherNet.name
-                self.nameStrength = netNameStrengthEnum.INHERIT
+            elif otherNet.nameStrength.value in (2, 3):
+                if otherNet.nameStrength.value == 3 or self.name != otherNet.name:
+                    resolve_name(self, otherNet)
+                    return False if self.name != otherNet.name else True
                 return True
         elif self.nameStrength.value == 1:  # WEAK
             if otherNet.nameStrength.value == 0:
-                otherNet.name = self.name
-                otherNet.nameStrength = netNameStrengthEnum.INHERIT
+                resolve_name(otherNet, self)
                 return True
-            elif otherNet.nameStrength.value == 1:
-                if self.name != otherNet.name:
-                    self.nameConflict = True
-                    otherNet.nameConflict = True
-                    return False
-                return True
-            elif otherNet.nameStrength.value == 2:
-                self.name = otherNet.name
-                self.nameStrength = netNameStrengthEnum.INHERIT
-                return True
-            elif otherNet.nameStrength.value == 3:
-                self.name = otherNet.name
-                self.nameStrength = netNameStrengthEnum.INHERIT
-                return True
+            elif otherNet.nameStrength.value in (1, 2, 3):
+                resolve_name(self, otherNet)
+                return False if self.name != otherNet.name else True
         elif self.nameStrength.value == 0:  # NONAME
-            if otherNet.nameStrength.value == 0:
-                return True
-            elif otherNet.nameStrength.value == 2:
-                self.name = otherNet.name
-                self.nameStrength = netNameStrengthEnum.INHERIT
-                return True
-            elif otherNet.nameStrength.value == 3:
-                self.name = otherNet.name
-                self.nameStrength = netNameStrengthEnum.INHERIT
-                return True
-        else:
-            return False
-        return True
+            if otherNet.nameStrength.value in (2, 3):
+                resolve_name(self, otherNet)
+            return True
+
+        return False
 
     def mergeNetNames(self, otherNet: Type["schematicNet"]) -> bool:
         if self.nameStrength.value < otherNet.nameStrength.value:
@@ -469,6 +439,7 @@ class schematicNet(QGraphicsItem):
             return self_points == other_points
         return False
 
+
 class netName(QGraphicsSimpleTextItem):
     def __init__(self, name: str, parent: schematicNet):
         super().__init__(name, parent)
@@ -552,12 +523,12 @@ class netFlightLine(QGraphicsPathItem):
         self._start = start
         self._end = end
         super().__init__()
+        self._createPath()
 
     def __repr__(self):
         return f"netFlightLine({self.mapToScene(self._start)},{self.mapToScene(self._end)})"
 
-    def paint(self, painter, option, widget) -> None:
-        painter.setPen(netFlightLine.wireHighlightPen)
+    def _createPath(self) -> None:
         line = QLineF(self._start, self._end)
         perpendicularLine = QLineF(
             line.center(), line.center() + QPointF(-line.dy(), line.dx())
@@ -567,7 +538,11 @@ class netFlightLine(QGraphicsPathItem):
         path = QPainterPath()
         path.moveTo(self._start)
         path.quadTo(perpendicularLine.p2(), self._end)
-        painter.drawPath(path)
+        self.setPath(path)
+
+    def paint(self, painter: QPainter, *_) -> None:
+        painter.setPen(netFlightLine.wireHighlightPen)
+        painter.drawPath(self.path())
 
 
 class guideLine(QGraphicsLineItem):
