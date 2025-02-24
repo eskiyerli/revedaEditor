@@ -24,6 +24,7 @@
 
 
 # net class definition.
+from tracemalloc import start
 from PySide6.QtCore import (
     QPoint,
     Qt,
@@ -47,8 +48,9 @@ from PySide6.QtWidgets import (
 
 from revedaEditor.backend.pdkPaths import importPDKModule
 from typing import List, Tuple
+import re
 
-schlyr = importPDKModule('schLayers')
+schlyr = importPDKModule("schLayers")
 
 import math
 from typing import Type, Set, Union
@@ -70,7 +72,7 @@ class netNameStrengthEnum(IntEnum):
 
 class schematicNet(QGraphicsItem):
 
-    def __init__(self, start: QPoint, end: QPoint, mode: int = 0):
+    def __init__(self, start: QPoint, end: QPoint, width:int = 0, mode: int = 0):
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -89,12 +91,13 @@ class schematicNet(QGraphicsItem):
         self.draftLine: QLineF = QLineF(start, end)
         self._flip = (1, 1)
         self._offset = QPoint(0, 0)
-        self._nameItem = netName('', self)
+        self._nameItem = netName("", self)
         self._nameItem.setPos(self._draftLine.center())
         self._nameItem.setParentItem(self)
+        self._width = width
 
     @property
-    def draftLine(self):
+    def draftLine(self) -> QLineF:
         return self._draftLine
 
     @draftLine.setter
@@ -137,20 +140,22 @@ class schematicNet(QGraphicsItem):
         painter.setPen(pen)
         painter.drawLine(self._draftLine)
 
-    def _getPen(self):
+    def _getPen(self) -> QPen:
         if self.isSelected():
-            return schlyr.selectedWirePen
+            returnPen = QPen(schlyr.selectedWirePen)
         elif self._stretch:
-            return schlyr.stretchWirePen
+            returnPen =  QPen(schlyr.stretchWirePen)
         elif self._highlighted:
-            return schlyr.hilightPen
+            returnPen =  QPen(schlyr.hilightPen)
         elif self._nameConflict:
-            return schlyr.errorWirePen
+            returnPen = QPen(schlyr.errorWirePen)
         else:
-            return schlyr.wirePen
+            returnPen =  QPen(schlyr.wirePen)
+        returnPen.setWidth(returnPen.width()*(self._width+1))
+        return returnPen
 
     def __repr__(self):
-        return f"schematicNet({self.sceneEndPoints})"
+        return f"schematicNet({self.sceneEndPoints}, {self.width})"
 
     def itemChange(self, change, value):
         if self.scene():
@@ -172,15 +177,15 @@ class schematicNet(QGraphicsItem):
             elif self._stretch:
                 eventPos = event.pos().toPoint()
                 if (
-                        eventPos - self._draftLine.p1().toPoint()
+                    eventPos - self._draftLine.p1().toPoint()
                 ).manhattanLength() <= self.scene().snapDistance:
                     self.setCursor(Qt.SizeHorCursor)
-                    self.scene().stretchNet.emit(self, 'p1')
+                    self.scene().stretchNet.emit(self, "p1")
                 elif (
-                        eventPos - self._draftLine.p2().toPoint()
+                    eventPos - self._draftLine.p2().toPoint()
                 ).manhattanLength() <= self.scene().snapDistance:
                     self.setCursor(Qt.SizeHorCursor)
-                    self.scene().stretchNet.emit(self, 'p2')
+                    self.scene().stretchNet.emit(self, "p2")
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.setSelected(False)
@@ -204,7 +209,9 @@ class schematicNet(QGraphicsItem):
         if self.scene().highlightNets:
             self._highlighted = True
             sceneNetsSet = self.scene().findSceneNetsSet() - {self}
-            self._connectedNetsSet = self.scene().findConnectedNetSet(self, sceneNetsSet)
+            self._connectedNetsSet = self.scene().findConnectedNetSet(
+                self, sceneNetsSet
+            )
 
             # Highlight the connected netItems
             for netItem in self._connectedNetsSet:
@@ -249,7 +256,11 @@ class schematicNet(QGraphicsItem):
             set: A set of netItems that overlap with self.sceneShapeRect.
         """
         if self.scene():
-            overlapNets = {netItem for netItem in self.collidingItems() if isinstance(netItem, schematicNet)}
+            overlapNets = {
+                netItem
+                for netItem in self.collidingItems()
+                if isinstance(netItem, schematicNet)
+            }
             return overlapNets - {self}
 
     def inheritNetName(self, otherNet: "schematicNet") -> bool:
@@ -308,7 +319,10 @@ class schematicNet(QGraphicsItem):
             elif self.nameStrength.value < 3:
                 otherNet.nameStrength = self.nameStrength
             return True
-        elif self.nameStrength.value == otherNet.nameStrength.value and self.name != otherNet.name:
+        elif (
+            self.nameStrength.value == otherNet.nameStrength.value
+            and self.name != otherNet.name
+        ):
             self.nameConflict = True
             otherNet.nameConflict = True
             return False
@@ -339,11 +353,13 @@ class schematicNet(QGraphicsItem):
 
     @property
     def nameConflict(self) -> bool:
-        return self._nameItem.nameConflict
+        return self._nameConflict
 
     @nameConflict.setter
     def nameConflict(self, value: bool):
+        self._nameConflict = value
         self._nameItem.nameConflict = value
+        self.update()
 
     @property
     def endPoints(self):
@@ -368,6 +384,16 @@ class schematicNet(QGraphicsItem):
     @offset.setter
     def offset(self, value: Union[QPoint | QPointF]):
         self._offset = value
+
+    @property
+    def width(self):
+        return self._width
+
+    @width.setter
+    def width(self, value: int):
+        self.prepareGeometryChange()
+        self._width = value
+        self.update()
 
     def highlight(self):
         self._highlighted = True

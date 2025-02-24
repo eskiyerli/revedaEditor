@@ -24,8 +24,8 @@
 
 from typing import List, Sequence
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt)
-from PySide6.QtGui import (QGuiApplication, QColor, QPen, QPainterPath, )
-from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene, QMenu, QGraphicsItem,
+from PySide6.QtGui import (QGuiApplication)
+from PySide6.QtWidgets import (QQGraphicsScene, QMenu, QGraphicsItem,
                                QDialog,
                                QCompleter)
 from contextlib import contextmanager

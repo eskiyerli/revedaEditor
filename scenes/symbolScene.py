@@ -38,7 +38,6 @@ from PySide6.QtCore import (
     QPoint,
     QPointF,
     QRectF,
-    QRect,
     Qt,
 )
 from PySide6.QtGui import (
@@ -62,7 +61,7 @@ import revedaEditor.fileio.loadJSON as lj
 import revedaEditor.fileio.symbolEncoder as symenc
 import revedaEditor.gui.propertyDialogues as pdlg
 from revedaEditor.backend.pdkPaths import importPDKModule
-from revedaEditor.gui.editorScene import editorScene
+from revedaEditor.scenes.editorScene import editorScene
 
 symlyr = importPDKModule('symLayers')
 

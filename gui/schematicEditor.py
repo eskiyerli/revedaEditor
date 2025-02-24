@@ -57,7 +57,7 @@ import revedaEditor.gui.editorViews as edv
 import revedaEditor.gui.editorWindow as edw
 import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.propertyDialogues as pdlg
-import revedaEditor.gui.schematicScene as schscn
+import revedaEditor.scenes.schematicScene as schscn
 from revedaEditor.gui.startThread import startThread
 
 import importlib

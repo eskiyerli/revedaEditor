@@ -50,7 +50,7 @@ import revedaEditor.gui.fileDialogues as fd
 import revedaEditor.gui.layoutDialogues as ldlg
 import revedaEditor.gui.propertyDialogues as pdlg
 from revedaEditor.backend.pdkPaths import importPDKModule
-from revedaEditor.gui.editorScene import editorScene
+from revedaEditor.scenes.editorScene import editorScene
 
 fabproc = importPDKModule('process')
 laylyr = importPDKModule('layoutLayers')
