@@ -623,3 +623,53 @@ class guideLine(QGraphicsLineItem):
         assert isinstance(otherNet, schematicNet)
         self.name = otherNet.name
         self.nameStrength = otherNet.nameStrength
+
+
+def clearNetStatus(netsSet: set[schematicNet]):
+    """
+    Clear all assigned net names
+    """
+    for netItem in netsSet:
+        netItem.nameConflict = False
+        if netItem.nameStrength.value < 3:
+            netItem.nameStrength = netNameStrengthEnum.NONAME
+
+
+def parseBusNotation(name: str) -> tuple[str, tuple[int, int]]:
+    """
+    Parse bus notation like 'name<0:5>' into base name and index range.
+    Also handles single net notation like 'name<0>' or 'name<1>'.
+
+    Args:
+    name (str): The net name with optional bus notation.
+
+    Returns:
+    tuple[str, tuple[int, int]]: A tuple containing the base name and a tuple of start and end indices.
+    """
+    # Check if the name does not contain bus notation
+    if '<' not in name or '>' not in name:
+        return name, (0, 0)
+
+    baseName = name.split('<')[0]  # Extract the base name before '<'
+    indexRange = name.split('<')[1].split('>')[0]  # Extract the content inside '<>'
+
+    # Check if it's a single index (e.g., 'name<0>')
+    if ':' not in indexRange:
+        singleIndex = int(indexRange)
+        return baseName, (singleIndex, singleIndex)
+
+    # Handle range notation (e.g., 'name<0:5>')
+    start, end = map(int, indexRange.split(':'))
+    return baseName, (start, end)
+# def parseBusNotation(name: str) -> tuple[str, tuple[int,int]]:
+#     """Parse bus notation like 'name<0:5>' into base name and list of indices."""
+#     # Check if the name does not contain bus notation
+#     if '<' not in name or '>' not in name:
+#         return name, (0,0)
+#
+#     baseName = name.split('<')[0]  # Extract the base name before '<'
+#     indexRange = name.split('<')[1]
+#     indexRange = indexRange.split('>')[0]
+#     start, end = map(int, indexRange.split(':'))
+#     # indices = list(range(start, end + 1))
+#     return baseName, (start, end)
