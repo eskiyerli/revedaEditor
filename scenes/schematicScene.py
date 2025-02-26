@@ -22,10 +22,11 @@
 #    License: Mozilla Public License 2.0
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
-
+import pysnooper
 import itertools as itt
 import json
 import os
+import math
 import pathlib
 from collections import Counter
 from typing import Union, Set, Dict, Tuple, List
@@ -391,7 +392,7 @@ class schematicScene(editorScene):
             self.removeItem(newNet)
             self.undoStack.removeLastCommand()
         else:
-            self.adjustNetToPinSizes(newNet)
+            # self.adjustNetToPinSizes(newNet)
             self.mergeSplitNets(newNet)
 
     def adjustNetToPinSizes(self, newNet):
@@ -435,42 +436,31 @@ class schematicScene(editorScene):
                         newNet.nameStrength = snet.netNameStrengthEnum.WEAK
                         self.netCounter += 1
 
-    def mergeSplitNets(self, inputNet: snet.schematicNet):
-        merged, mergedNet = self.mergeNets(inputNet)
-        if merged:
-            self.addItem(mergedNet)
-            self.removeItem(inputNet)
-            self.findNetsToSplit(mergedNet)
-            # splitSuccess, splitNetsSet = self.splitInputNet(
-            #     mergedNet
-            # )  # input net is split
-            # parallelNetsSet.add(inputNet)  # original nets in the scene.
-            # if splitSuccess:
-            #     for netItem in splitNetsSet - parallelNetsSet:
-            #         self.addItem(netItem)
-            #         netItem.mergeNetNames(mergedNet)
-            #     for netItem in parallelNetsSet - splitNetsSet:
-            #         self.removeItem(netItem)
-            #
-            # else:  # input net is not split only merged
-            #     mergedNet.highlighted = True
-            #     for netItem in parallelNetsSet:
-            #         self.removeItem(netItem)
-            #     self.addItem(mergedNet)
-        else:
-            self.findNetsToSplit(inputNet)
-        #     splitSuccess, splitNetsSet = self.splitInputNet(
-        #         inputNet
-        #     )  # input net is split
-        #     if splitSuccess:
-        #         for netItem in splitNetsSet:
-        #             self.addItem(netItem)
-        #             netItem.mergeNetNames(inputNet)
-        #         self.removeItem(inputNet)
 
-    def mergeNets(
-            self, inputNet: snet.schematicNet
-    ) -> Tuple[bool, snet.schematicNet]:
+    def mergeSplitNets(self, inputNet: snet.schematicNet):
+        merged, outputNet, processedNets = self.mergeNets(inputNet)
+        if merged:
+            splitDone, splitOutputNets = self.splitInputNet(outputNet)
+            if splitDone:
+                changedNetsSet = processedNets - splitOutputNets
+                for netItem in changedNetsSet:
+                    self.removeItem(netItem)
+                newNetsSet = splitOutputNets - processedNets
+                for netItem in newNetsSet:
+                    self.addItem(netItem)
+            else:
+                for netItem in processedNets:
+                    self.removeItem(netItem)
+                self.addItem(outputNet)
+        else:
+            splitDone, splitOutputNets = self.splitInputNet(inputNet)
+            if splitDone:
+                for netItem in splitOutputNets:
+                    self.addItem(netItem)
+                self.removeItem(inputNet)
+
+
+    def mergeNets(self, inputNet: snet.schematicNet) -> Tuple[bool, snet.schematicNet]:
         """
         Merges overlapping nets and returns the merged net.
 
@@ -479,29 +469,53 @@ class schematicScene(editorScene):
         """
         # Find other nets that overlap with self
         otherNets = inputNet.findOverlapNets()
+        processedNets = set()
         parallelNets = set()
         if otherNets:
             parallelNets = {
-                               netItem for netItem in otherNets if
-                               inputNet.isParallel(netItem)
-                           } - {self}
+                netItem for netItem in otherNets if inputNet.isParallel(netItem)
+            }
         points = inputNet.sceneEndPoints
         # If there are parallel nets
         if parallelNets:
+            print(f'parallel nets: {parallelNets}')
             busExists = int(any([netItem.width for netItem in parallelNets]) or inputNet.width)
-            while parallelNets:
-                netItem = parallelNets.pop()
-                result = inputNet.mergeNetNames(netItem)
-                if result:
-                    points.extend(netItem.sceneEndPoints)
-                    self.removeItem(netItem)
+            for netItem in parallelNets:
+                points.extend(netItem.sceneEndPoints)
+                processedNets.add(netItem)
             furthestPoints = self.findFurthestPoints(points)
-            returnNet = snet.schematicNet(*furthestPoints, busExists)
-            returnNet.name = inputNet.name
-            returnNet.nameStrength = inputNet.nameStrength
-            return True, returnNet
+            mergedNet = snet.schematicNet(*furthestPoints, busExists)
+            # returnNet.name = inputNet.name
+            # returnNet.nameStrength = inputNet.nameStrength
+            processedNets.add(inputNet)
+            print(f'processed nets: {processedNets}')
+            return True, mergedNet, processedNets
         else:
-            return False, inputNet
+            return False, inputNet, set()
+
+    @staticmethod
+    def findFurthestPoints(points: List[QPoint]) -> List[QPoint]:
+        """
+        Find the two furthest points from the given list of points.
+        """
+        if len(points) < 2:
+            return points
+
+        def distance(p1: QPoint, p2: QPoint) -> float:
+            return math.sqrt((p1.x() - p2.x()) ** 2 + (p1.y() - p2.y()) ** 2)
+
+        max_distance = 0
+        furthest_points = None
+
+        for i in range(len(points)):
+            for j in range(i + 1, len(points)):
+                dist = distance(points[i], points[j])
+                if dist > max_distance:
+                    max_distance = dist
+                    furthest_points = (points[i], points[j])
+
+        return furthest_points
+
 
     def findNetsToSplit(self, inputNet: snet.schematicNet):
         """
@@ -528,31 +542,29 @@ class schematicScene(editorScene):
 
         # Process each orthogonal net
         while orthoNets:
-            netItem = orthoNets.pop()
-            netItem_endpoints = netItem.sceneEndPoints
-            netItem_rect = netItem.sceneShapeRect
+            orthoNet = orthoNets.pop()
+            orthoNetEndpoints = orthoNet.sceneEndPoints
+            orthoNetRect = orthoNet.sceneShapeRect
             for netEnd in inputNetEndPoints:
-                if not netItem_rect.contains(netEnd) or netEnd in netItem_endpoints:
+                if not orthoNetRect.contains(netEnd) or netEnd in orthoNetEndpoints:
                     continue
-                if inputNet.splitNetNames(netItem):
-                    newNets =   [
-                            snet.schematicNet(netItem_endpoints[0], netEnd, netItem.width),
-                            snet.schematicNet(netEnd, netItem_endpoints[1], netItem.width),
+                newNets =   [
+                            snet.schematicNet(orthoNetEndpoints[0], netEnd, orthoNet.width),
+                            snet.schematicNet(netEnd, orthoNetEndpoints[1], orthoNet.width),
                         ]
-                    for newNet in newNets:
-                        newNet.name = netItem.name
-                        newSplitNets.append(newNet)
-                    netsToRemove.add(netItem)
+                for newNet in newNets:
+                    newNet.name = orthoNet.name
+                    newSplitNets.append(newNet)
+                netsToRemove.add(orthoNet)
 
-        if not newSplitNets:
-            return
+        for newNet in newSplitNets:
+            self.addItem(newNet)
+            newNet.inheritNetName(inputNet)
 
         # Batch remove items
-        for netItem in netsToRemove:
-            self.removeItem(netItem)
+        for orthoNet in netsToRemove:
+            self.removeItem(orthoNet)
 
-        # Add to undo stack and set properties
-        self.addListUndoStack(newSplitNets)
 
     def splitInputNet(self, inputNet) -> tuple[bool, Set[snet.schematicNet]]:
         # Cache frequently accessed properties
@@ -575,10 +587,10 @@ class schematicScene(editorScene):
             for netItem in orthoNets:
                 for netItemEnd in netItem.sceneEndPoints:
                     if sceneShapeRect.contains(netItemEnd):
-                        if not inputNet.mergeNetNames(netItem):
-                            inputNet.nameConflict = True
-                            netItem.nameConflict = True
-                            break
+                        # if not inputNet.mergeNetNames(netItem):
+                        #     inputNet.nameConflict = True
+                        #     netItem.nameConflict = True
+                        #     break
                         splitPointsSet.add(netItemEnd)
 
         if not splitPointsSet:
@@ -603,12 +615,11 @@ class schematicScene(editorScene):
         for i in range(len(orderedPoints) - 1):
             splitNet = snet.schematicNet(orderedPoints[i], orderedPoints[i + 1])
             if not splitNet.draftLine.isNull():
-                splitNet.mergeNetNames(inputNet)
                 if is_selected:
                     splitNet.setSelected(True)
-                if orthoNets:
-                    splitNet.name = inputName
-                    splitNet.nameStrength = inputStrength
+                # if orthoNets:
+                #     splitNet.name = inputName
+                #     splitNet.nameStrength = inputStrength
                 splitNetSet.add(splitNet)
 
         return True, splitNetSet
@@ -1600,7 +1611,7 @@ class schematicScene(editorScene):
 
             # Filter nets that can inherit the name of currentNet
             inheritableNets = {
-                net for net in connectedNets if net.splitNetNames(currentNet)
+                net for net in connectedNets if net.inheritNetName(currentNet)
             }
 
             # Remove processed nets from the set of unprocessed nets
