@@ -1492,6 +1492,7 @@ class schematicSymbol(symbolShape):
     def pins(self):
         if self.symattrs.get("pinOrder"):
             pinOrderList = self.symattrs.get("pinOrder").split(",")
+            print(pinOrderList)
             orderedPins = {key.strip(): self._pins[key.strip()] for key in pinOrderList}
             return orderedPins
         else:

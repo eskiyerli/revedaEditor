@@ -25,7 +25,7 @@
 from typing import List, Sequence
 from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt)
 from PySide6.QtGui import (QGuiApplication)
-from PySide6.QtWidgets import (QQGraphicsScene, QMenu, QGraphicsItem,
+from PySide6.QtWidgets import (QGraphicsScene, QMenu, QGraphicsItem,
                                QDialog,
                                QCompleter)
 from contextlib import contextmanager
@@ -40,7 +40,7 @@ class editorScene(QGraphicsScene):
     DEFAULT_GRID = (10, 10)
 
     def __init__(self, parent):
-        super().__init__(parent)
+        super().__init__()
         self.parent = parent
         self.editorWindow = self.parent.parent
         self.majorGrid = self.editorWindow.majorGrid

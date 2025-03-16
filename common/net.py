@@ -661,15 +661,4 @@ def parseBusNotation(name: str) -> tuple[str, tuple[int, int]]:
     # Handle range notation (e.g., 'name<0:5>')
     start, end = map(int, indexRange.split(':'))
     return baseName, (start, end)
-# def parseBusNotation(name: str) -> tuple[str, tuple[int,int]]:
-#     """Parse bus notation like 'name<0:5>' into base name and list of indices."""
-#     # Check if the name does not contain bus notation
-#     if '<' not in name or '>' not in name:
-#         return name, (0,0)
-#
-#     baseName = name.split('<')[0]  # Extract the base name before '<'
-#     indexRange = name.split('<')[1]
-#     indexRange = indexRange.split('>')[0]
-#     start, end = map(int, indexRange.split(':'))
-#     # indices = list(range(start, end + 1))
-#     return baseName, (start, end)
+
