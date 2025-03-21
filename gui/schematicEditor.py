@@ -112,7 +112,7 @@ class schematicEditor(edw.editorWindow):
         # create menu
         self.menuCreate.addAction(self.createInstAction)
         self.menuCreate.addAction(self.createNetAction)
-        # self.menuCreate.addAction(self.createBusAction)
+        self.menuCreate.addAction(self.createBusAction)
         self.menuCreate.addAction(self.createPinAction)
         self.menuCreate.addAction(self.createTextAction)
         self.menuCreate.addAction(self.createSymbolAction)
@@ -143,6 +143,7 @@ class schematicEditor(edw.editorWindow):
         super()._createTriggers()
 
         self.createNetAction.triggered.connect(self.createNetClick)
+        self.createBusAction.triggered.connect(self.createBusClick)
         self.createInstAction.triggered.connect(self.createInstClick)
         self.createPinAction.triggered.connect(self.createPinClick)
         self.createTextAction.triggered.connect(self.createNoteClick)
@@ -200,6 +201,9 @@ class schematicEditor(edw.editorWindow):
 
     def createNetClick(self, s):
         self.centralW.scene.editModes.setMode("drawWire")
+
+    def createBusClick(self, s):
+        self.centralW.scene.editModes.setMode("drawBus")
 
     def createInstClick(self, s):
         # create a designLibrariesView

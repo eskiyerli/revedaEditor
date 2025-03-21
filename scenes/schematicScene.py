@@ -29,7 +29,7 @@ import os
 import math
 import pathlib
 from collections import Counter
-from tracemalloc import start
+
 from typing import Union, Set, Dict, Tuple, List
 from PySide6.QtCore import (QPoint, QPointF, QRect, QRectF, Qt, QLineF, Signal, Slot,
                             QRegularExpression)
@@ -61,48 +61,90 @@ class schematicScene(editorScene):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.instCounter = 0
 
-        self.editModes = ddef.schematicModes(selectItem=True, deleteItem=False,
-            moveItem=False, copyItem=False, rotateItem=False, changeOrigin=False,
-            panView=False, drawPin=False, drawWire=False, drawBus=False, drawText=False,
-            addInstance=False, stretchItem=False, )
-        self.selectModes = ddef.schematicSelectModes(selectAll=True, selectDevice=False,
-            selectNet=False, selectPin=False, )
+        # Initialize counters
+        self.instCounter = 0
         self.instanceCounter = 0
         self.netCounter = 0
+
+        # Initialize modes with default values
+        self.editModes = ddef.schematicModes(
+            selectItem=True,
+            deleteItem=False,
+            moveItem=False,
+            copyItem=False,
+            rotateItem=False,
+            changeOrigin=False,
+            panView=False,
+            drawPin=False,
+            drawWire=False,
+            drawBus=False,
+            drawText=False,
+            addInstance=False,
+            stretchItem=False
+        )
+
+        self.selectModes = ddef.schematicSelectModes(
+            selectAll=True,
+            selectDevice=False,
+            selectNet=False,
+            selectPin=False
+        )
+
+        # Initialize selection trackers
         self.selectedNet = None
         self.selectedPin = None
         self.selectedSymbol = None
         self.selectedSymbolPin = None
-        # the same name
         self.newInstanceTuple = None
-        # pin attribute defaults
+
+        # Initialize pin defaults
         self.pinName = ""
         self.pinType = "Signal"
         self.pinDir = "Input"
+
+        # Initialize internal state trackers
         self._newNet = None
         self._stretchNet = None
         self._newInstance = None
         self._newPin = None
         self._newText = None
         self.textTuple = None
-        self.defineSnapRect()
 
+        # Initialize view properties
+        self.defineSnapRect()
         self.highlightNets = False
         self.hierarchyTrail = ""
+
+        # Font initialization
+        self._initializeFont()
+
+        # Connect signals
+        self.wireEditFinished.connect(self._handleWireFinished)
+        self.stretchNet.connect(self._handleStretchNet)
+
+        # Initialize cache
+        self._symbolCache = {}
+
+    def _initializeFont(self):
+        """Initialize fixed-width font settings."""
         fontFamilies = QFontDatabase.families(QFontDatabase.Latin)
-        fixedFamily = \
-        [family for family in fontFamilies if QFontDatabase.isFixedPitch(family)][0]
+
+        # Find first fixed-pitch font family
+        fixedFamily = next(
+            family for family in fontFamilies
+            if QFontDatabase.isFixedPitch(family)
+        )
+
+        # Get font style and create font
         fontStyle = QFontDatabase.styles(fixedFamily)[1]
         self.fixedFont = QFont(fixedFamily)
         self.fixedFont.setStyleName(fontStyle)
-        fontSize = [size for size in QFontDatabase.pointSizes(fixedFamily, fontStyle)][3]
+
+        # Set font size
+        fontSize = QFontDatabase.pointSizes(fixedFamily, fontStyle)[3]
         self.fixedFont.setPointSize(fontSize)
         self.fixedFont.setKerning(False)
-        self.wireEditFinished.connect(self._handleWireFinished)
-        self.stretchNet.connect(self._handleStretchNet)
-        self._symbolCache = {}
 
     def defineSnapRect(self):
         self._snapPointRect = QGraphicsRectItem()
@@ -335,6 +377,7 @@ class schematicScene(editorScene):
             self.removeItem(newNet)
             self.undoStack.removeLastCommand()
         else:
+            # self.mergeSplitNets(newNet)
             self.mergeSplitNets(newNet)
 
     def mergeSplitNets(self, inputNet: snet.schematicNet):
@@ -348,6 +391,7 @@ class schematicScene(editorScene):
                 newNetsSet = splitOutputNets - processedNets
                 for netItem in newNetsSet:
                     self.addItem(netItem)
+                    netItem.mergeNetName(outputNet)
             else:
                 for netItem in processedNets:
                     self.removeItem(netItem)
@@ -357,6 +401,7 @@ class schematicScene(editorScene):
             if splitDone:
                 for netItem in splitOutputNets:
                     self.addItem(netItem)
+                    netItem.mergeNetName(inputNet)
                 self.removeItem(inputNet)
 
     def mergeNets(self, inputNet: snet.schematicNet) -> Tuple[
@@ -377,7 +422,6 @@ class schematicScene(editorScene):
         points = inputNet.sceneEndPoints
         # If there are parallel nets
         if parallelNets:
-
             busExists = int(
                 any([netItem.width for netItem in parallelNets]) or inputNet.width)
             for netItem in parallelNets:
@@ -386,78 +430,59 @@ class schematicScene(editorScene):
             furthestPoints = self.findFurthestPoints(points)
             mergedNet = snet.schematicNet(*furthestPoints, busExists)
             processedNets.add(inputNet)
+            [mergedNet.mergeNetName(netItem) in processedNets]
             return True, mergedNet, processedNets
         else:
             return False, inputNet, set()
 
-    @staticmethod
-    def findFurthestPoints(points: List[QPoint]) -> List[QPoint]:
-        """
-        Find the two furthest points from the given list of points.
-        """
-        if len(points) < 2:
-            return points
 
-        def distance(p1: QPoint, p2: QPoint) -> float:
-            return math.sqrt((p1.x() - p2.x()) ** 2 + (p1.y() - p2.y()) ** 2)
-
-        max_distance = 0
-        furthest_points = None
-
-        for i in range(len(points)):
-            for j in range(i + 1, len(points)):
-                dist = distance(points[i], points[j])
-                if dist > max_distance:
-                    max_distance = dist
-                    furthest_points = (points[i], points[j])
-
-        return furthest_points
-
-    def findNetsToSplit(self, inputNet: snet.schematicNet):
-        """
-        Split orthogonal nets intersecting with input net.
-        Args:
-        inputNet: net splitting other orthogonal nets
-        """
-        netSceneRect = inputNet.sceneShapeRect
-        sceneItemsInRect = self.items(netSceneRect)
-        inputNetEndPoints = inputNet.sceneEndPoints
-
-        # Pre-filter orthogonal nets
-        orthoNets = {netItem for netItem in sceneItemsInRect if
-            isinstance(netItem, snet.schematicNet) and inputNet.isOrthogonal(netItem)}
-
-        if not orthoNets:
-            return
-
-        newSplitNets = []
-        netsToRemove = set()
-
-        # Process each orthogonal net
-        while orthoNets:
-            orthoNet = orthoNets.pop()
-            orthoNetEndpoints = orthoNet.sceneEndPoints
-            orthoNetRect = orthoNet.sceneShapeRect
-            for netEnd in inputNetEndPoints:
-                if not orthoNetRect.contains(netEnd) or netEnd in orthoNetEndpoints:
-                    continue
-                newNets = [snet.schematicNet(orthoNetEndpoints[0], netEnd, orthoNet.width),
-                    snet.schematicNet(netEnd, orthoNetEndpoints[1], orthoNet.width), ]
-                for newNet in newNets:
-                    newNet.name = orthoNet.name
-                    newSplitNets.append(newNet)
-                netsToRemove.add(orthoNet)
-
-        for newNet in newSplitNets:
-            self.addItem(newNet)
-            newNet.inheritNetName(inputNet)
-
-        # Batch remove items
-        for orthoNet in netsToRemove:
-            self.removeItem(orthoNet)
+    #
+    # def findNetsToSplit(self, inputNet: snet.schematicNet):
+    #     """
+    #     Split orthogonal nets intersecting with input net.
+    #     Args:
+    #     inputNet: net splitting other orthogonal nets
+    #     """
+    #     netSceneRect = inputNet.sceneShapeRect
+    #     sceneItemsInRect = self.items(netSceneRect)
+    #     inputNetEndPoints = inputNet.sceneEndPoints
+    #
+    #     # Pre-filter orthogonal nets
+    #     orthoNets = {netItem for netItem in sceneItemsInRect if
+    #         isinstance(netItem, snet.schematicNet) and inputNet.isOrthogonal(netItem)}
+    #
+    #     if not orthoNets:
+    #         return
+    #
+    #     newSplitNets = []
+    #     netsToRemove = set()
+    #
+    #     # Process each orthogonal net
+    #     while orthoNets:
+    #         orthoNet = orthoNets.pop()
+    #         orthoNetEndpoints = orthoNet.sceneEndPoints
+    #         orthoNetRect = orthoNet.sceneShapeRect
+    #         for netEnd in inputNetEndPoints:
+    #             if not orthoNetRect.contains(netEnd) or netEnd in orthoNetEndpoints:
+    #                 continue
+    #             newNets = [snet.schematicNet(orthoNetEndpoints[0], netEnd, orthoNet.width),
+    #                 snet.schematicNet(netEnd, orthoNetEndpoints[1], orthoNet.width), ]
+    #             for newNet in newNets:
+    #                 newNet.name = orthoNet.name
+    #                 newSplitNets.append(newNet)
+    #             netsToRemove.add(orthoNet)
+    #
+    #     for newNet in newSplitNets:
+    #         self.addItem(newNet)
+    #         newNet.inheritNetName(inputNet)
+    #
+    #     # Batch remove items
+    #     for orthoNet in netsToRemove:
+    #         self.removeItem(orthoNet)
 
     def splitInputNet(self, inputNet) -> tuple[bool, Set[snet.schematicNet]]:
         # Cache frequently accessed properties
+        inputNetWidth = inputNet.width
         sceneShapeRect = inputNet.sceneShapeRect
         sceneItems = self.items(sceneShapeRect)
 
@@ -492,7 +517,7 @@ class schematicScene(editorScene):
         is_selected = inputNet.isSelected()
 
         for i in range(len(orderedPoints) - 1):
-            splitNet = snet.schematicNet(orderedPoints[i], orderedPoints[i + 1])
+            splitNet = snet.schematicNet(orderedPoints[i], orderedPoints[i + 1], inputNetWidth)
             if not splitNet.draftLine.isNull():
                 if is_selected:
                     splitNet.setSelected(True)
@@ -584,6 +609,7 @@ class schematicScene(editorScene):
             currentPoint = points.pop(nearest_point_index)
 
         return orderedPoints
+
 
     @staticmethod
     def findFurthestPoints(points: list[QPoint]) -> tuple[QPoint, QPoint]:
@@ -1059,7 +1085,6 @@ class schematicScene(editorScene):
                 self.undoStack.push(us.addDeleteShapeUndo(self, newInstance, item))
 
     def setNetProperties(self, netItem: snet.schematicNet):
-        self.logger.info(f'net strength: {netItem.nameStrength}')
         dlg = pdlg.netProperties(self.editorWindow)
         dlg.netStartPointEditX.setText(
             str(round(netItem.mapToScene(netItem.draftLine.p1()).x())))
@@ -1476,7 +1501,7 @@ class schematicScene(editorScene):
 
         # If it contains any of <, >, or :, check if it ends with complete pattern
         match = bus_pattern.match(text)
-        if match.hasMatch():
+        if match.hasMatch() and text.count('<') == 1 and text.count('>') == 1:
             return True
         return False
 
