@@ -50,7 +50,6 @@ import revedaEditor.backend.dataDefinitions as ddef
 import revedaEditor.backend.libraryMethods as libm
 import revedaEditor.backend.libraryModelView as lmview
 import revedaEditor.backend.libBackEnd as libb
-import revedaEditor.common.net as net
 import revedaEditor.common.shapes as shp  # import the shapes
 import revedaEditor.fileio.symbolEncoder as symenc
 import revedaEditor.gui.editorViews as edv
@@ -118,8 +117,8 @@ class schematicEditor(edw.editorWindow):
         self.menuCreate.addAction(self.createSymbolAction)
 
         # check menu
-        # self.menuCheck.addAction(self.viewErrorsAction)
-        # self.menuCheck.addAction(self.deleteErrorsAction)
+        self.menuCheck.addAction(self.viewErrorsAction)
+        self.menuCheck.addAction(self.deleteErrorsAction)
 
         # tools menu
         self.menuTools.addAction(self.hilightNetAction)
@@ -154,9 +153,11 @@ class schematicEditor(edw.editorWindow):
         self.simulateAction.triggered.connect(self.startSimClick)
         self.ignoreAction.triggered.connect(self.ignoreClick)
         self.goDownAction.triggered.connect(self.goDownClick)
+        self.viewErrorsAction.triggered.connect(self.checkErrorsClick)
+        self.deleteErrorsAction.triggered.connect(self.deleteErrorsClick)
 
         self.hilightNetAction.triggered.connect(self.hilightNetClick)
-        self.netNameAction.triggered.connect(self.netNameClick)
+        self.netNameAction.triggered.connect(self.createNetNameClick)
         self.selectDeviceAction.triggered.connect(self.selectDeviceClick)
         self.selectNetAction.triggered.connect(self.selectNetClick)
         self.selectPinAction.triggered.connect(self.selectPinClick)
@@ -470,12 +471,12 @@ class schematicEditor(edw.editorWindow):
     def ignoreClick(self, s):
         self.centralW.scene.ignoreSymbol()
 
-    def netNameClick(self, s):
-        # self.centralW.scene.netNameEdit()
-        if self.centralW.scene.selectedItems() is not None:
-            for item in self.centralW.scene.selectedItems():
-                if isinstance(item, net.schematicNet):
-                    self.centralW.scene.setNetProperties(item)
+    def createNetNameClick(self, s):
+        dlg = pdlg.netNameDialog(self)
+        if dlg.exec() == QDialog.Accepted:
+            self.centralW.scene.netNameString = dlg.netNameEdit.text().strip()
+            self.centralW.scene.editModes.setMode('nameNet')
+        self.messageLine.setText("Select a net to attach the name")
 
     def hilightNetClick(self, s):
         self.centralW.scene.hilightNets()
@@ -688,6 +689,14 @@ class schematicEditor(edw.editorWindow):
             self.appMainW.openViews[openCellViewTuple] = symbolWindow
             symbolWindow.show()
 
+    def checkErrorsClick(self):
+        self.centralW.scene.checkErrors()
+        self.logger.info("Schematic Errors checked.")
+
+    def deleteErrorsClick(self):
+        self.centralW.scene.deleteErrors()
+        self.logger.info("Schematic Errors checked.")
+
 class schematicContainer(QWidget):
     def __init__(self, parent: schematicEditor):
         super().__init__(parent=parent)
@@ -836,7 +845,6 @@ class xyceNetlist:
 
                 if viewTuple not in self.netlistedViewsSet:
                     self.netlistedViewsSet.add(viewTuple)
-                    pinOrderString = elementSymbol.symattrs.get("pinOrder", ", ")
                     pinList = elementSymbol.symattrs.get("pinOrder", ", ").replace(",", " ")
                     cirFile.write(f".SUBCKT {schematicObj.cellName} {pinList}\n")
                     self.recursiveNetlisting(schematicObj, cirFile)
