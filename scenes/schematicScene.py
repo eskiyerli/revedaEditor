@@ -1480,7 +1480,6 @@ class schematicScene(editorScene):
         namedNetsSet = set(
             itt.filterfalse(lambda x: x.nameStrength.value != 3, sceneNetsSet)
         )
-        [netItem.highlight() for netItem in namedNetsSet]
         sceneNetsSet -= namedNetsSet
         while namedNetsSet:
             netItem = namedNetsSet.pop()
