@@ -135,7 +135,6 @@ class schematicScene(editorScene):
         self.overlapRectSet = set()
 
         # Initialize view properties
-        self.defineSnapRect()
         self.highlightNets = False
         self.hierarchyTrail = ""
 
@@ -169,12 +168,13 @@ class schematicScene(editorScene):
         self.fixedFont.setKerning(False)
 
     def defineSnapRect(self):
-        self._snapPointRect = QGraphicsRectItem()
-        self._snapPointRect.setRect(QRect(-2, -2, 4, 4))
-        self._snapPointRect.setZValue(100)
-        self._snapPointRect.setVisible(False)
-        self._snapPointRect.setPen(schlyr.guideLinePen)
-        return self._snapPointRect
+        snapPointRect = QGraphicsRectItem()
+        snapPointRect.setRect(QRect(-2, -2, 4, 4))
+        snapPointRect.setZValue(100)
+        snapPointRect.setVisible(False)
+        snapPointRect.setPen(schlyr.guideLinePen)
+
+        return snapPointRect
 
     @property
     def drawMode(self):
@@ -979,7 +979,7 @@ class schematicScene(editorScene):
 
             # Create temporary file in the same directory
             temp_file = file.with_suffix(".tmp")
-
+            self.removeItem(self._snapPointRect)
             # Write to temporary file first
             with self.measureDuration():
                 with temp_file.open(mode="w", buffering=8192) as f:
@@ -994,7 +994,6 @@ class schematicScene(editorScene):
                     json.dump(header_items[0], f)
                     f.write(",\n")
                     json.dump(header_items[1], f)
-                    self.removeItem(self._snapPointRect)
                     # Get top-level items more efficiently
                     topLevelItems = {
                         item for item in self.items() if item.parentItem() is None
@@ -1025,7 +1024,7 @@ class schematicScene(editorScene):
                     f"Saved schematic to {self.editorWindow.cellName}:"
                     f"{self.editorWindow.viewName}"
                 )
-
+                self.addItem(self._snapPointRect)
         except IOError as io_err:
             self.logger.error(f"IO Error while saving schematic: {str(io_err)}")
             return
@@ -1073,11 +1072,9 @@ class schematicScene(editorScene):
                     return
                 self._configure_grid_settings(gridSettings)
                 self.createSchematicItems(itemData)
-                if self._snapPointRect.scene():
-                    self.removeItem(self._snapPointRect)
                 self._snapPointRect = self.defineSnapRect()
                 self.addItem(self._snapPointRect)
-
+                print(self._snapPointRect)
         except (json.JSONDecodeError, FileNotFoundError) as e:
             self.logger.error(f"File error while loading schematic: {e}")
             return
@@ -1116,10 +1113,9 @@ class schematicScene(editorScene):
 
     def reloadScene(self):
         super().reloadScene()
-        if self._snapPointRect:
-            self.removeItem(self._snapPointRect)
         self._snapPointRect = self.defineSnapRect()
         self.addItem(self._snapPointRect)
+
 
     def viewObjProperties(self):
         """
