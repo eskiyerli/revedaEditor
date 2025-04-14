@@ -64,7 +64,8 @@ class editorWindow(QMainWindow):
         self.parentEditor = None  # type: editorWindow
         self.parentObj = None  # type symbol or layoutInstance
         self._app = QApplication.instance()  # main application pointer
-        self.appMainW = self.libraryView.parent.parent.appMainW
+        # self.appMainW = self.libraryView.parent.parent.appMainW
+        self.appMainW = self._app.mainW
         self.logger = self.appMainW.logger
         self.switchViewList = self.appMainW.switchViewList
         self.stopViewList = self.appMainW.stopViewList
