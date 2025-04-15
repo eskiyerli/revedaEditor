@@ -25,8 +25,8 @@
 
 
 import pathlib
-
-# import numpy as np
+from contextlib import contextmanager
+import time
 from PySide6.QtCore import (Qt, QSize, Signal,)
 from PySide6.QtGui import (QAction, QIcon, QImage, QKeySequence, QPainter,)
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
@@ -696,4 +696,12 @@ class editorWindow(QMainWindow):
         self.centralW.scene.selectionChanged.connect(self.appMainW.selectionChangedScene)
         self.centralW.view.keyPressedSignal.connect(self.appMainW.viewKeyPressed)
         
-    
+
+    @contextmanager
+    def measureDuration(self):
+        start_time = time.perf_counter()
+        try:
+            yield
+        finally:
+            end_time = time.perf_counter()
+            self.logger.info(f"Total processing time: {end_time - start_time:.3f} seconds")
