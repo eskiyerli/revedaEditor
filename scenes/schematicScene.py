@@ -29,6 +29,7 @@ import os
 import pathlib
 from collections import Counter
 
+import re
 from typing import Union, Set, Dict, Tuple, List
 from PySide6.QtCore import (
     QPoint,
@@ -697,7 +698,7 @@ class schematicScene(editorScene):
                     netItem.sceneEndPoints[1], netItem.sceneEndPoints[0]
                 )
         self._stretchNet.stretch = True
-        self._stretchNet.splitNetNames(netItem)
+        self._stretchNet.mergeNetName(netItem)
         addDeleteStretchNetCommand = us.addDeleteShapeUndo(
             self, self._stretchNet, netItem
         )
@@ -769,6 +770,7 @@ class schematicScene(editorScene):
         Find all the symbols on the scene as a set.
         """
         return {item for item in self.items() if isinstance(item, shp.schematicSymbol)}
+        
 
     def findSceneNetsSet(self) -> set[snet.schematicNet]:
         return {item for item in self.items() if isinstance(item, snet.schematicNet)}
@@ -1074,7 +1076,6 @@ class schematicScene(editorScene):
                 self.createSchematicItems(itemData)
                 self._snapPointRect = self.defineSnapRect()
                 self.addItem(self._snapPointRect)
-                print(self._snapPointRect)
         except (json.JSONDecodeError, FileNotFoundError) as e:
             self.logger.error(f"File error while loading schematic: {e}")
             return
