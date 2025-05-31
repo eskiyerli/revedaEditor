@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -259,16 +258,20 @@ class schematicItems:
         end = QPoint(item["end"][0], item["end"][1])
         width = item.get('w',0)
         netItem = net.schematicNet(start, end, width)
+        netItem.name = item["nam"]
         match item["ns"]:
             case 3:
+
                 netItem.nameStrength = net.netNameStrengthEnum.SET
             case 2:
+
                 netItem.nameStrength = net.netNameStrengthEnum.INHERIT
             case 1:
+
                 netItem.nameStrength = net.netNameStrengthEnum.WEAK
             case _:
                 netItem.nameStrength = net.netNameStrengthEnum.NONAME
-        netItem.name = item["nam"]
+
         return netItem
 
     def _createSymbolShape(self, item):

@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -23,8 +22,8 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 
 from typing import List, Sequence
-from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt)
-from PySide6.QtGui import (QGuiApplication)
+from PySide6.QtCore import (QEvent, QPoint, QRectF, Qt, )
+from PySide6.QtGui import (QGuiApplication, QTransform,)
 from PySide6.QtWidgets import (QGraphicsScene, QMenu, QGraphicsItem,
                                QDialog,
                                QCompleter)
@@ -94,6 +93,17 @@ class editorScene(QGraphicsScene):
         self.installEventFilter(self)
         self.setMinimumRenderSize(2)
 
+
+    def contextMenuEvent(self, event):
+        clickedItem = self.itemAt(event.scenePos(), QTransform())
+        if clickedItem is None:
+            for item in self.selectedItems():
+                item.setSelected(False)
+            self._selectedItems = []
+            self._selectedItemGroup = None
+            self._groupItems = []
+            self.messageLine.setText("No item selected")
+        super().contextMenuEvent(event)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)

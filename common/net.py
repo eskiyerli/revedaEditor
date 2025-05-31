@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -365,7 +364,6 @@ class schematicNet(QGraphicsItem):
                 case 2 | 3:  # INHERIT or SET
                     resolve_name(self, otherNet)
                     return True
-            
 
         if self_strength == 0:  # NONAME
             if other_strength > 0:
@@ -586,13 +584,12 @@ class netName(QGraphicsSimpleTextItem):
             self.setRotation(self._parent.angle)
             self._draftLineCenter = self._parent.draftLine.center()
 
-    def setSelected(self, selected):
-        super().setSelected(selected)
-        if selected:
-            self.setBrush(schlyr.selectedWireBrush)
+    def paint(self, painter, option, widget, /):
+        if self._nameStrength == netNameStrengthEnum.SET:
+            super().paint(painter, option, widget)
         else:
-            self.setBrush(schlyr.wireBrush)
-        self.update()
+            # Do not paint the name if the strength is not SET
+            pass
 
     @property
     def nameConflict(self) -> bool:
@@ -627,10 +624,11 @@ class netName(QGraphicsSimpleTextItem):
         self.prepareGeometryChange()
         self.setText(value)
         self.setRotation(self._parent.angle)
-        if self._nameStrength == netNameStrengthEnum.SET:
-            self.setVisible(True)
-        else:
-            self.setVisible(False)
+        self.parentItem().update()
+        # if self._nameStrength == netNameStrengthEnum.SET:
+        #     self.setVisible(True)
+        # else:
+        #     self.setVisible(False)
 
     @property
     def parent(self):

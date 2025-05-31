@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -39,7 +38,6 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (QTableView, QMenu, QGraphicsItem, )
 import numpy as np
 import os
-from dotenv import load_dotenv
 from revedaEditor.backend.pdkPaths import importPDKModule
 fabproc = importPDKModule('process')
 laylyr = importPDKModule('layoutLayers')

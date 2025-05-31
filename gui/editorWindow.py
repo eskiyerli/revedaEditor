@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -27,6 +26,7 @@
 import pathlib
 from contextlib import contextmanager
 import time
+from logging import getLogger
 from PySide6.QtCore import (Qt, QSize, Signal,)
 from PySide6.QtGui import (QAction, QIcon, QImage, QKeySequence, QPainter,)
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
@@ -46,15 +46,16 @@ class editorWindow(QMainWindow):
     """
     Base class for editor windows.
     """
+    MAIN_LOGGER = "reveda"
 
 
     def __init__(self, viewItem: libb.viewItem, libraryDict: dict,
-                 libraryView: lmview.designLibrariesView, ):  # file is a pathlib.Path object
+                 libraryView: lmview.BaseDesignLibrariesView, ):
         super().__init__()
         self.centralW = None
         self.viewItem = viewItem
         self.file: pathlib.Path = self.viewItem.data(Qt.UserRole + 2)  # pathlib Path object
-        self.cellItem = self.viewItem.parent()
+        self.cellItem: libb.cellItem = self.viewItem.parent()
         self.cellName = self.cellItem.cellName
         self.libItem = self.cellItem.parent()
         self.libName: str = self.libItem.libraryName
@@ -66,7 +67,7 @@ class editorWindow(QMainWindow):
         self._app = QApplication.instance()  # main application pointer
         # self.appMainW = self.libraryView.parent.parent.appMainW
         self.appMainW = self._app.mainW
-        self.logger = self.appMainW.logger
+        self.logger = getLogger(self.MAIN_LOGGER)
         self.switchViewList = self.appMainW.switchViewList
         self.stopViewList = self.appMainW.stopViewList
         self.statusLine = self.statusBar()
@@ -695,7 +696,7 @@ class editorWindow(QMainWindow):
     def _createSignalConnections(self):
         self.centralW.scene.selectionChanged.connect(self.appMainW.selectionChangedScene)
         self.centralW.view.keyPressedSignal.connect(self.appMainW.viewKeyPressed)
-        
+
 
     @contextmanager
     def measureDuration(self):

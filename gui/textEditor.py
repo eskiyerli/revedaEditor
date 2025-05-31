@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -179,9 +178,8 @@ class XyceHighlighter(BaseHighlighter):
 class textEditor(QMainWindow):
     closedSignal = Signal(QObject)
 
-    def __init__(self, parent, fileName: str = ""):
-        super().__init__(parent=parent)
-        self.parent = parent
+    def __init__(self, fileName: str = ""):
+        super().__init__()
         self.fileName: str = fileName
         self.textEdit = QTextEdit()
         self.setCentralWidget(self.textEdit)
@@ -356,8 +354,8 @@ class textEditor(QMainWindow):
 
 
 class jsonEditor(textEditor):
-    def __init__(self, parent, fileName=""):
-        super().__init__(parent, fileName)
+    def __init__(self, fileName=""):
+        super().__init__(fileName)
         self.initEditor()
         self.setWindowTitle("JSON Editor")
 
@@ -367,8 +365,8 @@ class jsonEditor(textEditor):
 
 
 class verilogaEditor(textEditor):
-    def __init__(self, parent, fileName=""):
-        super().__init__(parent, fileName)
+    def __init__(self, fileName=""):
+        super().__init__(fileName)
         self.initEditor()
         self.setWindowTitle("Verilog-A Editor")
 
@@ -402,8 +400,8 @@ class verilogaEditor(textEditor):
 
 
 class xyceEditor(textEditor):
-    def __init__(self, parent, fileName=""):
-        super().__init__(parent, fileName)
+    def __init__(self, fileName=""):
+        super().__init__(fileName)
         self.initEditor()
         self.setWindowTitle("Xyce/SPICE Editor")
 

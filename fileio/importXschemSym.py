@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -23,6 +22,7 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 import pathlib
+import re
 from pathlib import Path
 
 from PySide6.QtCore import (QPoint, QRect, )
@@ -39,8 +39,6 @@ from revedaEditor.backend.pdkPaths import importPDKModule
 
 cb = importPDKModule('callbacks')
 
-import re
-
 
 class importXschemSym:
     """
@@ -48,7 +46,7 @@ class importXschemSym:
     """
 
     def __init__(self, parent: QMainWindow, filePathObj: Path,
-            libraryView: lmview.designLibrariesView, libraryName: str, ):
+            libraryView: lmview.BaseDesignLibrariesView, libraryName: str, ):
         self.parent = parent
         self.filePathObj = filePathObj
         self.libraryView = libraryView

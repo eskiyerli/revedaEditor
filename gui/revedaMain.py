@@ -9,8 +9,7 @@
 #
 #    For purposes of the foregoing, “Sell” means practicing any or all of the rights
 #    granted to you under the License to provide to third parties, for a fee or other
-#    consideration (including without limitation fees for hosting or consulting/
-#    support services related to the Software), a product or service whose value
+#    consideration (including without limitation fees for hosting) a product or service whose value
 #    derives, entirely or substantially, from the functionality of the Software. Any
 #    license notice or attribution required by the License must also include this
 #    Commons Clause License Condition notice.
@@ -22,10 +21,9 @@
 #    Licensor: Revolution Semiconductor (Registered in the Netherlands)
 #
 import json
-import logging
-import logging.config
 import pathlib
 import shutil
+import logging
 from typing import List, Dict
 from PySide6.QtCore import (QThreadPool, QThread, Slot, Signal, QTimer, QObject, QSize)
 from PySide6.QtGui import (
@@ -100,7 +98,6 @@ class MainWindow(QMainWindow):
         'switch': frozenset({"schematic", "veriloga", "spice", "symbol"}),
         'stop': frozenset({"symbol"})
     }
-    APP_LOGGER_NAME = "reveda"
     PATHS = {
         'defaultPDK': "defaultPDK",
         'testbenches': "testbenches",
@@ -122,6 +119,7 @@ class MainWindow(QMainWindow):
         self._init_data_structures()
         self._init_paths()
         self._init_app_components()
+        self.logger_def()
 
     def _init_window(self) -> None:
         """Initialize window properties and UI components."""
@@ -163,10 +161,10 @@ class MainWindow(QMainWindow):
             else:
                 self.runPath = pathlib.Path.cwd()
             if hasattr(self._app, "revedaPdkPathObj"):
-                self.simulationInpPath = self._app.revedaPdkPathObj
+                self.pdkPath = self._app.revedaPdkPathObj
             else:
-                self.simulationInpPath = self.runPath / self.PATHS["defaultPDK"]
-            self.simulationOutPath = self.runPath.parent / self.PATHS['testbenches']
+                self.pdkPath = self.runPath / self.PATHS["defaultPDK"]
+            self.outputPrefixPath = self.runPath.parent / self.PATHS['testbenches']
             self.libraryPathObj = self.runPath / self.PATHS['library']
             self.confFilePath = self.runPath / self.PATHS['config']
         except Exception as e:
@@ -177,7 +175,7 @@ class MainWindow(QMainWindow):
         try:
             # Core application components
             self.app = QApplication.instance()
-            self.logger = logging.getLogger(self.APP_LOGGER_NAME)
+            self.logger = self.app.logger
 
             # Library components
             self.libraryDict = self.readLibDefFile(self.libraryPathObj)
@@ -187,7 +185,7 @@ class MainWindow(QMainWindow):
             self._setup_thread_pool()
 
             # Final initialization
-            self.logger_def()
+
             self.loadState()
         except Exception as e:
             self._handle_init_error("Application component initialization failed", e)
@@ -207,42 +205,14 @@ class MainWindow(QMainWindow):
             self.logger.error(f"{message}: {str(error)}")
         raise RuntimeError(f"{message}: {str(error)}")
 
-#
-#
-# class MainWindow(QMainWindow):
-#     sceneSelectionChanged = Signal(QGraphicsScene)
-#     keyPressedView = Signal(int)
-#
-#
-#     def __init__(self):
-#         super().__init__()
-#         self.resize(900, 300)
-#         self._createActions()
-#         self._createMenuBar()
-#         self._createTriggers()
-#
-#         self.switchViewList = ["schematic", "veriloga", "spice", "symbol"]
-#         self.stopViewList = ["symbol"]
-#         self.openViews = dict()
-#         # create container to position all widgets
-#         self.centralW = mainwContainer(self)
-#         self.setCentralWidget(self.centralW)
-#         self.mainW_statusbar = self.statusBar()
-#         self.mainW_statusbar.showMessage("Ready")
-#         self.app = QApplication.instance()
-#         self.logger = logging.getLogger("reveda")
-#         # library definition file path
-#         self.runPath = pathlib.Path.cwd()  # all paths should refer to this
-#         self.simulationOutputPath = self.runPath.parent / "testbenches"  # good default
-#         # look for library.json file where the script is invoked
-#         self.libraryPathObj = self.runPath.joinpath("library.json")
-#         self.libraryDict = self.readLibDefFile(self.libraryPathObj)
-#         self.libraryBrowser = libw.libraryBrowser(self)
-#         self.threadPool = QThreadPool.globalInstance()
-#         self.confFilePath = self.runPath.joinpath("reveda.conf")
-#         self.logger_def()
-#         # now check the configuration file
-#         self.loadState()
+    def logger_def(self):
+
+        c_handler = logging.StreamHandler(stream=self.centralW.console)
+        c_handler.setLevel(logging.INFO)
+        c_format = logging.Formatter("%(levelname)s - %(message)s")
+        c_handler.setFormatter(c_format)
+        self.logger.addHandler(c_handler)
+
 
     def _createMenuBar(self):
         self.mainW_menubar = self.menuBar()
@@ -323,47 +293,14 @@ class MainWindow(QMainWindow):
         self.libraryBrowser.show()
         self.libraryBrowser.raise_()
 
-    def logger_def(self):
-        logging.basicConfig(level=logging.INFO)
-
-        c_handler = logging.StreamHandler(stream=self.centralW.console)
-        c_handler.setLevel(logging.INFO)
-        c_format = logging.Formatter("%(levelname)s - %(message)s")
-        c_handler.setFormatter(c_format)
-        f_handler = logging.FileHandler("reveda.log")
-        f_handler.setLevel(logging.INFO)
-        f_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        f_handler.setFormatter(f_format)
-        self.logger.addHandler(c_handler)
-        self.logger.addHandler(f_handler)
-
-
-    # def optionsClick(self):
-    #     dlg = fd.appProperties(self)
-    #     dlg.runPathEdit.setText(str(self.runPath))
-    #     dlg.simOutPathEdit.setText(str(self.simulationOutputPath))
-    #     dlg.switchViewsEdit.setText(", ".join(self.switchViewList))
-    #     dlg.stopViewsEdit.setText(", ".join(self.stopViewList))
-    #
-    #     if dlg.exec() == QDialog.Accepted:
-    #         self.runPath = pathlib.Path(dlg.runPathEdit.text())
-    #         self.simulationOutputPath = pathlib.Path(dlg.simOutPathEdit.text())
-    #         self.switchViewList = [
-    #             switchView.strip() for switchView in dlg.switchViewsEdit.text().split(",")
-    #         ]
-    #         self.stopViewList = [
-    #             stopView.strip() for stopView in dlg.stopViewsEdit.text().split(",")
-    #         ]
-    #         if dlg.optionSaveBox.isChecked():
-    #             self.saveState()
     def optionsClick(self):
         dlg = fd.appProperties(self)
 
         # Set initial values more efficiently using a dictionary
         initial_values = {
             'rootPathEdit': str(self.runPath),
-            'simInpPathEdit': str(self.simulationInpPath),
-            'simOutPathEdit': str(self.simulationOutPath),
+            'simInpPathEdit': str(self.pdkPath),
+            'simOutPathEdit': str(self.outputPrefixPath),
             'switchViewsEdit': ", ".join(self.switchViewList),
             'stopViewsEdit': ", ".join(self.stopViewList)
         }
@@ -384,8 +321,8 @@ class MainWindow(QMainWindow):
 
             # Update paths
             self.runPath = pathlib.Path(text_values['rootPathEdit'])
-            self.simulationInpPath = pathlib.Path(text_values['simInpPathEdit'])
-            self.simulationOutPath = pathlib.Path(text_values['simOutPathEdit'])
+            self.pdkPath = pathlib.Path(text_values['simInpPathEdit'])
+            self.outputPrefixPath = pathlib.Path(text_values['simOutPathEdit'])
 
             # Process lists in a more compact way
             self.switchViewList = [x.strip() for x in text_values['switchViewsEdit'].split(',')]
@@ -554,7 +491,7 @@ class MainWindow(QMainWindow):
         warning.setDefaultButton(QMessageBox.Yes)
         ret = warning.exec()
         if ret == QMessageBox.Yes:
-            
+
             libDialog = QFileDialog(self, "Select Parent Directory", self.runPath)
             libDialog.setFileMode(QFileDialog.Directory)
             if libDialog.exec() == QDialog.Accepted:
@@ -597,8 +534,8 @@ class MainWindow(QMainWindow):
             # Define default values and paths in a dictionary
             path_settings = {
                 'runPath': ('runPath', self.runPath),
-                'simulationInpPath': ('simulationInpPath', self.simulationInpPath),
-                'simulationOutPath': ('simulationOutPath', self.simulationOutPath)
+                'pdkPath': ('pdkPath', self.pdkPath),
+                'outputPrefixPath': ('outputPrefixPath', self.outputPrefixPath)
             }
 
             # Update paths
@@ -621,8 +558,8 @@ class MainWindow(QMainWindow):
     #             items = json.load(f)
     #         if items:
     #             self.runPath = pathlib.Path(items.get("runPath", os.getcwd()))
-    #             self.simulationInpPath = pathlib.Path(items.get("simulationInpPath", self.simulationInpPath))
-    #             self.simulationOutPath = pathlib.Path(items.get("simulationOutPath", self.simulationInpPath))
+    #             self.pdkPath = pathlib.Path(items.get("pdkPath", self.pdkPath))
+    #             self.outputPrefixPath = pathlib.Path(items.get("outputPrefixPath", self.pdkPath))
     #             if items.get("switchViewList")[0] != "":
     #                 self.switchViewList = items.get("switchViewList", "")
     #             if items.get("stopViewList")[0] != "":
@@ -631,8 +568,8 @@ class MainWindow(QMainWindow):
     def saveState(self):
         items = {
             "runPath": str(self.runPath),
-            "simulationInpPath": str(self.simulationInpPath),
-            "simulationOutPath": str(self.simulationOutPath),
+            "pdkPath": str(self.pdkPath),
+            "outputPrefixPath": str(self.outputPrefixPath),
             "switchViewList": self.switchViewList,
             "stopViewList": self.stopViewList,
         }
@@ -650,9 +587,9 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             if not self.threadPool.waitForDone(5000):
                 self.threadPool.clear()
-            # for item in self.app.topLevelWidgets():
-            #     item.close()
-            self.app.closeAllWindows()
+            for item in self.app.topLevelWidgets():
+                item.close()
+            # self.app.closeAllWindows()
         else:
             event.ignore()
 
@@ -667,7 +604,9 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             if not self.threadPool.waitForDone(5000):
                 self.threadPool.clear()
-            self.app.closeAllWindows()
+            for item in self.app.topLevelWidgets():
+                item.close()
+            # self.app.closeAllWindows()
 
 
     @Slot()
